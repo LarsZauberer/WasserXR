@@ -1,20 +1,20 @@
 #include <glad/gl.h>
 
 #include <GLFW/glfw3.h>
+#include <TheSeed/Window.hpp>
 #include <iostream>
 #include <string>
-#include <theSeed/Window.hpp>
 
-namespace theSeed::core {
+namespace TheSeed::core {
 struct Window::Impl {
   std::string name;
 
   GLFWwindow *window;
-
-  static void setViewport(GLFWwindow *window, int width, int height) {
-    glViewport(0, 0, width, height);
-  }
 };
+
+static void setViewport(GLFWwindow *window, int width, int height) {
+  glViewport(0, 0, width, height);
+}
 
 Window::Window() : pImpl(std::make_unique<Impl>()) {}
 Window::~Window() = default;
@@ -38,9 +38,9 @@ int Window::create(std::string name, int width, int height) {
   }
 
   // Width and height are set within the setViewport
-  this->pImpl->setViewport(this->pImpl->window, width, height);
+  setViewport(this->pImpl->window, width, height);
 
-  glfwSetFramebufferSizeCallback(this->pImpl->window, this->pImpl->setViewport);
+  glfwSetFramebufferSizeCallback(this->pImpl->window, setViewport);
 
   return 0;
 }
@@ -58,4 +58,8 @@ GLFWwindow *Window::get_window() { return this->pImpl->window; }
 
 void Window::terminate() { glfwTerminate(); }
 
-} // namespace theSeed::core
+bool Window::should_terminate() {
+  return glfwWindowShouldClose(this->get_window());
+}
+
+} // namespace TheSeed::core
