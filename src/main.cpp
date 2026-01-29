@@ -1,10 +1,10 @@
-#include "theSeed/Window.hpp"
+#include "TheSeed/Window.hpp"
 
 #include <memory>
 
 int main() {
-  std::unique_ptr<theSeed::core::Window> window =
-      std::make_unique<theSeed::core::Window>();
+  std::unique_ptr<TheSeed::core::Window> window =
+      std::make_unique<TheSeed::core::Window>();
 
   window->initialize();
   window->create("TheSeed", 800, 600);

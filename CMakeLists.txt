@@ -12,9 +12,9 @@ add_compile_options(-Wall -Wextra -Wpedantic -O1 -g)
 include_directories(include)
 
 # OpenGL
-add_library(glad STATIC src/gl.c)
+add_library(glad STATIC src/glad/gl.c)
 
-add_library(theSeed SHARED src/Window.cpp)
+add_library(theSeed SHARED src/TheSeed/Window.cpp)
 target_link_libraries(theSeed glad glfw)
 
 # Generate main executable

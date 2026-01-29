@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>
 #include <memory>
+
 namespace TheSeed::core {
 class Window {
   struct Impl;
