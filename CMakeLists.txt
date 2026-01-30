@@ -18,11 +18,11 @@ include_directories(include)
 add_library(glad STATIC src/glad/gl.c)
 
 add_library(theSeed SHARED src/TheSeed/Window.cpp src/TheSeed/Entity.cpp src/TheSeed/Scene.cpp)
-target_link_libraries(theSeed glad glfw)
+target_link_libraries(theSeed PRIVATE glad glfw)
 
 # Generate main executable
 add_executable(main src/main.cpp)
-target_link_libraries(main glad glfw theSeed)
+target_link_libraries(main PRIVATE theSeed glfw)
 
 install(TARGETS main glad
     RUNTIME DESTINATION bin
