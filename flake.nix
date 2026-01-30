@@ -24,6 +24,8 @@
           buildInputs = [
             pkgs.gcc
             pkgs.cmake
+            pkgs.ccache
+
             pkgs.glfw
           ];
 

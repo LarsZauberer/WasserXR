@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-Wall -Wextra -Wpedantic -O1 -g)
+set(CMAKE_C_COMPILER_LAUNCHER ccache)
+set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+
+add_compile_options(-Wall -Wextra -O0)
 
 # Set global include directories
 include_directories(include)
@@ -14,7 +17,7 @@ include_directories(include)
 # OpenGL
 add_library(glad STATIC src/glad/gl.c)
 
-add_library(theSeed SHARED src/TheSeed/Window.cpp)
+add_library(theSeed SHARED src/TheSeed/Window.cpp src/TheSeed/Entity.cpp src/TheSeed/Scene.cpp)
 target_link_libraries(theSeed glad glfw)
 
 # Generate main executable

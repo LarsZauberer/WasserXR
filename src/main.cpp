@@ -1,3 +1,4 @@
+#include "TheSeed/Scene.hpp"
 #include "TheSeed/Window.hpp"
 
 #include <memory>
@@ -9,9 +10,13 @@ int main() {
   window->initialize();
   window->create("TheSeed", 800, 600);
 
+  TheSeed::ecs::Scene scene;
+
   while (!glfwWindowShouldClose(window->get_window())) {
     glfwSwapBuffers(window->get_window());
     glfwPollEvents();
+
+    scene.update();
   }
 
   return 0;
