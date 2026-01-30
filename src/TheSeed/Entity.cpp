@@ -12,6 +12,8 @@ struct Entity::Impl {
 
 Entity::Entity() { this->pimpl = std::make_unique<Impl>(); }
 
+Entity::~Entity() {}
+
 bool Entity::addComponent(std::unique_ptr<IComponent> c) {
   if (this->pimpl->components.contains(c->getId())) {
     return false;

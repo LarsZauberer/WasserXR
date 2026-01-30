@@ -16,7 +16,7 @@ class Scene {
 
 public:
   Scene();
-  ~Scene() = default;
+  ~Scene();
 
   Entity *createEntity();
   std::vector<Entity *> query(std::vector<std::string>);

@@ -14,6 +14,7 @@ struct Scene::Impl {
 };
 
 Scene::Scene() { this->pimpl = std::make_unique<Impl>(); }
+Scene::~Scene() {}
 
 Entity *Scene::createEntity() {
   std::unique_ptr<Entity> e = std::make_unique<Entity>();
@@ -49,6 +50,23 @@ void Scene::update() {
   for (const auto &[id, s] : this->pimpl->systems) {
     s->update();
   }
+}
+
+std::vector<Entity *> Scene::query(std::vector<std::string> s) {
+  std::vector<Entity *> res;
+  for (const auto &e : this->pimpl->entities) {
+    bool found = false;
+    for (const auto &i : s) {
+      if (!e->getComponent(i).has_value()) {
+        continue;
+      }
+      found = true;
+    }
+    if (found) {
+      res.push_back(e.get());
+    }
+  }
+  return res;
 }
 
 } // namespace TheSeed::ecs

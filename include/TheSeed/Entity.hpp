@@ -11,7 +11,7 @@ class Entity {
 
 public:
   Entity();
-  ~Entity() = default;
+  ~Entity();
 
   bool addComponent(std::unique_ptr<IComponent>);
   std::optional<IComponent *> getComponent(std::string);
