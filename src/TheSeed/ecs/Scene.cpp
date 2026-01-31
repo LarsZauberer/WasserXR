@@ -1,6 +1,6 @@
-#include "TheSeed/Entity.hpp"
-#include "TheSeed/ISystem.hpp"
-#include <TheSeed/Scene.hpp>
+#include "TheSeed/ecs/Entity.hpp"
+#include "TheSeed/ecs/ISystem.hpp"
+#include <TheSeed/ecs/Scene.hpp>
 #include <map>
 #include <memory>
 #include <optional>

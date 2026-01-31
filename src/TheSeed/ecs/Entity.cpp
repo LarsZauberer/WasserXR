@@ -1,5 +1,5 @@
-#include "TheSeed/IComponent.hpp"
-#include <TheSeed/Entity.hpp>
+#include "TheSeed/ecs/Entity.hpp"
+#include "TheSeed/ecs/IComponent.hpp"
 #include <map>
 #include <memory>
 #include <optional>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "TheSeed/Components/Transform.hpp"
-#include "TheSeed/ISystem.hpp"
+#include "TheSeed/components/Transform.hpp"
+#include "TheSeed/ecs/ISystem.hpp"
 #include <iostream>
 
 namespace TheSeed::systems {

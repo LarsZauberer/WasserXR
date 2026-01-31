@@ -1,7 +1,7 @@
-#include "TheSeed/Components/Transform.hpp"
-#include "TheSeed/Scene.hpp"
-#include "TheSeed/Systems/Gravity.hpp"
-#include "TheSeed/Window.hpp"
+#include "TheSeed/components/Transform.hpp"
+#include "TheSeed/core/Window.hpp"
+#include "TheSeed/ecs/Scene.hpp"
+#include "TheSeed/systems/Gravity.hpp"
 
 #include <memory>
 

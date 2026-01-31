@@ -1,7 +1,7 @@
 #pragma once
 
-#include "TheSeed/Entity.hpp"
-#include "TheSeed/ISystem.hpp"
+#include "TheSeed/ecs/Entity.hpp"
+#include "TheSeed/ecs/ISystem.hpp"
 #include <memory>
 #include <optional>
 #include <vector>

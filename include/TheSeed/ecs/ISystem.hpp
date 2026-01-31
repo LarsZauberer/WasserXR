@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TheSeed/Scene.hpp"
+#include "TheSeed/ecs/Scene.hpp"
 
 namespace TheSeed::ecs {
 

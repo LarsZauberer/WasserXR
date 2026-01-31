@@ -1,7 +1,7 @@
 #include <glad/gl.h>
 
 #include <GLFW/glfw3.h>
-#include <TheSeed/Window.hpp>
+#include <TheSeed/core/Window.hpp>
 #include <iostream>
 #include <string>
 

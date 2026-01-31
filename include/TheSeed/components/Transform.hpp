@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TheSeed/IComponent.hpp"
+#include "TheSeed/ecs/IComponent.hpp"
 #include <string>
 
 namespace TheSeed::components {
