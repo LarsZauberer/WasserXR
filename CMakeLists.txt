@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(TheSeed LANGUAGES CXX C)
+project(TheSeed LANGUAGES C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -16,10 +16,10 @@ add_library(glad STATIC src/glad/gl.c)
 target_include_directories(glad PUBLIC include)
 
 # Core
-file(GLOB CORE_SRC src/TheSeed/core/*.cpp)
-add_library(theseed_core SHARED ${CORE_SRC})
-target_include_directories(theseed_core PUBLIC include)
-target_link_libraries(theseed_core PRIVATE glad glfw)
+# file(GLOB CORE_SRC src/TheSeed/core/*.cpp)
+# add_library(theseed_core SHARED ${CORE_SRC})
+# target_include_directories(theseed_core PUBLIC include)
+# target_link_libraries(theseed_core PRIVATE glad glfw)
 
 # ECS
 file(GLOB ECS_SRC src/TheSeed/ecs/*.cpp)
@@ -40,8 +40,8 @@ target_include_directories(theseed_systems PUBLIC include)
 target_link_libraries(theseed_systems PRIVATE)
 
 # Generate main executable
-add_executable(theseed src/theseed.cpp)
-target_link_libraries(theseed PRIVATE theseed_core theseed_ecs theseed_components theseed_systems glfw)
+# add_executable(theseed src/theseed.cpp)
+# target_link_libraries(theseed PRIVATE theseed_core theseed_ecs theseed_components theseed_systems glfw)
 
 install(TARGETS theseed
     RUNTIME DESTINATION bin
