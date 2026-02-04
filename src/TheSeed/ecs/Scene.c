@@ -44,19 +44,36 @@ void ts_destroy_scene(TS_Scene_t *scene) {
 size_t ts_add_entity(TS_Scene_t *scene) {
   size_t entity = scene->entity_counter;
   scene->entity_counter += 1;
-
-int ts_remove_entity(TS_Scene_t *scene, const size_t id) {
-  for (size_t i = 0; i < scene->entity_counter; i++) {
-    size_t entity = g_array_index(scene->entities, size_t, i);
-
-    if (entity == id) {
-      g_array_remove_index(scene->entities, i);
-      return 0;
-    }
-  }
   g_array_append_val(scene->entities, entity);
   return entity;
 }
+
+int ts_entity_exists(const TS_Scene_t *scene, const size_t entity) {
+  for (size_t i = 0; i < scene->entities->len; i++) {
+    const size_t e = g_array_index(scene->entities, size_t, i);
+    if (e == entity) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+long ts_get_entity_index(const TS_Scene_t *scene, const size_t entity) {
+  for (size_t i = 0; i < scene->entities->len; i++) {
+    const size_t e = g_array_index(scene->entities, size_t, i);
+    if (e == entity) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int ts_remove_entity(TS_Scene_t *scene, const size_t entity) {
+  long index = ts_get_entity_index(scene, entity);
+  if (index == -1L) {
+    return 1;
+  }
+  g_array_remove_index(scene->entities, index);
 
   // TODO: Remove all the components
 
