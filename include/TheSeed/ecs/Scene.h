@@ -5,6 +5,10 @@
 
 typedef struct TS_Scene_t TS_Scene_t;
 
+#define CREATOR_FUNCION_PREFIX "ts_create_"
+#define SYSTEM_FUNCTION_PREFIX "ts_system_"
+#define SYSTEM_SELECTOR_PREFIX "ts_select_"
+
 TS_Scene_t *ts_create_scene();
 
 size_t ts_add_entity(TS_Scene_t *);
@@ -16,9 +20,12 @@ int ts_reload_plugin(TS_Scene_t *);
 
 int ts_add_component(TS_Scene_t *, const size_t, const char *);
 int ts_remove_component(TS_Scene_t *, const size_t, const char *);
+void *ts_entity_get_component(TS_Scene_t *, const size_t, const char *);
 
-int ts_add_system(TS_Scene_t *, const char *);
+int ts_add_system(TS_Scene_t *, const char *, size_t);
 int ts_remove_system(TS_Scene_t *, const char *);
+
+void ts_tick_scene(TS_Scene_t *);
 
 void ts_destroy_scene(TS_Scene_t *);
 

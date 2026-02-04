@@ -19,11 +19,23 @@ typedef struct {
   void *component;
 } TS_Component_Handler;
 
+typedef void (*System_Function)(TS_Scene_t *, size_t *, size_t);
+typedef int (*System_Selector)(TS_Scene_t *, const size_t);
+
+typedef struct {
+  char *id;
+  size_t priority;
+  TS_Loaded_Plugin *plugin;
+  System_Selector selector;
+  System_Function system;
+} TS_System_Handler;
+
 struct TS_Scene_t {
   GArray *plugins;
   size_t entity_counter;
   GArray *entities;
   GArray *components;
+  GArray *systems;
 };
 
 TS_Scene_t *ts_create_scene() {
@@ -32,6 +44,7 @@ TS_Scene_t *ts_create_scene() {
   p->entities = g_array_new(FALSE, FALSE, sizeof(size_t));
   p->entity_counter = 0;
   p->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
+  p->systems = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
   return p;
 }
 
@@ -151,7 +164,7 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
     // Try to find a function that has the suitable naming
     plugin = g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
     GString *gstring_id_cpy = g_string_copy(gstring_id);
-    g_string_prepend(gstring_id_cpy, "ts_create_");
+    g_string_prepend(gstring_id_cpy, CREATOR_FUNCION_PREFIX);
     create_func = dlsym(plugin->fd, gstring_id_cpy->str);
     g_string_free(gstring_id_cpy, TRUE);
 
@@ -199,6 +212,18 @@ static long ts_get_component_index_from_entity_and_id(TS_Scene_t *scene,
   return -1L;
 }
 
+void *ts_entity_get_component(TS_Scene_t *scene, const size_t entity,
+                              const char *id) {
+  long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
+  if (index == -1L) {
+    return NULL;
+  }
+
+  TS_Component_Handler *component =
+      g_array_index(scene->components, TS_Component_Handler *, index);
+  return component->component;
+}
+
 int ts_remove_component(TS_Scene_t *scene, const size_t entity,
                         const char *id) {
   // There can only be one association between the entity and the component
@@ -215,6 +240,92 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity,
   free(component->component);
   free(component);
   return 0;
+}
+
+static long ts_get_system_index_from_id(TS_Scene_t *scene, const char *id) {
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    const TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    if (strcmp(system->id, id) == 0) {
+      return i;
+    }
+  }
+  return -1L;
+}
+
+int ts_add_system(TS_Scene_t *scene, const char *id, size_t priority) {
+  long index = ts_get_system_index_from_id(scene, id);
+  if (index != -1L) {
+    // Already exists, won't add
+    return 1;
+  }
+
+  // Find the selector and system function
+
+  // Working string
+  GString *symbol = g_string_new(id);
+  TS_Loaded_Plugin *plugin;
+  System_Selector selector;
+  System_Function system;
+
+  for (size_t i = 0; i < scene->plugins->len; i++) {
+    // Try to find a function that has the suitable naming
+    plugin = g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
+    GString *selector_symbol_cpy = g_string_copy(symbol);
+    g_string_prepend(selector_symbol_cpy, SYSTEM_SELECTOR_PREFIX);
+    selector = dlsym(plugin->fd, selector_symbol_cpy->str);
+    GString *system_symbol_cpy = g_string_copy(symbol);
+    g_string_prepend(system_symbol_cpy, SYSTEM_FUNCTION_PREFIX);
+    system = dlsym(plugin->fd, system_symbol_cpy->str);
+    g_string_free(selector_symbol_cpy, TRUE);
+    g_string_free(system_symbol_cpy, TRUE);
+
+    if (selector && system) {
+      break;
+    }
+  }
+
+  if (!selector || !system) {
+    // Didn't find the selector
+    g_string_free(symbol, TRUE);
+    return 1;
+  }
+
+  // Found everything -> We can build the system handler
+  TS_System_Handler *system_handler =
+      (TS_System_Handler *)malloc(sizeof(TS_System_Handler));
+  system_handler->id = g_string_free(symbol, FALSE);
+  system_handler->system = system;
+  system_handler->selector = selector;
+  system_handler->plugin = plugin;
+  system_handler->priority = priority;
+  // TODO: Sort the system array
+  g_array_append_val(scene->systems, system_handler);
+  return 0;
+}
+
+static GArray *ts_find_entities_with_selector(TS_Scene_t *scene,
+                                              System_Selector selector) {
+  GArray *res = g_array_new(FALSE, FALSE, sizeof(size_t));
+  for (size_t i = 0; i < scene->entities->len; i++) {
+    size_t entity = g_array_index(scene->entities, size_t, i);
+    if (selector(scene, entity)) {
+      g_array_append_val(res, entity);
+    }
+  }
+  return res;
+}
+
+void ts_tick_scene(TS_Scene_t *scene) {
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    GArray *entities_array =
+        ts_find_entities_with_selector(scene, system->selector);
+    size_t n = entities_array->len;
+    size_t *entities = (size_t *)g_array_free(entities_array, FALSE);
+    system->system(scene, entities, n);
+  }
 }
 
 // Debug Functions
@@ -249,4 +360,15 @@ void ts_print_components(TS_Scene_t *scene) {
       }
     }
   }
+}
+
+void ts_print_systems(TS_Scene_t *scene) {
+  printf("Active Systems %d:\n", scene->systems->len);
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    const TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    printf("- %s (Priority: %ld) (%s)\n", system->id, system->priority,
+           system->plugin->path);
+  }
+  return;
 }
