@@ -36,9 +36,24 @@ TS_Scene_t *ts_create_scene() {
 }
 
 void ts_destroy_scene(TS_Scene_t *scene) {
-  // TODO: Unload all the plugins
+  size_t plugins_len = scene->plugins->len;
+  for (size_t i = 0; i < plugins_len; i++) {
+    const TS_Loaded_Plugin *plugin =
+        g_array_index(scene->plugins, TS_Loaded_Plugin *, 0);
+    ts_unload_plugin(scene, plugin->path);
+  }
+  size_t entities_len = scene->entities->len;
+  for (size_t i = 0; i < entities_len; i++) {
+    const size_t entity = g_array_index(scene->entities, size_t, 0);
+    // This will also destroy all the components associated with the entity
+    ts_remove_entity(scene, entity);
+  }
+  g_array_free(scene->plugins, TRUE);
+  g_array_free(scene->entities, TRUE);
+  g_array_free(scene->components, TRUE);
 
-  // TODO: Remove all the entities
+  free(scene);
+  return;
 }
 
 size_t ts_add_entity(TS_Scene_t *scene) {
@@ -48,17 +63,7 @@ size_t ts_add_entity(TS_Scene_t *scene) {
   return entity;
 }
 
-int ts_entity_exists(const TS_Scene_t *scene, const size_t entity) {
-  for (size_t i = 0; i < scene->entities->len; i++) {
-    const size_t e = g_array_index(scene->entities, size_t, i);
-    if (e == entity) {
-      return 1;
-    }
-  }
-  return 0;
-}
-
-long ts_get_entity_index(const TS_Scene_t *scene, const size_t entity) {
+static long ts_get_entity_index(const TS_Scene_t *scene, const size_t entity) {
   for (size_t i = 0; i < scene->entities->len; i++) {
     const size_t e = g_array_index(scene->entities, size_t, i);
     if (e == entity) {
@@ -75,12 +80,21 @@ int ts_remove_entity(TS_Scene_t *scene, const size_t entity) {
   }
   g_array_remove_index(scene->entities, index);
 
-  // TODO: Remove all the components
+  // Cleanup the components
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *c =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (c->entity == entity) {
+      ts_remove_component(scene, entity, c->id);
+      i--;
+    }
+  }
 
   return 1;
 }
 
 int ts_load_plugin(TS_Scene_t *scene, const char *path) {
+  // TODO: Add check if the plugin is already loaded
   TS_Loaded_Plugin *plugin =
       (TS_Loaded_Plugin *)malloc(sizeof(TS_Loaded_Plugin));
 
@@ -95,7 +109,39 @@ int ts_load_plugin(TS_Scene_t *scene, const char *path) {
   return 0;
 }
 
+static long ts_get_plugin_index(const TS_Scene_t *scene, const char *path) {
+  for (size_t i = 0; i < scene->plugins->len; i++) {
+    const TS_Loaded_Plugin *plugin =
+        g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
+    if (strcmp(plugin->path, path) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int ts_unload_plugin(TS_Scene_t *scene, const char *path) {
+  long index = ts_get_plugin_index(scene, path);
+  if (index == -1L) {
+    return 1;
+  }
+
+  TS_Loaded_Plugin *plugin =
+      g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
+  dlclose(plugin->fd);
+  free(plugin->path);
+  free(plugin);
+  g_array_remove_index(scene->plugins, index);
+  return 0;
+}
+
 int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
+  // Check if the entity exists
+  long does_exist = ts_get_entity_index(scene, entity);
+  if (does_exist == -1) {
+    return 0;
+  }
+
   GString *gstring_id = g_string_new(id);
 
   TS_Loaded_Plugin *plugin;
@@ -136,6 +182,38 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
   // Add the component
   g_array_append_val(scene->components, component_handler);
 
+  return 0;
+}
+
+static long ts_get_component_index_from_entity_and_id(TS_Scene_t *scene,
+                                                      const size_t entity,
+                                                      const char *id) {
+  // Entity and id can uniquely identify a component
+  for (size_t i = 0; i < scene->components->len; i++) {
+    const TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (strcmp(component->id, id) == 0 && component->entity == entity) {
+      return i;
+    }
+  }
+  return -1L;
+}
+
+int ts_remove_component(TS_Scene_t *scene, const size_t entity,
+                        const char *id) {
+  // There can only be one association between the entity and the component
+  long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
+  if (index == -1L) {
+    return 1;
+  }
+
+  TS_Component_Handler *component =
+      g_array_index(scene->components, TS_Component_Handler *, index);
+  // This is the one to remove
+  g_array_remove_index(scene->components, index);
+  free(component->id);
+  free(component->component);
+  free(component);
   return 0;
 }
 
