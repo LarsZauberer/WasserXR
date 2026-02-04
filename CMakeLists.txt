@@ -49,3 +49,22 @@ install(TARGETS theseed
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
+
+# Doxygen documentation
+file(GLOB_RECURSE HEADER_FILES include/TheSeed/*.h)
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/docs/html/index.html ${CMAKE_BINARY_DIR}/docs/man/man3
+    COMMAND doxygen ${CMAKE_SOURCE_DIR}/Doxyfile
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    DEPENDS ${HEADER_FILES}
+    COMMENT "Generating HTML and man page documentation with Doxygen"
+)
+
+add_custom_target(docs ALL
+    DEPENDS ${CMAKE_BINARY_DIR}/docs/html/index.html
+)
+
+# Install man pages
+install(DIRECTORY ${CMAKE_BINARY_DIR}/docs/man/man3
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man
+        OPTIONAL)
