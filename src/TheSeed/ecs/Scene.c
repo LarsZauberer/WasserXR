@@ -111,8 +111,22 @@ int ts_remove_entity(TS_Scene_t *scene, const size_t entity) {
   return 1;
 }
 
+static long ts_get_plugin_index(const TS_Scene_t *scene, const char *path) {
+  for (size_t i = 0; i < scene->plugins->len; i++) {
+    const TS_Loaded_Plugin *plugin =
+        g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
+    if (strcmp(plugin->path, path) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 int ts_load_plugin(TS_Scene_t *scene, const char *path) {
-  // TODO: Add check if the plugin is already loaded
+  long does_exist = ts_get_plugin_index(scene, path);
+  if (does_exist != -1L) {
+    return 1;
+  }
   TS_Loaded_Plugin *plugin =
       (TS_Loaded_Plugin *)malloc(sizeof(TS_Loaded_Plugin));
 
@@ -125,17 +139,6 @@ int ts_load_plugin(TS_Scene_t *scene, const char *path) {
   }
   g_array_append_val(scene->plugins, plugin);
   return 0;
-}
-
-static long ts_get_plugin_index(const TS_Scene_t *scene, const char *path) {
-  for (size_t i = 0; i < scene->plugins->len; i++) {
-    const TS_Loaded_Plugin *plugin =
-        g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
-    if (strcmp(plugin->path, path) == 0) {
-      return i;
-    }
-  }
-  return -1;
 }
 
 int ts_unload_plugin(TS_Scene_t *scene, const char *path) {
@@ -179,7 +182,7 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
   // Check if the entity exists
   long does_exist = ts_get_entity_index(scene, entity);
   if (does_exist == -1) {
-    return 0;
+    return 1;
   }
 
   GString *gstring_id = g_string_new(id);
