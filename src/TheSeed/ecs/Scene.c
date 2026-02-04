@@ -138,18 +138,6 @@ static long ts_get_plugin_index(const TS_Scene_t *scene, const char *path) {
   return -1;
 }
 
-static GArray *ts_get_systems_from_plugin(TS_Scene_t *scene, const char *id) {
-  GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
-  for (size_t i = 0; i < scene->systems->len; i++) {
-    const TS_System_Handler *system =
-        g_array_index(scene->systems, TS_System_Handler *, i);
-    if (strcmp(system->plugin->path, id) == 0) {
-      g_array_append_val(res, system);
-    }
-  }
-  return res;
-}
-
 int ts_unload_plugin(TS_Scene_t *scene, const char *path) {
   long index = ts_get_plugin_index(scene, path);
   if (index == -1L) {
