@@ -1,4 +1,8 @@
 #include <stddef.h>
+
+#ifndef TS_Scene_H
+#define TS_Scene_H
+
 typedef struct TS_Scene_t TS_Scene_t;
 
 TS_Scene_t *ts_create_scene();
@@ -23,3 +27,5 @@ void ts_print_entities(TS_Scene_t *);
 void ts_print_plugins(TS_Scene_t *);
 void ts_print_components(TS_Scene_t *);
 void ts_print_systems(TS_Scene_t *);
+
+#endif
