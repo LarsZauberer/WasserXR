@@ -64,7 +64,7 @@ int main() {
   printf("Status of Systems creation: %d\n", status);
   ts_print_systems(scene);
 
-  status = ts_add_system(scene, "TS_Print_Transform", 99);
+  status = ts_add_system(scene, "TS_Print_Transform", 101);
   printf("Status of Systems creation: %d\n", status);
   ts_print_systems(scene);
 
@@ -73,6 +73,20 @@ int main() {
   printf("Tick 2\n");
   ts_tick_scene(scene);
   printf("Tick 3\n");
+  ts_tick_scene(scene);
+
+  // Reload testing
+  printf("Reloading the gravity system\n");
+  status = ts_reload_plugin(scene, "build/libtheseed_systems.so",
+                            "build/libtheseed_systems2.so");
+  printf("Reload status: %d\n", status);
+  ts_print_plugins(scene);
+
+  printf("Tick 4\n");
+  ts_tick_scene(scene);
+  printf("Tick 5\n");
+  ts_tick_scene(scene);
+  printf("Tick 6\n");
   ts_tick_scene(scene);
 
   ts_destroy_scene(scene);

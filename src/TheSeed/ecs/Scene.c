@@ -403,6 +403,87 @@ int ts_remove_system(TS_Scene_t *scene, const char *id) {
   return 0;
 }
 
+int ts_reload_plugin(TS_Scene_t *scene, const char *path,
+                     const char *new_path) {
+  long index = ts_get_plugin_index(scene, path);
+  if (index == -1L) {
+    return 1;
+  }
+
+  TS_Loaded_Plugin *plugin =
+      g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
+
+  // Check if you can open the new one
+  void *new_fd = dlopen(new_path, RTLD_NOW);
+  if (!new_fd) {
+    // Failed to open the new plugin -> Abort
+    return 1;
+  }
+
+  free(plugin->path);
+  plugin->path = ts_copy_char_ptr(new_path);
+
+  // Close the binding
+  dlclose(plugin->fd);
+  plugin->fd = new_fd;
+
+  int status = 0;
+
+  // Replace all the bindings of the systems
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+
+    // Check if the same plugin handler is assigned
+    if (system->plugin == plugin) {
+      GString *id = g_string_new(system->id);
+      GString *id_selector = g_string_copy(id);
+      GString *id_function = g_string_copy(id);
+
+      g_string_prepend(id_selector, SYSTEM_SELECTOR_PREFIX);
+      g_string_prepend(id_function, SYSTEM_FUNCTION_PREFIX);
+
+      TS_System_Selector selector = dlsym(plugin->fd, id_selector->str);
+      TS_System_Function function = dlsym(plugin->fd, id_function->str);
+
+      g_string_free(id_selector, TRUE);
+      g_string_free(id_function, TRUE);
+      g_string_free(id, TRUE);
+
+      if (!selector || !function) {
+        // The systems are not defined anymore and hence need to be deleted
+        status = 2;
+        ts_remove_system(scene, system->id);
+        i--;
+      }
+
+      system->selector = selector;
+      system->system = function;
+    }
+  }
+
+  // Replace all the components
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+
+    // Check if the same plugin handler is assigned
+    if (component->plugin == plugin) {
+      // Destroy the old component
+      size_t entity = component->entity;
+      char *component_id = ts_copy_char_ptr(component->id);
+      ts_remove_component(scene, component->entity, component->id);
+      if (ts_add_component(scene, entity, component_id)) {
+        status = 2;
+      }
+      free(component_id); // The ownership is not passed above
+      i--;
+    }
+  }
+
+  return status;
+}
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene_t *scene) {
