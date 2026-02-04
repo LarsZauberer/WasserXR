@@ -22,8 +22,9 @@ int ts_add_component(TS_Scene_t *, const size_t, const char *);
 int ts_remove_component(TS_Scene_t *, const size_t, const char *);
 void *ts_entity_get_component(TS_Scene_t *, const size_t, const char *);
 
-int ts_add_system(TS_Scene_t *, const char *, size_t);
+int ts_add_system(TS_Scene_t *, const char *, int);
 int ts_remove_system(TS_Scene_t *, const char *);
+void ts_sort_systems(TS_Scene_t *);
 
 void ts_tick_scene(TS_Scene_t *);
 

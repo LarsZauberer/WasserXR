@@ -19,15 +19,15 @@ typedef struct {
   void *component;
 } TS_Component_Handler;
 
-typedef void (*System_Function)(TS_Scene_t *, size_t *, size_t);
-typedef int (*System_Selector)(TS_Scene_t *, const size_t);
+typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
+typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
 
 typedef struct {
   char *id;
-  size_t priority;
+  int priority;
   TS_Loaded_Plugin *plugin;
-  System_Selector selector;
-  System_Function system;
+  TS_System_Selector selector;
+  TS_System_Function system;
 } TS_System_Handler;
 
 struct TS_Scene_t {
@@ -253,7 +253,7 @@ static long ts_get_system_index_from_id(TS_Scene_t *scene, const char *id) {
   return -1L;
 }
 
-int ts_add_system(TS_Scene_t *scene, const char *id, size_t priority) {
+int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   long index = ts_get_system_index_from_id(scene, id);
   if (index != -1L) {
     // Already exists, won't add
@@ -265,8 +265,8 @@ int ts_add_system(TS_Scene_t *scene, const char *id, size_t priority) {
   // Working string
   GString *symbol = g_string_new(id);
   TS_Loaded_Plugin *plugin;
-  System_Selector selector;
-  System_Function system;
+  TS_System_Selector selector;
+  TS_System_Function system;
 
   for (size_t i = 0; i < scene->plugins->len; i++) {
     // Try to find a function that has the suitable naming
@@ -299,13 +299,16 @@ int ts_add_system(TS_Scene_t *scene, const char *id, size_t priority) {
   system_handler->selector = selector;
   system_handler->plugin = plugin;
   system_handler->priority = priority;
-  // TODO: Sort the system array
   g_array_append_val(scene->systems, system_handler);
+
+  // Sort for priority
+  ts_sort_systems(scene);
+
   return 0;
 }
 
 static GArray *ts_find_entities_with_selector(TS_Scene_t *scene,
-                                              System_Selector selector) {
+                                              TS_System_Selector selector) {
   GArray *res = g_array_new(FALSE, FALSE, sizeof(size_t));
   for (size_t i = 0; i < scene->entities->len; i++) {
     size_t entity = g_array_index(scene->entities, size_t, i);
@@ -328,6 +331,19 @@ void ts_tick_scene(TS_Scene_t *scene) {
   }
 }
 
+static int ts_compare_systems_priority(const gconstpointer a,
+                                       const gconstpointer b) {
+  const TS_System_Handler *system_a = (TS_System_Handler *)a;
+  const TS_System_Handler *system_b = (TS_System_Handler *)b;
+
+  return system_a->priority - system_b->priority;
+}
+
+void ts_sort_systems(TS_Scene_t *scene) {
+  g_array_sort(scene->systems, ts_compare_systems_priority);
+  return;
+}
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene_t *scene) {
@@ -336,6 +352,7 @@ void ts_print_entities(TS_Scene_t *scene) {
     const size_t entity = g_array_index(scene->entities, size_t, i);
     printf("- Entity %ld\n", entity);
   }
+  return;
 }
 
 void ts_print_plugins(TS_Scene_t *scene) {
