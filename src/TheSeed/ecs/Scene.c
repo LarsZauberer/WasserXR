@@ -42,10 +42,8 @@ void ts_destroy_scene(TS_Scene_t *scene) {
 }
 
 size_t ts_add_entity(TS_Scene_t *scene) {
+  size_t entity = scene->entity_counter;
   scene->entity_counter += 1;
-  g_array_append_val(scene->entities, scene->entity_counter);
-  return scene->entity_counter;
-}
 
 int ts_remove_entity(TS_Scene_t *scene, const size_t id) {
   for (size_t i = 0; i < scene->entity_counter; i++) {
@@ -56,6 +54,9 @@ int ts_remove_entity(TS_Scene_t *scene, const size_t id) {
       return 0;
     }
   }
+  g_array_append_val(scene->entities, entity);
+  return entity;
+}
 
   // TODO: Remove all the components
 
@@ -124,8 +125,7 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
 // Debug Functions
 
 void ts_print_entities(TS_Scene_t *scene) {
-  printf("Active Entities: %d\n", scene->entities->len);
-  printf("Active Entities:\n");
+  printf("Active Entities %d:\n", scene->entities->len);
   for (size_t i = 0; i < scene->entities->len; i++) {
     const size_t entity = g_array_index(scene->entities, size_t, i);
     printf("- Entity %ld\n", entity);
@@ -133,8 +133,7 @@ void ts_print_entities(TS_Scene_t *scene) {
 }
 
 void ts_print_plugins(TS_Scene_t *scene) {
-  printf("Loaded Plugins: %d\n", scene->plugins->len);
-  printf("Loaded Plugins:\n");
+  printf("Loaded Plugins %d:\n", scene->plugins->len);
   for (size_t i = 0; i < scene->plugins->len; i++) {
     const TS_Loaded_Plugin *plugin =
         g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
@@ -143,14 +142,14 @@ void ts_print_plugins(TS_Scene_t *scene) {
 }
 
 void ts_print_components(TS_Scene_t *scene) {
-  printf("Active Components: %d\n", scene->components->len);
-  printf("Active Components:\n");
+  printf("Active Components %d:\n", scene->components->len);
   for (size_t i = 0; i < scene->entities->len; i++) {
-    printf("- Entity %ld:\n", i);
+    const size_t entity = g_array_index(scene->entities, size_t, i);
+    printf("- Entity %ld:\n", entity);
     for (size_t j = 0; j < scene->components->len; j++) {
       const TS_Component_Handler *component =
           g_array_index(scene->components, TS_Component_Handler *, j);
-      if (component->entity == i) {
+      if (component->entity == entity) {
         printf("  - %s (%s)\n", component->id, component->plugin->path);
       }
     }
