@@ -42,7 +42,7 @@ target_link_libraries(theseed_systems PRIVATE)
 
 # Generate main executable
 add_executable(theseed src/main.c)
-target_link_libraries(theseed PRIVATE theseed_core theseed_ecs theseed_components theseed_systems glfw)
+target_link_libraries(theseed PRIVATE theseed_core theseed_ecs glfw)
 
 install(TARGETS theseed
     RUNTIME DESTINATION bin
