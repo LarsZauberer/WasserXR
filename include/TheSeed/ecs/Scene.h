@@ -29,7 +29,8 @@ size_t ts_add_entity(TS_Scene_t *scene);
  * component data.
  * @param scene The scene where the entity that should be removed lives in
  * @param entity_id The entity id that you want to delete
- * @return 0 if it successfully removed the entity and 1 if it didn't remove the entity (may happen if the entity doesn't exist)
+ * @return 0 if it successfully removed the entity and 1 if it didn't remove the
+ * entity (may happen if the entity doesn't exist)
  */
 int ts_remove_entity(TS_Scene_t *scene, const size_t entity_id);
 
@@ -42,7 +43,9 @@ int ts_remove_entity(TS_Scene_t *scene, const size_t entity_id);
 int ts_load_plugin(TS_Scene_t *scene, const char *plugin_path);
 
 /**
- * Unload a plugin from the scene.
+ * Unload a plugin from the scene. It destroys all the components and systems
+ * associated to them so that when the plugin is loaded back in, you need to
+ * recreate all the components and systems. To avoid that see ts_reload_plugin
  * @param scene The scene to unload the plugin from
  * @param plugin_name Name of the plugin to unload
  * @return 0 on success, non-zero on failure
@@ -63,7 +66,8 @@ int ts_reload_plugin(TS_Scene_t *scene);
  * @param component_name Name of the component type to add
  * @return 0 on success, non-zero on failure
  */
-int ts_add_component(TS_Scene_t *scene, const size_t entity_id, const char *component_name);
+int ts_add_component(TS_Scene_t *scene, const size_t entity_id,
+                     const char *component_name);
 
 /**
  * Remove a component from an entity.
@@ -72,7 +76,8 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity_id, const char *comp
  * @param component_name Name of the component type to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_component(TS_Scene_t *scene, const size_t entity_id, const char *component_name);
+int ts_remove_component(TS_Scene_t *scene, const size_t entity_id,
+                        const char *component_name);
 
 /**
  * Get a component from an entity.
@@ -81,13 +86,15 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity_id, const char *c
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene_t *scene, const size_t entity_id, const char *component_name);
+void *ts_entity_get_component(TS_Scene_t *scene, const size_t entity_id,
+                              const char *component_name);
 
 /**
  * Add a system to the scene.
  * @param scene The scene to add the system to
  * @param system_name Name of the system to add
- * @param priority Priority value for system execution order (lower values execute first)
+ * @param priority Priority value for system execution order (lower values
+ * execute first)
  * @return 0 on success, non-zero on failure
  */
 int ts_add_system(TS_Scene_t *scene, const char *system_name, int priority);

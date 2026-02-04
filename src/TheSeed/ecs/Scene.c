@@ -25,6 +25,7 @@ typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
 typedef struct {
   char *id;
   int priority;
+  int active;
   TS_Loaded_Plugin *plugin;
   TS_System_Selector selector;
   TS_System_Function system;
@@ -49,12 +50,15 @@ TS_Scene_t *ts_create_scene() {
 }
 
 void ts_destroy_scene(TS_Scene_t *scene) {
+  // Unloading all plugins
+  // This will result in destroying all the components and systems with it.
   size_t plugins_len = scene->plugins->len;
   for (size_t i = 0; i < plugins_len; i++) {
     const TS_Loaded_Plugin *plugin =
         g_array_index(scene->plugins, TS_Loaded_Plugin *, 0);
     ts_unload_plugin(scene, plugin->path);
   }
+  // Clean up all the rest of the entities
   size_t entities_len = scene->entities->len;
   for (size_t i = 0; i < entities_len; i++) {
     const size_t entity = g_array_index(scene->entities, size_t, 0);
@@ -64,6 +68,7 @@ void ts_destroy_scene(TS_Scene_t *scene) {
   g_array_free(scene->plugins, TRUE);
   g_array_free(scene->entities, TRUE);
   g_array_free(scene->components, TRUE);
+  g_array_free(scene->systems, TRUE);
 
   free(scene);
   return;
@@ -133,18 +138,52 @@ static long ts_get_plugin_index(const TS_Scene_t *scene, const char *path) {
   return -1;
 }
 
+static GArray *ts_get_systems_from_plugin(TS_Scene_t *scene, const char *id) {
+  GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    const TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    if (strcmp(system->plugin->path, id) == 0) {
+      g_array_append_val(res, system);
+    }
+  }
+  return res;
+}
+
 int ts_unload_plugin(TS_Scene_t *scene, const char *path) {
   long index = ts_get_plugin_index(scene, path);
   if (index == -1L) {
     return 1;
   }
 
+  // Destroy all systems associated to the plugin
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    if (strcmp(system->plugin->path, path) == 0) {
+      ts_remove_system(scene, system->id);
+      i--;
+    }
+  }
+
+  // Destroy all the components associated to the plugin
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (strcmp(component->plugin->path, path) == 0) {
+      ts_remove_component(scene, component->entity, component->id);
+      i--;
+    }
+  }
+
+  // Destroy the plugins
   TS_Loaded_Plugin *plugin =
       g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
   dlclose(plugin->fd);
   free(plugin->path);
   free(plugin);
   g_array_remove_index(scene->plugins, index);
+
   return 0;
 }
 
@@ -295,10 +334,11 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   TS_System_Handler *system_handler =
       (TS_System_Handler *)malloc(sizeof(TS_System_Handler));
   system_handler->id = g_string_free(symbol, FALSE);
+  system_handler->active = 1;
+  system_handler->priority = priority;
   system_handler->system = system;
   system_handler->selector = selector;
   system_handler->plugin = plugin;
-  system_handler->priority = priority;
   g_array_append_val(scene->systems, system_handler);
 
   // Sort for priority
@@ -323,18 +363,22 @@ void ts_tick_scene(TS_Scene_t *scene) {
   for (size_t i = 0; i < scene->systems->len; i++) {
     TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
+    if (!system->active) {
+      continue;
+    }
     GArray *entities_array =
         ts_find_entities_with_selector(scene, system->selector);
     size_t n = entities_array->len;
     size_t *entities = (size_t *)g_array_free(entities_array, FALSE);
     system->system(scene, entities, n);
+    free(entities);
   }
 }
 
 static int ts_compare_systems_priority(const gconstpointer a,
                                        const gconstpointer b) {
-  const TS_System_Handler *system_a = (TS_System_Handler *)a;
-  const TS_System_Handler *system_b = (TS_System_Handler *)b;
+  const TS_System_Handler *system_a = *(const TS_System_Handler **)a;
+  const TS_System_Handler *system_b = *(const TS_System_Handler **)b;
 
   return system_a->priority - system_b->priority;
 }
@@ -342,6 +386,21 @@ static int ts_compare_systems_priority(const gconstpointer a,
 void ts_sort_systems(TS_Scene_t *scene) {
   g_array_sort(scene->systems, ts_compare_systems_priority);
   return;
+}
+
+int ts_remove_system(TS_Scene_t *scene, const char *id) {
+  long index = ts_get_system_index_from_id(scene, id);
+
+  if (index == -1L) {
+    return 1;
+  }
+
+  TS_System_Handler *system =
+      g_array_index(scene->systems, TS_System_Handler *, index);
+  free(system->id);
+  free(system);
+  g_array_remove_index(scene->systems, index);
+  return 0;
 }
 
 // Debug Functions
@@ -384,7 +443,7 @@ void ts_print_systems(TS_Scene_t *scene) {
   for (size_t i = 0; i < scene->systems->len; i++) {
     const TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
-    printf("- %s (Priority: %ld) (%s)\n", system->id, system->priority,
+    printf("- %s (Priority: %d) (%s)\n", system->id, system->priority,
            system->plugin->path);
   }
   return;
