@@ -26,8 +26,14 @@
             pkgs.cmake
             pkgs.ccache
             pkgs.ninja
+            pkgs.gdb
+            pkgs.valgrind
 
             pkgs.glfw
+            pkgs.glib
+            pkgs.pkg-config
+            pkgs.pcre2
+            pkgs.libsysprof-capture
           ];
 
           shellHook = '''';
