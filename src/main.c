@@ -22,7 +22,12 @@ int main() {
   printf("Status of Plugin loading: %d\n", status);
   ts_print_plugins(scene);
 
-  // status = ts_load_plugin(scene, "build/libgo.so");
+  status = ts_load_plugin(scene, "build/libgo.so");
+
+  printf("Status of Plugin loading: %d\n", status);
+  ts_print_plugins(scene);
+
+  status = ts_load_plugin(scene, "build/libtheseed_systems.so");
 
   printf("Status of Plugin loading: %d\n", status);
   ts_print_plugins(scene);
@@ -50,6 +55,25 @@ int main() {
 
   printf("Status of Go Creation: %d\n", status);
   ts_print_components(scene);
+
+  printf("Status of Systems before adding:\n");
+  ts_print_systems(scene);
+
+  status = ts_add_system(scene, "TS_Gravity", 100);
+
+  printf("Status of Systems creation: %d\n", status);
+  ts_print_systems(scene);
+
+  status = ts_add_system(scene, "TS_Print_Transform", 99);
+  printf("Status of Systems creation: %d\n", status);
+  ts_print_systems(scene);
+
+  printf("Tick 1\n");
+  ts_tick_scene(scene);
+  printf("Tick 2\n");
+  ts_tick_scene(scene);
+  printf("Tick 3\n");
+  ts_tick_scene(scene);
 
   ts_destroy_scene(scene);
 }
