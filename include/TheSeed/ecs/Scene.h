@@ -10,6 +10,11 @@ typedef struct TS_Scene_t TS_Scene_t;
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 
+typedef void *(*TS_Component_Creator)(void);
+typedef void (*TS_Component_Destroyer)(void *);
+typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
+typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
+
 /**
  * Create a new scene object.
  * It allocates all the required memory to store all entities, components and

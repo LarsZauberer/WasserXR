@@ -7,11 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef void *(*TS_Component_Creator)(void);
-typedef void (*TS_Component_Destroyer)();
-typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
-typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
-
 typedef struct {
   char *path;
   void *fd;
@@ -139,6 +134,7 @@ int ts_load_plugin(TS_Scene_t *scene, const char *path) {
   if (!plugin->fd) {
     free(plugin->path);
     free(plugin);
+    printf("%s", dlerror());
     return 1;
   }
   g_array_append_val(scene->plugins, plugin);
@@ -280,8 +276,9 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity,
   // This is the one to remove
   g_array_remove_index(scene->components, index);
   free(component->id);
+  component->destroyer(
+      component->component); // Call the destroyer for the component
   free(component->component);
-  component->destroyer(); // Call the destroyer for the component
   free(component);
   return 0;
 }
@@ -422,6 +419,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   void *new_fd = dlopen(new_path, RTLD_NOW);
   if (!new_fd) {
     // Failed to open the new plugin -> Abort
+    printf("%s", dlerror());
     return 1;
   }
 
