@@ -136,6 +136,7 @@ int ts_load_plugin(TS_Scene_t *scene, const char *path) {
   if (!plugin->fd) {
     free(plugin->path);
     free(plugin);
+    return 1;
   }
   g_array_append_val(scene->plugins, plugin);
   return 0;
