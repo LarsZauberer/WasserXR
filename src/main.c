@@ -16,9 +16,13 @@ int main() {
   status = ts_add_system(scene, "ts_window_renderer", 1000);
   printf("Status: %d\n", status);
 
+  status = ts_add_system(scene, "ts_window_quiter", 100);
+  printf("Status: %d\n", status);
+
+  status = ts_add_system(scene, "ts_window_reloader", 1010);
+  printf("Status: %d\n", status);
+
   while (1) {
     ts_tick_scene(scene);
   }
-
-  ts_destroy_scene(scene);
 }

@@ -46,4 +46,4 @@ void *ts_create_TS_Window() {
   return this;
 }
 
-void ts_destroy_TS_Window(void *w) { glfwTerminate(); }
+void ts_destroy_TS_Window(void *w) {}
