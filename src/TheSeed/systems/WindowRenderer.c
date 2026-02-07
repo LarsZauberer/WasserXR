@@ -42,7 +42,6 @@ int ts_select_ts_window_quiter(TS_Scene_t *scene, const size_t entity) {
 void ts_system_ts_window_quiter(TS_Scene_t *scene, size_t *entities, size_t n) {
   if (n == 0) {
     glfwTerminate();
-    ts_destroy_scene(scene);
     exit(0);
   }
 }
