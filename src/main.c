@@ -13,13 +13,13 @@ int main() {
   status = ts_add_component(scene, window, "TS_Window");
   printf("Status: %d\n", status);
 
-  status = ts_add_system(scene, "ts_window_renderer", 1000);
+  status = ts_add_system(scene, "ts_window_renderer", 100);
   printf("Status: %d\n", status);
 
-  status = ts_add_system(scene, "ts_window_quiter", 100);
+  status = ts_add_system(scene, "ts_window_quiter", 1000);
   printf("Status: %d\n", status);
 
-  status = ts_add_system(scene, "ts_window_reloader", 1010);
+  status = ts_add_system(scene, "ts_window_reloader", 0);
   printf("Status: %d\n", status);
 
   while (1) {
