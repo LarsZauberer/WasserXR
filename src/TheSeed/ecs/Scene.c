@@ -281,6 +281,7 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity,
   g_array_remove_index(scene->components, index);
   free(component->id);
   free(component->component);
+  component->destroyer(); // Call the destroyer for the component
   free(component);
   return 0;
 }
