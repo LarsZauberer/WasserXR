@@ -55,8 +55,6 @@ int ts_select_ts_window_reloader(TS_Scene_t *scene, const size_t entity) {
   }
 }
 
-int reload_pressed = 0;
-
 void ts_system_ts_window_reloader(TS_Scene_t *scene, size_t *entities,
                                   size_t n) {
   for (size_t i = 0; i < n; i++) {
@@ -64,16 +62,10 @@ void ts_system_ts_window_reloader(TS_Scene_t *scene, size_t *entities,
         (TS_Window *)ts_entity_get_component(scene, entities[i], "TS_Window");
 
     if (glfwGetKey(window->window, GLFW_KEY_R) == GLFW_PRESS) {
-      if (!reload_pressed) {
-        reload_pressed = 1;
-        printf("Beginning Reload!\n");
-        int status = ts_reload_plugin(scene, "build/libtheseed_systems.so",
-                                      "build/libtheseed_systems.so");
-        printf("Status after reload: %d\n", status);
-        ts_print_components(scene);
-      }
-    } else if (glfwGetKey(window->window, GLFW_KEY_R) == GLFW_RELEASE) {
-      reload_pressed = 0;
+      printf("Beginning Reload!\n");
+      int status = ts_reload_plugin(scene, "build/libtheseed_systems.so",
+                                    "build/libtheseed_systems.so");
+      printf("Status after reload: %d\n", status);
     }
   }
 }
