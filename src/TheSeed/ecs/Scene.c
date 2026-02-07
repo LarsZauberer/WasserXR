@@ -415,19 +415,20 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   TS_Loaded_Plugin *plugin =
       g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
 
-  // Check if you can open the new one
-  void *new_fd = dlopen(new_path, RTLD_NOW);
-  if (!new_fd) {
-    // Failed to open the new plugin -> Abort
-    printf("%s", dlerror());
-    return 1;
-  }
-
+  // Copy the path and the new_path over since it might be in a systems memory
+  // location
   free(plugin->path);
   plugin->path = ts_copy_char_ptr(new_path);
 
-  // Close the binding
+  // Close and Check if you can open the new one
   dlclose(plugin->fd);
+  void *new_fd = dlopen(plugin->path, RTLD_NOW);
+  if (!new_fd) {
+    // Failed to open the new plugin -> Abort
+    printf("%s", dlerror());
+    exit(1);
+    return 1;
+  }
   plugin->fd = new_fd;
 
   int status = 0;
@@ -458,6 +459,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
         status = 2;
         ts_remove_system(scene, system->id);
         i--;
+        continue;
       }
 
       system->selector = selector;
@@ -466,9 +468,10 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   }
 
   // Replace all the components
-  for (size_t i = 0; i < scene->components->len; i++) {
+  GArray *components = g_array_copy(scene->components);
+  for (size_t i = 0; i < components->len; i++) {
     TS_Component_Handler *component =
-        g_array_index(scene->components, TS_Component_Handler *, i);
+        g_array_index(components, TS_Component_Handler *, i);
 
     // Check if the same plugin handler is assigned
     if (component->plugin == plugin) {
@@ -483,6 +486,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
       i--;
     }
   }
+  g_array_free(components, TRUE);
 
   return status;
 }
