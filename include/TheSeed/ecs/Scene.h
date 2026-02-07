@@ -71,6 +71,15 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *plugin_name,
                      const char *new_plugin_name);
 
 /**
+ * Reload all plugins in the scene. It automatically replaces all the systems
+ * with the new functions and recreates all the components
+ * @param scene The scene whose plugins should be reloaded
+ * instead
+ * @return 0 on success, non-zero on failure
+ */
+int ts_reload_all_plugins(TS_Scene_t *scene);
+
+/**
  * Add a component to an entity.
  * @param scene The scene containing the entity
  * @param entity_id The entity to add the component to

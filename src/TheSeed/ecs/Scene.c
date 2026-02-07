@@ -491,6 +491,18 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   return status;
 }
 
+int ts_reload_all_plugins(TS_Scene_t *scene) {
+  GArray *plugins = g_array_copy(scene->plugins);
+
+  for (size_t i = 0; i < plugins->len; i++) {
+    TS_Loaded_Plugin *p = g_array_index(plugins, TS_Loaded_Plugin *, i);
+    ts_reload_plugin(scene, p->path, p->path);
+  }
+
+  g_array_free(plugins, TRUE);
+  return 0;
+}
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene_t *scene) {
