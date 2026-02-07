@@ -6,6 +6,7 @@
 typedef struct TS_Scene_t TS_Scene_t;
 
 #define CREATOR_FUNCION_PREFIX "ts_create_"
+#define DESTROYER_FUNCION_PREFIX "ts_destroy_"
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 

@@ -8,5 +8,6 @@ typedef struct {
 } TS_Transform_t;
 
 void *ts_create_TS_Transform();
+void ts_destroy_TS_Transform();
 
 #endif

@@ -10,3 +10,5 @@ void *ts_create_TS_Transform() {
 
   return t;
 }
+
+void ts_destroy_TS_Transform() { return; }

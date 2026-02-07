@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef void *(*TS_Component_Creator)(void);
+typedef void (*TS_Component_Destroyer)();
+typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
+typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
+
 typedef struct {
   char *path;
   void *fd;
@@ -16,11 +21,9 @@ typedef struct {
   char *id;
   size_t entity;
   TS_Loaded_Plugin *plugin;
+  TS_Component_Destroyer destroyer;
   void *component;
 } TS_Component_Handler;
-
-typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
-typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
 
 typedef struct {
   char *id;
@@ -186,28 +189,36 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
     return 1;
   }
 
-  GString *gstring_id = g_string_new(id);
+  GString *symbol_id = g_string_new(id);
 
   TS_Loaded_Plugin *plugin;
-  void *(*create_func)(void);
+  TS_Component_Creator creator;
+  TS_Component_Destroyer destroyer;
 
   for (size_t i = 0; i < scene->plugins->len; i++) {
-    // Try to find a function that has the suitable naming
     plugin = g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
-    GString *gstring_id_cpy = g_string_copy(gstring_id);
-    g_string_prepend(gstring_id_cpy, CREATOR_FUNCION_PREFIX);
-    create_func = dlsym(plugin->fd, gstring_id_cpy->str);
-    g_string_free(gstring_id_cpy, TRUE);
 
-    if (create_func) {
+    // Try to find a function that has the suitable naming
+    GString *creator_symbol_id = g_string_copy(symbol_id);
+    GString *destroyer_symbol_id = g_string_copy(symbol_id);
+    g_string_prepend(creator_symbol_id, CREATOR_FUNCION_PREFIX);
+    g_string_prepend(destroyer_symbol_id, DESTROYER_FUNCION_PREFIX);
+
+    creator = dlsym(plugin->fd, creator_symbol_id->str);
+    g_string_free(creator_symbol_id, TRUE);
+
+    destroyer = dlsym(plugin->fd, destroyer_symbol_id->str);
+    g_string_free(destroyer_symbol_id, TRUE);
+
+    if (creator && destroyer) {
       break;
     }
   }
 
-  g_string_free(gstring_id, TRUE);
+  g_string_free(symbol_id, TRUE);
 
-  if (!create_func) {
-    // Not found the constructor for the component
+  if (!creator || !destroyer) {
+    // Not found the constructor or destroyer for the component
     return 1;
   }
 
@@ -218,8 +229,9 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity, const char *id) {
   component_handler->id = ts_copy_char_ptr(id);
   component_handler->entity = entity;
   component_handler->plugin = plugin;
+  component_handler->destroyer = destroyer;
 
-  void *component = create_func();
+  void *component = creator();
 
   component_handler->component = component;
 
