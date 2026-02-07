@@ -11,4 +11,4 @@ void *ts_create_TS_Transform() {
   return t;
 }
 
-void ts_destroy_TS_Transform() { return; }
+void ts_destroy_TS_Transform(void *t) { return; }

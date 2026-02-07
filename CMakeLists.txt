@@ -12,7 +12,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 
 # OpenGL
-add_library(glad STATIC src/glad/gl.c)
+add_library(glad SHARED src/glad/gl.c)
 target_include_directories(glad PUBLIC include)
 
 # Core
@@ -32,17 +32,17 @@ target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES})
 file(GLOB COMPONENTS_SRC src/TheSeed/components/*.c)
 add_library(theseed_components SHARED ${COMPONENTS_SRC})
 target_include_directories(theseed_components PUBLIC include)
-target_link_libraries(theseed_components PRIVATE)
+target_link_libraries(theseed_components PRIVATE glad glfw)
 
 # Systems
 file(GLOB SYSTEMS_SRC src/TheSeed/systems/*.c)
 add_library(theseed_systems SHARED ${SYSTEMS_SRC})
 target_include_directories(theseed_systems PUBLIC include)
-target_link_libraries(theseed_systems PRIVATE)
+target_link_libraries(theseed_systems PRIVATE glad glfw)
 
 # Generate main executable
 add_executable(theseed src/main.c)
-target_link_libraries(theseed PRIVATE theseed_core theseed_ecs glfw)
+target_link_libraries(theseed PRIVATE theseed_core theseed_ecs)
 
 install(TARGETS theseed
     RUNTIME DESTINATION bin
