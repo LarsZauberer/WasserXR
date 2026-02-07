@@ -29,6 +29,8 @@
             pkgs.gdb
             pkgs.valgrind
 
+            pkgs.doxygen
+
             pkgs.glfw
             pkgs.glib
             pkgs.pkg-config
