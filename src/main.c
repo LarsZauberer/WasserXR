@@ -10,13 +10,13 @@ int main() {
   size_t window = ts_add_entity(scene);
   status = ts_add_component(scene, window, "TS_Window");
 
-  status = ts_add_system(scene, "ts_window_renderer", 100);
+  status = ts_add_system(scene, "ts_window_renderer", 1000);
 
-  status = ts_add_system(scene, "ts_window_quiter", 1000);
+  status = ts_add_system(scene, "ts_window_quiter", 100);
 
-  status = ts_add_system(scene, "ts_window_reloader", 0);
+  status = ts_add_system(scene, "ts_window_reloader", 100);
 
-  status = ts_add_system(scene, "ts_mesh_renderer", 110);
+  status = ts_add_system(scene, "ts_mesh_renderer", 100);
 
   size_t triangle = ts_add_entity(scene);
 
