@@ -132,9 +132,9 @@ int ts_load_plugin(TS_Scene_t *scene, const char *path) {
 
   plugin->fd = dlopen(path, RTLD_NOW);
   if (!plugin->fd) {
+    printf("%s\n", dlerror());
     free(plugin->path);
     free(plugin);
-    printf("%s", dlerror());
     return 1;
   }
   g_array_append_val(scene->plugins, plugin);
@@ -278,7 +278,7 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity,
   free(component->id);
   component->destroyer(
       component->component); // Call the destroyer for the component
-  free(component->component);
+  // The component pointer itself should be destroyed by the destroyer function
   free(component);
   return 0;
 }
@@ -417,15 +417,16 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
 
   // Copy the path and the new_path over since it might be in a systems memory
   // location
+  char *p = ts_copy_char_ptr(new_path);
   free(plugin->path);
-  plugin->path = ts_copy_char_ptr(new_path);
+  plugin->path = p;
 
   // Close and Check if you can open the new one
   dlclose(plugin->fd);
   void *new_fd = dlopen(plugin->path, RTLD_NOW);
   if (!new_fd) {
     // Failed to open the new plugin -> Abort
-    printf("%s", dlerror());
+    printf("%s\n", dlerror());
     exit(1);
     return 1;
   }
@@ -483,7 +484,6 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
         status = 2;
       }
       free(component_id); // The ownership is not passed above
-      i--;
     }
   }
   g_array_free(components, TRUE);
