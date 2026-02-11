@@ -72,7 +72,10 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *plugin_name,
 
 /**
  * Reload all plugins in the scene. It automatically replaces all the systems
- * with the new functions and recreates all the components
+ * with the new functions and recreates all the components.
+ * This function should not be called within a system or component. This would
+ * also replace the system it came from and hence the return address would
+ * become invalid.
  * @param scene The scene whose plugins should be reloaded
  * instead
  * @return 0 on success, non-zero on failure
