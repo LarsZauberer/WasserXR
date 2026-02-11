@@ -179,14 +179,6 @@ void ts_destroy_shader(TS_Shader *shader) {
     glDeleteProgram(shader->program);
   }
 
-  if (shader->vertex_source) {
-    g_string_free(shader->vertex_source, TRUE);
-  }
-
-  if (shader->fragment_source) {
-    g_string_free(shader->fragment_source, TRUE);
-  }
-
   if (shader->path) {
     free(shader->path);
   }
