@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int glfw_initialization = 0;
-
 #define WIDTH 400
 #define HEIGHT 600
 
@@ -18,13 +16,10 @@ static void setViewport(GLFWwindow *window, int width, int height) {
 void *ts_create_TS_Window() {
   TS_Window *this = (TS_Window *)malloc(sizeof(TS_Window));
 
-  if (!glfw_initialization) {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfw_initialization = 1;
-  }
+  glfwInit();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   this->window = glfwCreateWindow(WIDTH, HEIGHT, "TheSeed", NULL, NULL);
 
@@ -46,4 +41,12 @@ void *ts_create_TS_Window() {
   return this;
 }
 
-void ts_destroy_TS_Window(void *w) {}
+void ts_destroy_TS_Window(void *w) {
+  TS_Window *this = (TS_Window *)w;
+
+  if (this->window) {
+    glfwDestroyWindow(this->window);
+  }
+  free(w);
+  return;
+}
