@@ -33,6 +33,7 @@
 
             pkgs.glfw
             pkgs.glib
+            pkgs.cglm
             pkgs.pkg-config
             pkgs.pcre2
             pkgs.libsysprof-capture
