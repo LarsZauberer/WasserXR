@@ -16,6 +16,13 @@ int main() {
 
   status = ts_add_system(scene, "ts_window_reloader", 0);
 
+  status = ts_add_system(scene, "ts_mesh_renderer", 110);
+
+  size_t triangle = ts_add_entity(scene);
+
+  ts_add_component(scene, triangle, "TS_Transform");
+  ts_add_component(scene, triangle, "TS_Mesh");
+
   while (1) {
     ts_tick_scene(scene);
   }
