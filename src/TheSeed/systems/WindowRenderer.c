@@ -61,11 +61,8 @@ void ts_system_ts_window_reloader(TS_Scene_t *scene, size_t *entities,
         (TS_Window *)ts_entity_get_component(scene, entities[i], "TS_Window");
 
     if (glfwGetKey(window->window, GLFW_KEY_R) == GLFW_PRESS) {
-      printf("Beginning Reload!\n");
-      // int status = ts_reload_plugin(scene, "build/libtheseed_systems.so",
-      //                               "build/libtheseed_systems.so");
-      int status = ts_reload_all_plugins(scene);
-      printf("Status after reload: %d\n", status);
+      ts_set_scene_reload(scene);
+      return;
     }
   }
 }

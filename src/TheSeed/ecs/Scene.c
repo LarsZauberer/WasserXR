@@ -35,6 +35,7 @@ struct TS_Scene_t {
   GArray *entities;
   GArray *components;
   GArray *systems;
+  int should_reload;
 };
 
 TS_Scene_t *ts_create_scene() {
@@ -44,6 +45,7 @@ TS_Scene_t *ts_create_scene() {
   p->entity_counter = 0;
   p->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
   p->systems = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
+  p->should_reload = 0;
   return p;
 }
 
@@ -375,6 +377,12 @@ void ts_tick_scene(TS_Scene_t *scene) {
     system->system(scene, entities, n);
     free(entities);
   }
+
+  // Check if the scene should reload
+  if (scene->should_reload) {
+    scene->should_reload = 0; // Reset
+    ts_reload_all_plugins(scene);
+  }
 }
 
 static int ts_compare_systems_priority(const gconstpointer a,
@@ -501,6 +509,11 @@ int ts_reload_all_plugins(TS_Scene_t *scene) {
 
   g_array_free(plugins, TRUE);
   return 0;
+}
+
+void ts_set_scene_reload(TS_Scene_t *scene) {
+  scene->should_reload = 1;
+  return;
 }
 
 // Debug Functions

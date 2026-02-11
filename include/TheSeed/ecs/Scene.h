@@ -145,6 +145,12 @@ void ts_tick_scene(TS_Scene_t *scene);
  */
 void ts_destroy_scene(TS_Scene_t *scene);
 
+/**
+ * Tells the scene to reload at the end of a tick all the systems and components
+ * @param scene The scene to destroy
+ */
+void ts_set_scene_reload(TS_Scene_t *scene);
+
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
  * @{
