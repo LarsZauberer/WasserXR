@@ -21,10 +21,10 @@ void ts_system_ts_window_renderer(TS_Scene_t *scene, size_t *entities,
         (TS_Window *)ts_entity_get_component(scene, entities[i], "TS_Window");
 
     if (!glfwWindowShouldClose(window->window)) {
-      glfwSwapBuffers(window->window);
-      glfwPollEvents();
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
+      glfwSwapBuffers(window->window);
+      glfwPollEvents();
     } else {
       ts_remove_component(scene, entities[i], "TS_Window");
     }

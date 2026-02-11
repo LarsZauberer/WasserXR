@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define WIDTH 400
+#define WIDTH 800
 #define HEIGHT 600
 
 static void setViewport(GLFWwindow *window, int width, int height) {
@@ -16,6 +16,7 @@ static void setViewport(GLFWwindow *window, int width, int height) {
 void *ts_create_TS_Window() {
   TS_Window *this = (TS_Window *)malloc(sizeof(TS_Window));
 
+  glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
