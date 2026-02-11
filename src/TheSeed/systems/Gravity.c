@@ -13,7 +13,7 @@ void ts_system_TS_Gravity(TS_Scene_t *scene, const size_t *entities, size_t n) {
   for (size_t i = 0; i < n; i++) {
     TS_Transform_t *t = (TS_Transform_t *)ts_entity_get_component(
         scene, entities[i], "TS_Transform");
-    t->z += -1;
+    t->position[2] += -1;
   }
 }
 
@@ -29,6 +29,7 @@ void ts_system_TS_Print_Transform(TS_Scene_t *scene, const size_t *entities,
   for (size_t i = 0; i < n; i++) {
     TS_Transform_t *t = (TS_Transform_t *)ts_entity_get_component(
         scene, entities[i], "TS_Transform");
-    printf("Entity %ld: x: %f y: %f z: %f\n", entities[i], t->x, t->y, t->z);
+    printf("Entity %ld: x: %f y: %f z: %f\n", entities[i], t->position[0],
+           t->position[1], t->position[2]);
   }
 }
