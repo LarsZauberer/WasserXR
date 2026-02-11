@@ -1,5 +1,6 @@
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/core/utils.h"
+#include <cglm/cglm.h>
 #include <glad/gl.h>
 #include <glib.h>
 #include <stdio.h>
@@ -191,4 +192,175 @@ void ts_destroy_shader(TS_Shader *shader) {
   }
 
   free(shader);
+}
+
+int ts_set_shader_uniform_1f(TS_Shader *shader, char *name, float value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniform1f(location, value);
+  return 0;
+}
+
+int ts_set_shader_uniform_1i(TS_Shader *shader, char *name, int value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniform1i(location, value);
+  return 0;
+}
+
+int ts_set_shader_uniform_2f(TS_Shader *shader, char *name, const vec2 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniform2f(location, value[0], value[1]);
+  return 0;
+}
+
+int ts_set_shader_uniform_3f(TS_Shader *shader, char *name, const vec3 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniform3f(location, value[0], value[1], value[2]);
+  return 0;
+}
+
+int ts_set_shader_uniform_4f(TS_Shader *shader, char *name, const vec4 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniform4f(location, value[0], value[1], value[2], value[3]);
+  return 0;
+}
+
+int ts_set_shader_uniform_mat2(TS_Shader *shader, char *name,
+                               const mat2 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniformMatrix2fv(location, 1, GL_FALSE, (float *)value);
+  return 0;
+}
+
+int ts_set_shader_uniform_mat3(TS_Shader *shader, char *name,
+                               const mat3 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniformMatrix3fv(location, 1, GL_FALSE, (float *)value);
+  return 0;
+}
+
+int ts_set_shader_uniform_mat4(TS_Shader *shader, char *name,
+                               const mat4 value) {
+  if (!shader) {
+    fprintf(stderr, "Error: NULL shader pointer\n");
+    return 1;
+  }
+
+  if (!shader->is_compiled) {
+    fprintf(stderr, "Error: Shader not compiled\n");
+    return 1;
+  }
+
+  GLint location = glGetUniformLocation(shader->program, name);
+  if (location == -1) {
+    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    return 1;
+  }
+
+  glUniformMatrix4fv(location, 1, GL_FALSE, (float *)value);
+  return 0;
 }
