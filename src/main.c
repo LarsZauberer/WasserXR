@@ -10,7 +10,8 @@ int main() {
   size_t window = ts_add_entity(scene);
   status = ts_add_component(scene, window, "TS_Window");
 
-  status = ts_add_system(scene, "ts_window_renderer", 1000);
+  status = ts_add_system(scene, "ts_window_pre_renderer", 50);
+  status = ts_add_system(scene, "ts_window_post_renderer", 150);
 
   status = ts_add_system(scene, "ts_window_quiter", 100);
 
