@@ -11,6 +11,8 @@ void *ts_create_TS_Mesh() {
   mesh->indices = (unsigned int *)malloc(sizeof(unsigned int) * 3 * 2);
 
   // Model data
+  // TODO: When implementing mesh loading have a mesh cache (Return the right
+  // VBO)
   mesh->vertices[0] = 0.5f;
   mesh->vertices[1] = 0.6f;
   mesh->vertices[2] = 0.0f;
@@ -36,10 +38,12 @@ void *ts_create_TS_Mesh() {
   mesh->indices[5] = 3;
 
   // Add shader
+  // TODO: Add shader cache
   mesh->shader = ts_create_shader("shaders/base");
   ts_load_shader(mesh->shader);
   ts_compile_shader(mesh->shader);
 
+  // Generating all the vertex arrays and buffers
   glGenVertexArrays(1, &mesh->vao);
   glGenBuffers(1, &mesh->vbo);
   glGenBuffers(1, &mesh->ebo);
@@ -52,8 +56,8 @@ void *ts_create_TS_Mesh() {
                GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(float) * 3 * 2, mesh->indices,
-               GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * 3 * 2,
+               mesh->indices, GL_STATIC_DRAW);
 
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);

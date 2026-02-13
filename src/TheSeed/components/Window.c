@@ -1,5 +1,6 @@
 #include <glad/gl.h>
 
+#include "GL/gl.h"
 #include "TheSeed/components/Window.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -38,6 +39,9 @@ void *ts_create_TS_Window() {
 
   setViewport(this->window, WIDTH, HEIGHT);
   glfwSetFramebufferSizeCallback(this->window, setViewport);
+
+  // Load OpenGL Extensions
+  glEnable(GL_DEPTH_TEST);
 
   return this;
 }

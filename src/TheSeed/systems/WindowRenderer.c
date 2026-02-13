@@ -22,7 +22,7 @@ void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, size_t *entities,
 
     if (!glfwWindowShouldClose(window->window)) {
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     } else {
       ts_remove_component(scene, entities[i], "TS_Window");
     }

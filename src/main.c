@@ -1,3 +1,4 @@
+#include "TheSeed/components/Transform.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdio.h>
 
@@ -10,6 +11,19 @@ int main() {
   size_t window = ts_add_entity(scene);
   status = ts_add_component(scene, window, "TS_Window");
 
+  size_t camera = ts_add_entity(scene);
+  status = ts_add_component(scene, camera, "TS_Camera");
+  status = ts_add_component(scene, camera, "TS_Transform");
+
+  TS_Transform_t *camera_transform =
+      ts_entity_get_component(scene, camera, "TS_Transform");
+  camera_transform->position[2] = 3.0f;
+
+  size_t triangle = ts_add_entity(scene);
+  ts_add_component(scene, triangle, "TS_Transform");
+  ts_add_component(scene, triangle, "TS_Mesh");
+
+  // Add the systems
   status = ts_add_system(scene, "ts_window_pre_renderer", 50);
   status = ts_add_system(scene, "ts_window_post_renderer", 150);
 
@@ -18,11 +32,6 @@ int main() {
   status = ts_add_system(scene, "ts_window_reloader", 100);
 
   status = ts_add_system(scene, "ts_mesh_renderer", 100);
-
-  size_t triangle = ts_add_entity(scene);
-
-  ts_add_component(scene, triangle, "TS_Transform");
-  ts_add_component(scene, triangle, "TS_Mesh");
 
   while (1) {
     ts_tick_scene(scene);
