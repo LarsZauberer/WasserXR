@@ -22,6 +22,18 @@ int main() {
   size_t triangle = ts_add_entity(scene);
   ts_add_component(scene, triangle, "TS_Transform");
   ts_add_component(scene, triangle, "TS_Mesh");
+  TS_Transform_t *triangle_transform =
+      ts_entity_get_component(scene, triangle, "TS_Transform");
+  triangle_transform->position[0] = 1.0f;
+  triangle_transform->rotation[2] = 180.0f;
+
+  size_t triangle2 = ts_add_entity(scene);
+  ts_add_component(scene, triangle2, "TS_Transform");
+  ts_add_component(scene, triangle2, "TS_Mesh");
+
+  TS_Transform_t *triangle2_transform =
+      ts_entity_get_component(scene, triangle2, "TS_Transform");
+  triangle2_transform->position[0] = -1.0f;
 
   // Add the systems
   status = ts_add_system(scene, "ts_window_pre_renderer", 50);
