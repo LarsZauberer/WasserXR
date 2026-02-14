@@ -20,7 +20,7 @@
 #define NEAR 0.1f
 #define FAR 100.0f
 
-int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const size_t entity) {
+int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const TS_Entity entity) {
   size_t normal_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&
       ts_entity_get_component(scene, entity, "TS_Mesh");
@@ -35,17 +35,18 @@ int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const size_t entity) {
   }
 }
 
-void ts_system_ts_mesh_renderer(TS_Scene_t *scene, size_t *entities, size_t n) {
-  size_t camera_entity;
+void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
+                                size_t n) {
+  TS_Entity camera_entity;
   TS_Camera *cam;
   TS_Transform_t *cam_transform;
 
-  size_t window_entity;
+  TS_Entity window_entity;
   TS_Window *window;
 
   // Find the camera
   for (size_t i = 0; i < n; i++) {
-    size_t entity = entities[i];
+    TS_Entity entity = entities[i];
     cam = ts_entity_get_component(scene, entity, "TS_Camera");
     cam_transform = ts_entity_get_component(scene, entity, "TS_Transform");
     if (cam) {
@@ -61,7 +62,7 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, size_t *entities, size_t n) {
 
   // Find the window
   for (size_t i = 0; i < n; i++) {
-    size_t entity = entities[i];
+    TS_Entity entity = entities[i];
     window = ts_entity_get_component(scene, entity, "TS_Window");
     if (window) {
       window_entity = entity;
@@ -76,7 +77,7 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, size_t *entities, size_t n) {
 
   for (size_t i = 0; i < n; i++) {
     // Entity has to have both mesh and transform
-    size_t entity = entities[i];
+    TS_Entity entity = entities[i];
     if (entity == camera_entity || entity == window_entity) {
       continue;
     }

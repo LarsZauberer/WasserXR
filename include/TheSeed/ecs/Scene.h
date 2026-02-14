@@ -4,6 +4,7 @@
 #define TS_Scene_H
 
 typedef struct TS_Scene_t TS_Scene_t;
+typedef size_t TS_Entity;
 
 #define CREATOR_FUNCION_PREFIX "ts_create_"
 #define DESTROYER_FUNCION_PREFIX "ts_destroy_"

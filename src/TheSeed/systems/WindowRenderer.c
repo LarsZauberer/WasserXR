@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int ts_select_ts_window_pre_renderer(TS_Scene_t *scene, const size_t entity) {
+int ts_select_ts_window_pre_renderer(TS_Scene_t *scene,
+                                     const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
   } else {
@@ -14,7 +15,7 @@ int ts_select_ts_window_pre_renderer(TS_Scene_t *scene, const size_t entity) {
   }
 }
 
-void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, size_t *entities,
+void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, TS_Entity *entities,
                                       size_t n) {
   for (size_t i = 0; i < n; i++) {
     TS_Window *window =
@@ -29,7 +30,8 @@ void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, size_t *entities,
   }
 }
 
-int ts_select_ts_window_post_renderer(TS_Scene_t *scene, const size_t entity) {
+int ts_select_ts_window_post_renderer(TS_Scene_t *scene,
+                                      const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
   } else {
@@ -37,7 +39,7 @@ int ts_select_ts_window_post_renderer(TS_Scene_t *scene, const size_t entity) {
   }
 }
 
-void ts_system_ts_window_post_renderer(TS_Scene_t *scene, size_t *entities,
+void ts_system_ts_window_post_renderer(TS_Scene_t *scene, TS_Entity *entities,
                                        size_t n) {
   for (size_t i = 0; i < n; i++) {
     TS_Window *window =
