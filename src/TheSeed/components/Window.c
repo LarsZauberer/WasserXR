@@ -8,6 +8,7 @@
 
 #define WIDTH 800
 #define HEIGHT 600
+#define ANTIALIASING 8
 
 static void setViewport(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
@@ -22,6 +23,7 @@ void *ts_create_TS_Window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_SAMPLES, ANTIALIASING);
 
   this->window = glfwCreateWindow(WIDTH, HEIGHT, "TheSeed", NULL, NULL);
 
@@ -42,6 +44,7 @@ void *ts_create_TS_Window() {
 
   // Load OpenGL Extensions
   glEnable(GL_DEPTH_TEST);
+  glEnable(GL_MULTISAMPLE);
 
   return this;
 }
