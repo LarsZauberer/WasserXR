@@ -423,6 +423,34 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   TS_Loaded_Plugin *plugin =
       g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
 
+  // Pre Unload operations
+
+  GArray *component_ids_to_reconstruct =
+      g_array_new(FALSE, FALSE, sizeof(char *));
+  GArray *component_entity_to_reconstruct =
+      g_array_new(FALSE, FALSE, sizeof(size_t));
+
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+
+    if (component->plugin == plugin) {
+      // This component is part of the plugin
+      // Unload the component
+      // Save everything that is needed for reconstruction
+
+      char *id = ts_copy_char_ptr(component->id);
+      g_array_append_val(component_ids_to_reconstruct, id);
+      g_array_append_val(component_entity_to_reconstruct, component->entity);
+
+      // Delete the component
+      ts_remove_component(scene, component->entity, component->id);
+      i--;
+    }
+  }
+
+  // Loading the new plugin
+
   // Copy the path and the new_path over since it might be in a systems memory
   // location
   char *p = ts_copy_char_ptr(new_path);
@@ -440,6 +468,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   }
   plugin->fd = new_fd;
 
+  // Post Unload operations -> Recreation of stuff
   int status = 0;
 
   // Replace all the bindings of the systems
@@ -477,24 +506,24 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   }
 
   // Replace all the components
-  GArray *components = g_array_copy(scene->components);
-  for (size_t i = 0; i < components->len; i++) {
-    TS_Component_Handler *component =
-        g_array_index(components, TS_Component_Handler *, i);
+  for (size_t i = 0; i < component_ids_to_reconstruct->len; i++) {
+    char *id_to_construct =
+        g_array_index(component_ids_to_reconstruct, char *, i);
+    size_t entity_to_construct =
+        g_array_index(component_entity_to_reconstruct, size_t, i);
 
-    // Check if the same plugin handler is assigned
-    if (component->plugin == plugin) {
-      // Destroy the old component
-      size_t entity = component->entity;
-      char *component_id = ts_copy_char_ptr(component->id);
-      ts_remove_component(scene, component->entity, component->id);
-      if (ts_add_component(scene, entity, component_id)) {
-        status = 2;
-      }
-      free(component_id); // The ownership is not passed above
+    if (ts_add_component(scene, entity_to_construct, id_to_construct)) {
+      status = 2;
     }
   }
-  g_array_free(components, TRUE);
+
+  // Destroy all the helper arrays
+  for (size_t i = 0; i < component_ids_to_reconstruct->len; i++) {
+    char *id_to_free = g_array_index(component_ids_to_reconstruct, char *, i);
+    free(id_to_free);
+  }
+  g_array_free(component_ids_to_reconstruct, TRUE);
+  g_array_free(component_entity_to_reconstruct, TRUE);
 
   return status;
 }
