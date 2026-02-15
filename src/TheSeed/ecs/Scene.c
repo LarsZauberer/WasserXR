@@ -17,6 +17,8 @@ typedef struct {
   TS_Entity entity;
   TS_Loaded_Plugin *plugin;
   TS_Component_Destroyer destroyer;
+  TS_Component_Serializer serializer;
+  TS_Component_Deserializer deserializer;
   void *component;
 } TS_Component_Handler;
 
@@ -215,12 +217,20 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
 
   TS_Loaded_Plugin *plugin1;
   TS_Loaded_Plugin *plugin2;
+  TS_Loaded_Plugin *plugin3;
+  TS_Loaded_Plugin *plugin4;
   TS_Component_Creator creator;
   TS_Component_Destroyer destroyer;
+  TS_Component_Serializer serializer;
+  TS_Component_Deserializer deserializer;
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, CREATOR_FUNCION_PREFIX, creator,
                             plugin1);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESTROYER_FUNCION_PREFIX,
                             destroyer, plugin2);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SERIALIZER_FUNCTION_PREFIX,
+                            serializer, plugin3);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESERIALIZER_SELECTOR_PREFIX,
+                            deserializer, plugin4);
 
   if (!creator) {
     return 2;
@@ -228,9 +238,15 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   if (!destroyer) {
     return 2;
   }
-  if (plugin1 != plugin2) {
+  if (!(plugin1 != plugin2 && (plugin1 != plugin3 || !plugin3) &&
+        (plugin1 != plugin4 || !plugin4))) {
     return 2;
   }
+  // Note that only the creator and the destroyer are required for a component
+  // to exist
+
+  // Create the actual data container
+  void *component = creator();
 
   // Create the component handler object
   TS_Component_Handler *component_handler =
@@ -240,9 +256,8 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   component_handler->entity = entity;
   component_handler->plugin = plugin1;
   component_handler->destroyer = destroyer;
-
-  void *component = creator();
-
+  component_handler->serializer = serializer;
+  component_handler->deserializer = deserializer;
   component_handler->component = component;
 
   // Add the component
