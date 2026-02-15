@@ -38,6 +38,20 @@ struct TS_Scene_t {
   int should_reload;
 };
 
+#define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
+                                  plugin_var)                                  \
+  for (size_t i = 0; i < plugins->len; i++) {                                  \
+    TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);  \
+    GString *symbol = g_string_new(id);                                        \
+    g_string_prepend(symbol, prefix);                                          \
+    function_var = dlsym(plugin->fd, symbol->str);                             \
+    g_string_free(symbol, TRUE);                                               \
+    if (function_var) {                                                        \
+      plugin_var = plugin;                                                     \
+      break;                                                                   \
+    }                                                                          \
+  }
+
 TS_Scene_t *ts_create_scene() {
   TS_Scene_t *p = (TS_Scene_t *)malloc(sizeof(TS_Scene_t));
   p->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Loaded_Plugin *));
@@ -189,37 +203,23 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
     return 1;
   }
 
-  GString *symbol_id = g_string_new(id);
-
-  TS_Loaded_Plugin *plugin;
+  TS_Loaded_Plugin *plugin1;
+  TS_Loaded_Plugin *plugin2;
   TS_Component_Creator creator;
   TS_Component_Destroyer destroyer;
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, CREATOR_FUNCION_PREFIX, creator,
+                            plugin1);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESTROYER_FUNCION_PREFIX,
+                            destroyer, plugin2);
 
-  for (size_t i = 0; i < scene->plugins->len; i++) {
-    plugin = g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
-
-    // Try to find a function that has the suitable naming
-    GString *creator_symbol_id = g_string_copy(symbol_id);
-    GString *destroyer_symbol_id = g_string_copy(symbol_id);
-    g_string_prepend(creator_symbol_id, CREATOR_FUNCION_PREFIX);
-    g_string_prepend(destroyer_symbol_id, DESTROYER_FUNCION_PREFIX);
-
-    creator = dlsym(plugin->fd, creator_symbol_id->str);
-    g_string_free(creator_symbol_id, TRUE);
-
-    destroyer = dlsym(plugin->fd, destroyer_symbol_id->str);
-    g_string_free(destroyer_symbol_id, TRUE);
-
-    if (creator && destroyer) {
-      break;
-    }
+  if (!creator) {
+    return 2;
   }
-
-  g_string_free(symbol_id, TRUE);
-
-  if (!creator || !destroyer) {
-    // Not found the constructor or destroyer for the component
-    return 1;
+  if (!destroyer) {
+    return 2;
+  }
+  if (plugin1 != plugin2) {
+    return 2;
   }
 
   // Create the component handler object
@@ -228,7 +228,7 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
 
   component_handler->id = ts_copy_char_ptr(id);
   component_handler->entity = entity;
-  component_handler->plugin = plugin;
+  component_handler->plugin = plugin1;
   component_handler->destroyer = destroyer;
 
   void *component = creator();
@@ -308,43 +308,35 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   // Find the selector and system function
 
   // Working string
-  GString *symbol = g_string_new(id);
-  TS_Loaded_Plugin *plugin;
+  TS_Loaded_Plugin *plugin1;
+  TS_Loaded_Plugin *plugin2;
   TS_System_Selector selector;
   TS_System_Function system;
 
-  for (size_t i = 0; i < scene->plugins->len; i++) {
-    // Try to find a function that has the suitable naming
-    plugin = g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
-    GString *selector_symbol_cpy = g_string_copy(symbol);
-    g_string_prepend(selector_symbol_cpy, SYSTEM_SELECTOR_PREFIX);
-    selector = dlsym(plugin->fd, selector_symbol_cpy->str);
-    GString *system_symbol_cpy = g_string_copy(symbol);
-    g_string_prepend(system_symbol_cpy, SYSTEM_FUNCTION_PREFIX);
-    system = dlsym(plugin->fd, system_symbol_cpy->str);
-    g_string_free(selector_symbol_cpy, TRUE);
-    g_string_free(system_symbol_cpy, TRUE);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_SELECTOR_PREFIX,
+                            selector, plugin1);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_FUNCTION_PREFIX, system,
+                            plugin2);
 
-    if (selector && system) {
-      break;
-    }
+  if (!selector) {
+    return 2;
   }
-
-  if (!selector || !system) {
-    // Didn't find the selector
-    g_string_free(symbol, TRUE);
-    return 1;
+  if (!system) {
+    return 2;
+  }
+  if (plugin1 != plugin2) {
+    return 2;
   }
 
   // Found everything -> We can build the system handler
   TS_System_Handler *system_handler =
       (TS_System_Handler *)malloc(sizeof(TS_System_Handler));
-  system_handler->id = g_string_free(symbol, FALSE);
+  system_handler->id = ts_copy_char_ptr(id);
   system_handler->active = 1;
   system_handler->priority = priority;
   system_handler->system = system;
   system_handler->selector = selector;
-  system_handler->plugin = plugin;
+  system_handler->plugin = plugin1;
   g_array_append_val(scene->systems, system_handler);
 
   // Sort for priority
