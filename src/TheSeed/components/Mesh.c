@@ -4,7 +4,7 @@
 #include <glad/gl.h>
 #include <stdlib.h>
 
-void *ts_create_TS_Mesh() {
+void *ts_create_TS_Model() {
   TS_Mesh *mesh = (TS_Mesh *)malloc(sizeof(TS_Mesh));
 
   mesh->vertices = (float *)malloc(sizeof(float) * 3 * 4);
