@@ -38,6 +38,16 @@ struct TS_Scene_t {
   int should_reload;
 };
 
+typedef struct {
+  char *name;
+  size_t size;
+  void *data;
+} TS_Serialization_Field;
+
+struct TS_Serialization {
+  GArray *fields;
+};
+
 #define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
                                   plugin_var)                                  \
   for (size_t i = 0; i < plugins->len; i++) {                                  \
@@ -537,6 +547,59 @@ int ts_reload_all_plugins(TS_Scene_t *scene) {
 void ts_set_scene_reload(TS_Scene_t *scene) {
   scene->should_reload = 1;
   return;
+}
+
+void *ts_create_serialization() {
+  GArray *data = g_array_new(FALSE, FALSE, sizeof(TS_Serialization));
+
+  TS_Serialization *serialization =
+      (TS_Serialization *)malloc(sizeof(TS_Serialization));
+  serialization->fields = data;
+  return serialization;
+}
+
+void ts_destroy_serialization(TS_Serialization *serialization) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    free(field.name);
+  }
+  g_array_free(serialization->fields, TRUE);
+  free(serialization);
+  return;
+}
+
+void *ts_get_serialization(TS_Serialization *serialization, char *name) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    if (strcmp(name, field.name) == 0) {
+      return field.data;
+    }
+  }
+  return NULL;
+}
+
+int ts_set_serialization(TS_Serialization *serialization, char *name,
+                         size_t size, void *data) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    if (strcmp(name, field.name) == 0) {
+      // Replace the value
+      // The user is required to free the value stored in there beforehand
+      field.data = data;
+      return 1;
+    }
+  }
+
+  // Create new field
+  TS_Serialization_Field field;
+  field.name = ts_copy_char_ptr(name);
+  field.size = size;
+  field.data = data;
+  g_array_append_val(serialization->fields, field);
+  return 0;
 }
 
 // Debug Functions

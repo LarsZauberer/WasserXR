@@ -4,15 +4,20 @@
 #define TS_Scene_H
 
 typedef struct TS_Scene_t TS_Scene_t;
+typedef struct TS_Serialization TS_Serialization;
 typedef size_t TS_Entity;
 
 #define CREATOR_FUNCION_PREFIX "ts_create_"
 #define DESTROYER_FUNCION_PREFIX "ts_destroy_"
+#define SERIALIZER_FUNCTION_PREFIX "ts_serialize_"
+#define DESERIALIZER_SELECTOR_PREFIX "ts_deserialize_"
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 
 typedef void *(*TS_Component_Creator)(void);
 typedef void (*TS_Component_Destroyer)(void *);
+typedef void (*TS_Component_Serializer)(void *, TS_Serialization *);
+typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
 typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
 typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
 
@@ -154,6 +159,11 @@ void ts_destroy_scene(TS_Scene_t *scene);
  * @param scene The scene to destroy
  */
 void ts_set_scene_reload(TS_Scene_t *scene);
+
+void *ts_get_serialization(TS_Serialization *serialization, char *name);
+
+int ts_set_serialization(TS_Serialization *serialization, char *name,
+                         size_t size, void *data);
 
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
