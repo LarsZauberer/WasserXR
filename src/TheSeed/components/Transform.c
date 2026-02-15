@@ -10,12 +10,6 @@ void *ts_create_TS_Transform() {
   glm_vec3_zero(t->rotation);
   glm_vec3_one(t->scale);
 
-  // t->position[0] = -1.5f;
-  //
-  // t->rotation[0] = 45.0f;
-  //
-  // t->rotation[1] = 45.0f;
-
   return t;
 }
 
