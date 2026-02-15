@@ -47,6 +47,8 @@ typedef struct {
 } TS_Serialization_Field;
 
 struct TS_Serialization {
+  char *name;
+  TS_Entity entity;
   GArray *fields;
 };
 
@@ -207,6 +209,62 @@ int ts_unload_plugin(TS_Scene_t *scene, const char *path) {
   return 0;
 }
 
+TS_Serialization *ts_create_serialization(char *name, size_t entity) {
+  GArray *data = g_array_new(FALSE, FALSE, sizeof(TS_Serialization));
+
+  TS_Serialization *serialization =
+      (TS_Serialization *)malloc(sizeof(TS_Serialization));
+  serialization->name = ts_copy_char_ptr(name);
+  serialization->entity = entity;
+  serialization->fields = data;
+  return serialization;
+}
+
+void ts_destroy_serialization(TS_Serialization *serialization) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    free(field.name);
+  }
+  g_array_free(serialization->fields, TRUE);
+  free(serialization->name);
+  free(serialization);
+  return;
+}
+
+void *ts_get_serialization(TS_Serialization *serialization, char *name) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    if (strcmp(name, field.name) == 0) {
+      return field.data;
+    }
+  }
+  return NULL;
+}
+
+int ts_set_serialization(TS_Serialization *serialization, char *name,
+                         size_t size, void *data) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Serialization_Field field =
+        g_array_index(serialization->fields, TS_Serialization_Field, i);
+    if (strcmp(name, field.name) == 0) {
+      // Replace the value
+      // The user is required to free the value stored in there beforehand
+      field.data = data;
+      return 1;
+    }
+  }
+
+  // Create new field
+  TS_Serialization_Field field;
+  field.name = ts_copy_char_ptr(name);
+  field.size = size;
+  field.data = data;
+  g_array_append_val(serialization->fields, field);
+  return 0;
+}
+
 int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
                      const char *id) {
   // Check if the entity exists
@@ -238,10 +296,10 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   if (!destroyer) {
     return 2;
   }
-  if (!(plugin1 != plugin2 && (plugin1 != plugin3 || !plugin3) &&
-        (plugin1 != plugin4 || !plugin4))) {
-    return 2;
-  }
+  // if (!(plugin1 != plugin2 && (plugin1 != plugin3 || !plugin3) &&
+  //       (plugin1 != plugin4 || !plugin4))) {
+  //   return 2;
+  // }
   // Note that only the creator and the destroyer are required for a component
   // to exist
 
@@ -444,23 +502,23 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
 
   // Pre Unload operations
 
-  GArray *component_ids_to_reconstruct =
-      g_array_new(FALSE, FALSE, sizeof(char *));
-  GArray *component_entity_to_reconstruct =
-      g_array_new(FALSE, FALSE, sizeof(TS_Entity));
+  GArray *components_to_reconstruct =
+      g_array_new(FALSE, FALSE, sizeof(TS_Serialization *));
 
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
 
     if (component->plugin == plugin) {
-      // This component is part of the plugin
-      // Unload the component
-      // Save everything that is needed for reconstruction
+      // Serialize the component to reconstruct it later
+      TS_Serialization *serialization =
+          ts_create_serialization(component->id, component->entity);
 
-      char *id = ts_copy_char_ptr(component->id);
-      g_array_append_val(component_ids_to_reconstruct, id);
-      g_array_append_val(component_entity_to_reconstruct, component->entity);
+      // Serialize the component
+      if (component->serializer) {
+        component->serializer(component->component, serialization);
+      }
+      g_array_append_val(components_to_reconstruct, serialization);
 
       // Delete the component
       ts_remove_component(scene, component->entity, component->id);
@@ -524,25 +582,29 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
     }
   }
 
-  // Replace all the components
-  for (size_t i = 0; i < component_ids_to_reconstruct->len; i++) {
-    char *id_to_construct =
-        g_array_index(component_ids_to_reconstruct, char *, i);
-    TS_Entity entity_to_construct =
-        g_array_index(component_entity_to_reconstruct, TS_Entity, i);
+  // Reconstruct all the components
+  for (size_t i = 0; i < components_to_reconstruct->len; i++) {
+    TS_Serialization *reconstruction =
+        g_array_index(components_to_reconstruct, TS_Serialization *, i);
 
-    if (ts_add_component(scene, entity_to_construct, id_to_construct)) {
-      status = 2;
+    status =
+        ts_add_component(scene, reconstruction->entity, reconstruction->name);
+    if (status) {
+      ts_destroy_serialization(reconstruction);
+      continue;
     }
-  }
+    size_t index_of_new_component = ts_get_component_index_from_entity_and_id(
+        scene, reconstruction->entity, reconstruction->name);
+    TS_Component_Handler *component = g_array_index(
+        scene->components, TS_Component_Handler *, index_of_new_component);
+    if (component->deserializer) {
+      component->deserializer(component, reconstruction);
+    }
 
-  // Destroy all the helper arrays
-  for (size_t i = 0; i < component_ids_to_reconstruct->len; i++) {
-    char *id_to_free = g_array_index(component_ids_to_reconstruct, char *, i);
-    free(id_to_free);
+    // Clean up the helper array and the serialization
+    ts_destroy_serialization(reconstruction);
   }
-  g_array_free(component_ids_to_reconstruct, TRUE);
-  g_array_free(component_entity_to_reconstruct, TRUE);
+  g_array_free(components_to_reconstruct, TRUE);
 
   return status;
 }
@@ -562,59 +624,6 @@ int ts_reload_all_plugins(TS_Scene_t *scene) {
 void ts_set_scene_reload(TS_Scene_t *scene) {
   scene->should_reload = 1;
   return;
-}
-
-void *ts_create_serialization() {
-  GArray *data = g_array_new(FALSE, FALSE, sizeof(TS_Serialization));
-
-  TS_Serialization *serialization =
-      (TS_Serialization *)malloc(sizeof(TS_Serialization));
-  serialization->fields = data;
-  return serialization;
-}
-
-void ts_destroy_serialization(TS_Serialization *serialization) {
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    free(field.name);
-  }
-  g_array_free(serialization->fields, TRUE);
-  free(serialization);
-  return;
-}
-
-void *ts_get_serialization(TS_Serialization *serialization, char *name) {
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    if (strcmp(name, field.name) == 0) {
-      return field.data;
-    }
-  }
-  return NULL;
-}
-
-int ts_set_serialization(TS_Serialization *serialization, char *name,
-                         size_t size, void *data) {
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    if (strcmp(name, field.name) == 0) {
-      // Replace the value
-      // The user is required to free the value stored in there beforehand
-      field.data = data;
-      return 1;
-    }
-  }
-
-  // Create new field
-  TS_Serialization_Field field;
-  field.name = ts_copy_char_ptr(name);
-  field.size = size;
-  field.data = data;
-  g_array_append_val(serialization->fields, field);
-  return 0;
 }
 
 // Debug Functions
