@@ -225,6 +225,7 @@ void ts_destroy_serialization(TS_Serialization *serialization) {
     TS_Serialization_Field field =
         g_array_index(serialization->fields, TS_Serialization_Field, i);
     free(field.name);
+    free(field.data);
   }
   g_array_free(serialization->fields, TRUE);
   free(serialization->name);
@@ -598,7 +599,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
     TS_Component_Handler *component = g_array_index(
         scene->components, TS_Component_Handler *, index_of_new_component);
     if (component->deserializer) {
-      component->deserializer(component, reconstruction);
+      component->deserializer(component->component, reconstruction);
     }
 
     // Clean up the helper array and the serialization
