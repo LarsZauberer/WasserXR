@@ -4,21 +4,20 @@
 #include <stddef.h>
 typedef struct {
   size_t vertices_size;
-  size_t indices_size;
+  size_t faces_size;
 
   float *vertices;
+  float *normals;
   unsigned int *indices;
-  float *texture_coordinates;
 } TS_Mesh_Data;
 
 typedef struct {
-  TS_Mesh_Data *mesh;
   unsigned int vao;
   unsigned int vbo;
   unsigned int ebo;
 } TS_Mesh;
 
-TS_Mesh_Data *ts_read_model_file(char *filename);
+int ts_read_mesh_data(TS_Mesh_Data *out, char *filename);
 void ts_destroy_mesh_data(TS_Mesh_Data *mesh);
 
 TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data);

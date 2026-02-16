@@ -1,5 +1,5 @@
-#ifndef TS_MESH_H
-#define TS_MESH_H
+#ifndef TS_MODEL_H
+#define TS_MODEL_H
 
 #include "TheSeed/core/Shader.h"
 typedef struct {

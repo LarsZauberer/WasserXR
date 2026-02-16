@@ -36,6 +36,7 @@
             pkgs.pkg-config
             pkgs.pcre2
             pkgs.libsysprof-capture
+            pkgs.assimp
           ];
 
           shellHook = '''';

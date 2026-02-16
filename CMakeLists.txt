@@ -8,6 +8,7 @@ add_compile_options(-std=c99 -Wall -Wextra -O0 -g -fno-omit-frame-pointer)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(CGLM REQUIRED cglm)
+pkg_check_modules(ASSIMP REQUIRED assimp)
 
 # OpenGL
 add_library(glad SHARED src/glad/gl.c)
@@ -17,8 +18,8 @@ target_include_directories(glad PUBLIC include)
 file(GLOB CORE_SRC src/TheSeed/core/*.c)
 add_library(theseed_core SHARED ${CORE_SRC})
 target_include_directories(theseed_core PUBLIC include)
-target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_LIBRARIES})
-target_link_libraries(theseed_core PRIVATE glad glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES})
+target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
+target_link_libraries(theseed_core PRIVATE glad glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} ${ASSIMP_LIBRARIES})
 
 # ECS
 file(GLOB ECS_SRC src/TheSeed/ecs/*.c)
