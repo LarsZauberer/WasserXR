@@ -34,19 +34,18 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
   mesh_data.vertices = vertices;
   mesh_data.normals = normals;
 
-  GArray *indices = g_array_new(FALSE, FALSE, sizeof(unsigned int));
+  unsigned int *indices = malloc(sizeof(unsigned int) * 3);
 
   for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
     aiFace face = mesh->mFaces[i];
     g_assert(face.mNumIndices == 3);
     for (unsigned int j = 0; j < face.mNumIndices; j++) {
-      g_array_append_val(indices, face.mIndices[j]);
+      indices[i * 3 + j] = face.mIndices[j];
     }
   }
 
   mesh_data.faces_size = mesh->mNumFaces;
-  mesh_data.indices = (unsigned int *)g_array_free(indices, FALSE);
-
+  mesh_data.indices = indices;
   return mesh_data;
 }
 
@@ -66,7 +65,7 @@ static void ts_process_node(GArray *mesh_data, const aiScene *scene,
   return;
 }
 
-int ts_read_mesh_data(TS_Mesh_Data *out, char *filename) {
+unsigned int ts_read_mesh_data(TS_Mesh_Data *out, char *filename) {
   const aiScene *scene =
       aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
 
@@ -90,6 +89,41 @@ void ts_destroy_mesh_data(TS_Mesh_Data *mesh) {
   return;
 }
 
-TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {}
+TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
+  TS_Mesh *mesh = (TS_Mesh *)malloc(sizeof(TS_Mesh));
 
-void ts_destroy_mesh(TS_Mesh *mesh) {}
+  // Generate the buffers
+  glGenVertexArrays(1, &mesh->vao);
+  glGenBuffers(1, &mesh->vbo);
+  glGenBuffers(1, &mesh->ebo);
+
+  // // Bind the buffers
+  glBindVertexArray(mesh->vao);
+
+  // Move vertices over
+  glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * mesh_data->vertices_size,
+               mesh_data->vertices, GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+               sizeof(unsigned int) * 3 * mesh_data->faces_size,
+               mesh_data->indices, GL_STATIC_DRAW);
+
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+
+  // Unbind
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  // You are not allowed to unbind the ebo because it is stored in the vao
+  // directly
+  glBindVertexArray(0);
+  return mesh;
+}
+
+void ts_destroy_mesh(TS_Mesh *mesh) {
+  glDeleteVertexArrays(1, &mesh->vao);
+  glDeleteBuffers(1, &mesh->vbo);
+  glDeleteBuffers(1, &mesh->ebo);
+  free(mesh);
+}

@@ -17,7 +17,7 @@ typedef struct {
   unsigned int ebo;
 } TS_Mesh;
 
-int ts_read_mesh_data(TS_Mesh_Data *out, char *filename);
+unsigned int ts_read_mesh_data(TS_Mesh_Data *out, char *filename);
 void ts_destroy_mesh_data(TS_Mesh_Data *mesh);
 
 TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data);
