@@ -3,10 +3,7 @@ project(TheSeed LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_C_COMPILER_LAUNCHER ccache)
-set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
-
-add_compile_options(-Wall -Wextra -O0 -g -std=c99)
+add_compile_options(-std=c99 -Wall -Wextra -O0 -g -fno-omit-frame-pointer)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)

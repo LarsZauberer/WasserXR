@@ -24,7 +24,6 @@
           buildInputs = [
             pkgs.gcc
             pkgs.cmake
-            pkgs.ccache
             pkgs.ninja
             pkgs.gdb
             pkgs.valgrind
