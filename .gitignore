@@ -1,5 +1,6 @@
 .cache/
 build/
 .direnv/
+vgcore*
 
 AGENTS.md
