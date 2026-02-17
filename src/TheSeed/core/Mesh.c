@@ -92,6 +92,8 @@ void ts_destroy_mesh_data(TS_Mesh_Data *mesh) {
 TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
   TS_Mesh *mesh = (TS_Mesh *)malloc(sizeof(TS_Mesh));
 
+  mesh->numIndices = mesh_data->faces_size * 3;
+
   // Generate the buffers
   glGenVertexArrays(1, &mesh->vao);
   glGenBuffers(1, &mesh->vbo);

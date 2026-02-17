@@ -12,6 +12,7 @@ typedef struct {
 } TS_Mesh_Data;
 
 typedef struct {
+  unsigned int numIndices;
   unsigned int vao;
   unsigned int vbo;
   unsigned int ebo;

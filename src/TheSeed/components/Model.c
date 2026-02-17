@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define CHECKED_FREE(ptr)                                                      \
+  if (ptr) {                                                                   \
+    free(ptr);                                                                 \
+  }
+
 void *ts_create_TS_Model() {
   TS_Model *model = (TS_Model *)malloc(sizeof(TS_Model));
 
@@ -18,10 +23,19 @@ void *ts_create_TS_Model() {
 
 void ts_destroy_TS_Mesh(void *p) {
   TS_Model *model = (TS_Model *)p;
-  free(model->model_name);
-  free(model->shader_name);
-  free(model->meshes);
+  CHECKED_FREE(model->model_name);
+  CHECKED_FREE(model->shader_name);
+
+  // Free all the meshes
+  for (unsigned int i = 0; i < model->numMeshes; i++) {
+    ts_destroy_mesh(model->meshes[i]);
+  }
+  CHECKED_FREE(model->meshes);
+
+  // Free the shader
   ts_destroy_shader(model->shader);
+
+  // Free the model
   free(model);
   return;
 }
@@ -63,6 +77,7 @@ void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
     model->shader_name =
         (char *)ts_get_serialization(serialization, "shader_name");
   }
+  ts_activate_TS_Model(model);
   return;
 }
 
@@ -79,13 +94,17 @@ void ts_activate_TS_Model(void *ptr) {
 
   if (model->model_name) {
     // Read all the mesh data
-    // TODO: Fix the issue with the double pointering
-    TS_Mesh_Data **mesh_data = NULL;
-    unsigned int n = ts_read_mesh_data(mesh_data, model->model_name);
+    TS_Mesh_Data *mesh_data = NULL;
+    model->numMeshes = ts_read_mesh_data(mesh_data, model->model_name);
+
+    TS_Mesh **meshes = (TS_Mesh **)malloc(sizeof(TS_Mesh) * model->numMeshes);
 
     // Load the mesh with opengl
-    for (unsigned int i = 0; i < n; i++) {
-      ts_create_mesh_from_data(mesh_data[i]);
+    for (unsigned int i = 0; i < model->numMeshes; i++) {
+      meshes[i] = ts_create_mesh_from_data(&mesh_data[i]);
     }
+
+    model->meshes = meshes;
   }
+  return;
 }

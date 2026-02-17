@@ -9,7 +9,7 @@ typedef struct {
   char *shader_name;
   TS_Shader *shader;
   unsigned int numMeshes;
-  TS_Mesh *meshes;
+  TS_Mesh **meshes;
 } TS_Model;
 
 void *ts_create_TS_Model();

@@ -2,7 +2,7 @@
 
 #include "GLFW/glfw3.h"
 #include "TheSeed/components/Camera.h"
-#include "TheSeed/components/Mesh.h"
+#include "TheSeed/components/Model.h"
 #include "TheSeed/components/Transform.h"
 #include "TheSeed/components/Window.h"
 #include "TheSeed/core/Shader.h"
@@ -76,52 +76,60 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
   }
 
   for (size_t i = 0; i < n; i++) {
-    // Entity has to have both mesh and transform
+    // Normal mesh entity
     TS_Entity entity = entities[i];
     if (entity == camera_entity || entity == window_entity) {
       continue;
     }
-    TS_Mesh *mesh = ts_entity_get_component(scene, entity, "TS_Mesh");
+    TS_Model *model = ts_entity_get_component(scene, entity, "TS_Mesh");
     TS_Transform_t *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");
 
-    glBindVertexArray(mesh->vao);
-    ts_use_shader(mesh->shader);
+    ts_use_shader(model->shader);
+    mat4 model_transform;
+    mat4 view_transform;
+    mat4 projection_transform;
+    glm_mat4_identity(model_transform);
+    glm_mat4_identity(view_transform);
+    glm_mat4_identity(projection_transform);
 
     // Create the transformation matrix
-    mat4 model;
-    mat4 view;
-    mat4 projection;
-    glm_mat4_identity(model);
-    glm_mat4_identity(view);
-    glm_mat4_identity(projection);
 
     // World Space placement
-    glm_translate(model, transform->position);
-    glm_rotate_x(model, glm_rad(transform->rotation[0]), model);
-    glm_rotate_y(model, glm_rad(transform->rotation[1]), model);
-    glm_rotate_z(model, glm_rad(transform->rotation[2]), model);
-    glm_scale(model, transform->scale);
+    glm_translate(model_transform, transform->position);
+    glm_rotate_x(model_transform, glm_rad(transform->rotation[0]),
+                 model_transform);
+    glm_rotate_y(model_transform, glm_rad(transform->rotation[1]),
+                 model_transform);
+    glm_rotate_z(model_transform, glm_rad(transform->rotation[2]),
+                 model_transform);
+    glm_scale(model_transform, transform->scale);
 
     // Camera placement
     vec4 camera_pos_4;
     glm_vec4(cam_transform->position, 1.0f, camera_pos_4);
     glm_vec4_negate(camera_pos_4);
-    glm_translate(view, camera_pos_4);
+    glm_translate(view_transform, camera_pos_4);
 
     // Perspective
     int width, height;
     glfwGetWindowSize(window->window, &width, &height);
     glm_perspective(glm_rad(FOV), (float)width / (float)height, NEAR, FAR,
-                    projection);
+                    projection_transform);
 
     // Put everything to the respective uniforms in the shader
-    ts_set_shader_uniform_mat4(mesh->shader, "model", model);
-    ts_set_shader_uniform_mat4(mesh->shader, "view", view);
-    ts_set_shader_uniform_mat4(mesh->shader, "projection", projection);
+    ts_set_shader_uniform_mat4(model->shader, "model", model_transform);
+    ts_set_shader_uniform_mat4(model->shader, "view", view_transform);
+    ts_set_shader_uniform_mat4(model->shader, "projection",
+                               projection_transform);
 
-    // TODO: Handle the amount of vertices to draw
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // Draw the meshes
+    for (unsigned int i = 0; i < model->numMeshes; i++) {
+      glBindVertexArray(model->meshes[i]->vao);
+
+      glDrawElements(GL_TRIANGLES, model->meshes[i]->numIndices,
+                     GL_UNSIGNED_INT, 0);
+    }
   }
   return;
 }
