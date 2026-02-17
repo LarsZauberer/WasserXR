@@ -17,11 +17,13 @@ void *ts_create_TS_Model() {
   model->model_name = NULL;
   model->shader_name = NULL;
   model->meshes = NULL;
+  model->shader = NULL;
+  model->numMeshes = 0;
 
   return model;
 }
 
-void ts_destroy_TS_Mesh(void *p) {
+void ts_destroy_TS_Model(void *p) {
   TS_Model *model = (TS_Model *)p;
   CHECKED_FREE(model->model_name);
   CHECKED_FREE(model->shader_name);
