@@ -74,13 +74,17 @@ void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
   }
 
   if (ts_get_serialization(serialization, "model_name")) {
-    model->model_name =
+    char *serialization_model_name =
         (char *)ts_get_serialization(serialization, "model_name");
+
+    model->model_name = ts_copy_char_ptr(serialization_model_name);
   }
 
   if (ts_get_serialization(serialization, "shader_name")) {
-    model->shader_name =
+    char *serialization_shader_name =
         (char *)ts_get_serialization(serialization, "shader_name");
+
+    model->shader_name = ts_copy_char_ptr(serialization_shader_name);
   }
   ts_activate_TS_Model(model);
   return;
