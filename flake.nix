@@ -24,7 +24,6 @@
           buildInputs = [
             pkgs.gcc
             pkgs.cmake
-            pkgs.ccache
             pkgs.ninja
             pkgs.gdb
             pkgs.valgrind
@@ -37,6 +36,7 @@
             pkgs.pkg-config
             pkgs.pcre2
             pkgs.libsysprof-capture
+            pkgs.assimp
           ];
 
           shellHook = '''';

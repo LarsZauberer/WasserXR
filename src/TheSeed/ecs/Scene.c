@@ -297,6 +297,8 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   if (!destroyer) {
     return 2;
   }
+  // TODO: Fix the plugin checking
+  //
   // if (!(plugin1 != plugin2 && (plugin1 != plugin3 || !plugin3) &&
   //       (plugin1 != plugin4 || !plugin4))) {
   //   return 2;
