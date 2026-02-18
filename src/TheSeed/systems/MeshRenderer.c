@@ -85,6 +85,11 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
     TS_Transform_t *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");
 
+    // Check if the model is loaded yet
+    if (model->meshes == NULL || model->shader == NULL) {
+      continue;
+    }
+
     ts_use_shader(model->shader);
     mat4 model_transform;
     mat4 view_transform;
