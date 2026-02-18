@@ -10,7 +10,8 @@ typedef size_t TS_Entity;
 #define CREATOR_FUNCION_PREFIX "ts_create_"
 #define DESTROYER_FUNCION_PREFIX "ts_destroy_"
 #define SERIALIZER_FUNCTION_PREFIX "ts_serialize_"
-#define DESERIALIZER_SELECTOR_PREFIX "ts_deserialize_"
+#define DESERIALIZER_FUNCTION_PREFIX "ts_deserialize_"
+#define ACTIVATOR_FUNCTION_PREFIX "ts_activate_"
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 
@@ -18,6 +19,7 @@ typedef void *(*TS_Component_Creator)(void);
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Serializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
+typedef void (*TS_Component_Activator)(void *);
 typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
 typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
 
@@ -96,7 +98,8 @@ int ts_reload_all_plugins(TS_Scene_t *scene);
  * @return 0 on success, non-zero on failure
  */
 int ts_add_component(TS_Scene_t *scene, const size_t entity_id,
-                     const char *component_name);
+                     const char *component_name,
+                     TS_Serialization *serialization);
 
 /**
  * Remove a component from an entity.

@@ -86,7 +86,6 @@ void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
 
     model->shader_name = ts_copy_char_ptr(serialization_shader_name);
   }
-  ts_activate_TS_Model(model);
   return;
 }
 

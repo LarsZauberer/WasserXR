@@ -11,19 +11,19 @@ int main() {
   status = ts_load_plugin(scene, "build/libtheseed_systems.so");
 
   size_t window = ts_add_entity(scene);
-  status = ts_add_component(scene, window, "TS_Window");
+  status = ts_add_component(scene, window, "TS_Window", NULL);
 
   size_t camera = ts_add_entity(scene);
-  status = ts_add_component(scene, camera, "TS_Camera");
-  status = ts_add_component(scene, camera, "TS_Transform");
+  status = ts_add_component(scene, camera, "TS_Camera", NULL);
+  status = ts_add_component(scene, camera, "TS_Transform", NULL);
 
   TS_Transform_t *camera_transform =
       ts_entity_get_component(scene, camera, "TS_Transform");
   camera_transform->position[2] = 3.0f;
 
   size_t triangle = ts_add_entity(scene);
-  ts_add_component(scene, triangle, "TS_Transform");
-  ts_add_component(scene, triangle, "TS_Model");
+  ts_add_component(scene, triangle, "TS_Transform", NULL);
+  ts_add_component(scene, triangle, "TS_Model", NULL);
   TS_Transform_t *triangle_transform =
       ts_entity_get_component(scene, triangle, "TS_Transform");
   triangle_transform->position[0] = 0.0f;

@@ -19,6 +19,7 @@ typedef struct {
   TS_Component_Destroyer destroyer;
   TS_Component_Serializer serializer;
   TS_Component_Deserializer deserializer;
+  TS_Component_Activator activator;
   void *component;
 } TS_Component_Handler;
 
@@ -266,8 +267,8 @@ int ts_set_serialization(TS_Serialization *serialization, char *name,
   return 0;
 }
 
-int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
-                     const char *id) {
+int ts_add_component(TS_Scene_t *scene, const TS_Entity entity, const char *id,
+                     TS_Serialization *serialization) {
   // Check if the entity exists
   long does_exist = ts_get_entity_index(scene, entity);
   if (does_exist == -1) {
@@ -278,18 +279,22 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   TS_Loaded_Plugin *plugin2;
   TS_Loaded_Plugin *plugin3;
   TS_Loaded_Plugin *plugin4;
+  TS_Loaded_Plugin *plugin5;
   TS_Component_Creator creator;
   TS_Component_Destroyer destroyer;
   TS_Component_Serializer serializer;
   TS_Component_Deserializer deserializer;
+  TS_Component_Activator activator;
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, CREATOR_FUNCION_PREFIX, creator,
                             plugin1);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESTROYER_FUNCION_PREFIX,
                             destroyer, plugin2);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SERIALIZER_FUNCTION_PREFIX,
                             serializer, plugin3);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESERIALIZER_SELECTOR_PREFIX,
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESERIALIZER_FUNCTION_PREFIX,
                             deserializer, plugin4);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, ACTIVATOR_FUNCTION_PREFIX,
+                            activator, plugin5);
 
   if (!creator) {
     return 2;
@@ -308,6 +313,19 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
 
   // Create the actual data container
   void *component = creator();
+  if (deserializer) {
+    if (!serialization) {
+      TS_Serialization *serialization =
+          ts_create_serialization(ts_copy_char_ptr(id), entity);
+      deserializer(component, serialization);
+      ts_destroy_serialization(serialization);
+    } else {
+      deserializer(component, serialization);
+    }
+  }
+  if (activator) {
+    activator(component);
+  }
 
   // Create the component handler object
   TS_Component_Handler *component_handler =
@@ -319,6 +337,7 @@ int ts_add_component(TS_Scene_t *scene, const TS_Entity entity,
   component_handler->destroyer = destroyer;
   component_handler->serializer = serializer;
   component_handler->deserializer = deserializer;
+  component_handler->activator = activator;
   component_handler->component = component;
 
   // Add the component
@@ -590,19 +609,9 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
     TS_Serialization *reconstruction =
         g_array_index(components_to_reconstruct, TS_Serialization *, i);
 
-    status =
-        ts_add_component(scene, reconstruction->entity, reconstruction->name);
-    if (status) {
-      ts_destroy_serialization(reconstruction);
-      continue;
-    }
-    size_t index_of_new_component = ts_get_component_index_from_entity_and_id(
-        scene, reconstruction->entity, reconstruction->name);
-    TS_Component_Handler *component = g_array_index(
-        scene->components, TS_Component_Handler *, index_of_new_component);
-    if (component->deserializer) {
-      component->deserializer(component->component, reconstruction);
-    }
+    // Silently fail if something doesn't work
+    status = ts_add_component(scene, reconstruction->entity,
+                              reconstruction->name, reconstruction);
 
     // Clean up the helper array and the serialization
     ts_destroy_serialization(reconstruction);
