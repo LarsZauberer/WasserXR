@@ -29,6 +29,8 @@ typedef struct {
   int active;
   TS_Loaded_Plugin *plugin;
   TS_System_Selector selector;
+  TS_System_Attacher attacher;
+  TS_System_Detacher detacher;
   TS_System_Function system;
 } TS_System_Handler;
 
@@ -415,13 +417,21 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   // Working string
   TS_Loaded_Plugin *plugin1;
   TS_Loaded_Plugin *plugin2;
+  TS_Loaded_Plugin *plugin3;
+  TS_Loaded_Plugin *plugin4;
   TS_System_Selector selector;
   TS_System_Function system;
+  TS_System_Attacher attacher;
+  TS_System_Detacher detacher;
 
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_SELECTOR_PREFIX,
                             selector, plugin1);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_FUNCTION_PREFIX, system,
                             plugin2);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_ATTACH_PREFIX, attacher,
+                            plugin3);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_DETACH_PREFIX, detacher,
+                            plugin4);
 
   if (!selector) {
     return 2;
@@ -441,8 +451,15 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   system_handler->priority = priority;
   system_handler->system = system;
   system_handler->selector = selector;
+  system_handler->attacher = attacher;
+  system_handler->detacher = detacher;
   system_handler->plugin = plugin1;
   g_array_append_val(scene->systems, system_handler);
+
+  // Execute the attacher
+  if (attacher) {
+    attacher();
+  }
 
   // Sort for priority
   ts_sort_systems(scene);
@@ -506,6 +523,11 @@ int ts_remove_system(TS_Scene_t *scene, const char *id) {
 
   TS_System_Handler *system =
       g_array_index(scene->systems, TS_System_Handler *, index);
+
+  if (system->detacher) {
+    system->detacher();
+  }
+
   free(system->id);
   free(system);
   g_array_remove_index(scene->systems, index);
