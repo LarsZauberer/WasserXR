@@ -14,8 +14,8 @@ struct TS_Shader {
   unsigned int program;
   int is_loaded;
   int is_compiled;
-  GString *vertex_source;
-  GString *fragment_source;
+  char *vertex_source;
+  char *fragment_source;
 };
 
 TS_Shader *ts_create_shader(char *path) {
@@ -51,17 +51,19 @@ int ts_load_shader(TS_Shader *shader) {
   strcat(fragment_path, ".frag");
 
   // Load vertex shader
-  if (ts_read_file_to_gstring(vertex_path, &shader->vertex_source) != 0) {
+  shader->vertex_source = ts_read_file(vertex_path);
+  if (shader->vertex_source == NULL) {
     free(vertex_path);
     free(fragment_path);
     return 1;
   }
 
   // Load fragment shader
-  if (ts_read_file_to_gstring(fragment_path, &shader->fragment_source) != 0) {
+  shader->fragment_source = ts_read_file(fragment_path);
+  if (shader->fragment_source == NULL) {
     free(vertex_path);
     free(fragment_path);
-    g_string_free(shader->vertex_source, TRUE);
+    free(shader->vertex_source);
     shader->vertex_source = NULL;
     return 1;
   }
@@ -92,7 +94,7 @@ int ts_compile_shader(TS_Shader *shader) {
 
   // Compile vertex shader
   vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  const char *vertex_src = shader->vertex_source->str;
+  const char *vertex_src = shader->vertex_source;
   glShaderSource(vertex_shader, 1, &vertex_src, NULL);
   glCompileShader(vertex_shader);
 
@@ -100,15 +102,15 @@ int ts_compile_shader(TS_Shader *shader) {
   if (!success) {
     glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
     fprintf(stderr, "Error: Vertex shader compilation failed\n%s\n", info_log);
-    g_string_free(shader->vertex_source, TRUE);
-    g_string_free(shader->fragment_source, TRUE);
+    free(shader->vertex_source);
+    free(shader->fragment_source);
     shader->is_loaded = 0;
     return 1;
   }
 
   // Compile fragment shader
   fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  const char *fragment_src = shader->fragment_source->str;
+  const char *fragment_src = shader->fragment_source;
   glShaderSource(fragment_shader, 1, &fragment_src, NULL);
   glCompileShader(fragment_shader);
 
@@ -117,8 +119,8 @@ int ts_compile_shader(TS_Shader *shader) {
     glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
     fprintf(stderr, "Error: Fragment shader compilation failed\n%s\n",
             info_log);
-    g_string_free(shader->vertex_source, TRUE);
-    g_string_free(shader->fragment_source, TRUE);
+    free(shader->vertex_source);
+    free(shader->fragment_source);
     glDeleteShader(vertex_shader);
     shader->is_loaded = 0;
     return 1;
@@ -134,8 +136,8 @@ int ts_compile_shader(TS_Shader *shader) {
   if (!success) {
     glGetProgramInfoLog(shader->program, 512, NULL, info_log);
     fprintf(stderr, "Error: Shader program linking failed\n%s\n", info_log);
-    g_string_free(shader->vertex_source, TRUE);
-    g_string_free(shader->fragment_source, TRUE);
+    free(shader->vertex_source);
+    free(shader->fragment_source);
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
     glDeleteProgram(shader->program);
@@ -144,8 +146,8 @@ int ts_compile_shader(TS_Shader *shader) {
   }
 
   // Clean up everything unneeded
-  g_string_free(shader->vertex_source, TRUE);
-  g_string_free(shader->fragment_source, TRUE);
+  free(shader->vertex_source);
+  free(shader->fragment_source);
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
 
