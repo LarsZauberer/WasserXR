@@ -6,7 +6,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_COMPILER_LAUNCHER ccache)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 
-add_compile_options(-Wall -Wextra -O0 -g)
+add_compile_options(-Wall -Wextra -O0 -g -std=c99)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
