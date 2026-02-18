@@ -14,6 +14,8 @@ typedef size_t TS_Entity;
 #define ACTIVATOR_FUNCTION_PREFIX "ts_activate_"
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
+#define SYSTEM_ATTACH_PREFIX "ts_attach_"
+#define SYSTEM_DETACH_PREFIX "ts_detach_"
 
 typedef void *(*TS_Component_Creator)(void);
 typedef void (*TS_Component_Destroyer)(void *);
@@ -22,6 +24,8 @@ typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Activator)(void *);
 typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
 typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
+typedef void (*TS_System_Attacher)(void);
+typedef void (*TS_System_Detacher)(void);
 
 /**
  * Create a new scene object.
