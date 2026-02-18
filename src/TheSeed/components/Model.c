@@ -1,6 +1,7 @@
 #include "TheSeed/components/Model.h"
 #include "TheSeed/core/Mesh.h"
 #include "TheSeed/core/Shader.h"
+#include "TheSeed/core/utils.h"
 #include "TheSeed/ecs/Scene.h"
 #include <glad/gl.h>
 #include <stdlib.h>
@@ -50,15 +51,17 @@ void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization) {
   }
 
   if (model->model_name) {
+    char *model_name_copy = ts_copy_char_ptr(model->model_name);
     ts_set_serialization(serialization, "model_name",
-                         sizeof(char) * strlen(model->model_name),
-                         model->model_name);
+                         sizeof(char) * (strlen(model->model_name) + 1),
+                         model_name_copy);
   }
 
   if (model->shader_name) {
+    char *shader_name_copy = ts_copy_char_ptr(model->shader_name);
     ts_set_serialization(serialization, "shader_name",
-                         sizeof(char) * strlen(model->shader_name),
-                         model->shader_name);
+                         sizeof(char) * (strlen(model->shader_name) + 1),
+                         shader_name_copy);
   }
   return;
 }
@@ -92,19 +95,25 @@ void ts_activate_TS_Model(void *ptr) {
 
   if (model->shader_name) {
     model->shader = ts_create_shader(model->shader_name);
+    ts_load_shader(model->shader);
+    ts_compile_shader(model->shader);
   }
 
   if (model->model_name) {
-    // Read all the mesh data
-    TS_Mesh_Data *mesh_data = NULL;
-    model->numMeshes = ts_read_mesh_data(mesh_data, model->model_name);
+    // Read all the mesh data (array)
+    TS_Mesh_Data *mesh_data =
+        ts_read_mesh_data(&model->numMeshes, model->model_name);
 
-    TS_Mesh **meshes = (TS_Mesh **)malloc(sizeof(TS_Mesh) * model->numMeshes);
+    // Array of pointers
+    TS_Mesh **meshes = (TS_Mesh **)malloc(sizeof(TS_Mesh *) * model->numMeshes);
 
     // Load the mesh with opengl
     for (unsigned int i = 0; i < model->numMeshes; i++) {
       meshes[i] = ts_create_mesh_from_data(&mesh_data[i]);
+      // Free up the mesh data
+      ts_destroy_mesh_data(&mesh_data[i]);
     }
+    free(mesh_data);
 
     model->meshes = meshes;
   }

@@ -34,7 +34,7 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
   mesh_data.vertices = vertices;
   mesh_data.normals = normals;
 
-  unsigned int *indices = malloc(sizeof(unsigned int) * 3);
+  unsigned int *indices = malloc(sizeof(unsigned int) * mesh->mNumFaces * 3);
 
   for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
     aiFace face = mesh->mFaces[i];
@@ -65,21 +65,22 @@ static void ts_process_node(GArray *mesh_data, const aiScene *scene,
   return;
 }
 
-unsigned int ts_read_mesh_data(TS_Mesh_Data *out, char *filename) {
+TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
   const aiScene *scene =
       aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
 
   if (!scene) {
     printf("Failed to load the model file %s: %s\n", filename,
            aiGetErrorString());
+    *n = 0;
+    return NULL;
   }
 
   GArray *output_meshes = g_array_new(FALSE, FALSE, sizeof(TS_Mesh_Data));
   ts_process_node(output_meshes, scene, scene->mRootNode);
 
-  unsigned int n = output_meshes->len;
-  out = (TS_Mesh_Data *)g_array_free(output_meshes, FALSE);
-  return n;
+  *n = output_meshes->len;
+  return (TS_Mesh_Data *)g_array_free(output_meshes, FALSE);
 }
 
 void ts_destroy_mesh_data(TS_Mesh_Data *mesh) {

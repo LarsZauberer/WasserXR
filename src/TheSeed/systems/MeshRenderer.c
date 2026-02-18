@@ -23,7 +23,7 @@
 int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const TS_Entity entity) {
   size_t normal_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&
-      ts_entity_get_component(scene, entity, "TS_Mesh");
+      ts_entity_get_component(scene, entity, "TS_Model");
   size_t camera_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&
       ts_entity_get_component(scene, entity, "TS_Camera");
@@ -81,7 +81,7 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
     if (entity == camera_entity || entity == window_entity) {
       continue;
     }
-    TS_Model *model = ts_entity_get_component(scene, entity, "TS_Mesh");
+    TS_Model *model = ts_entity_get_component(scene, entity, "TS_Model");
     TS_Transform_t *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");
 

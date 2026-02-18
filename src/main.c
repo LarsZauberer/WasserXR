@@ -26,8 +26,9 @@ int main() {
   ts_add_component(scene, triangle, "TS_Model");
   TS_Transform_t *triangle_transform =
       ts_entity_get_component(scene, triangle, "TS_Transform");
-  triangle_transform->position[0] = 1.0f;
-  triangle_transform->rotation[2] = 180.0f;
+  triangle_transform->position[0] = 0.0f;
+  triangle_transform->rotation[1] = 45.0f;
+  triangle_transform->rotation[2] = 45.0f;
 
   TS_Model *triangle_model =
       ts_entity_get_component(scene, triangle, "TS_Model");
