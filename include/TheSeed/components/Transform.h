@@ -7,7 +7,7 @@ typedef struct {
   vec3 position;
   vec3 rotation;
   vec3 scale;
-} TS_Transform_t;
+} TS_Transform;
 
 void *ts_create_TS_Transform();
 void ts_destroy_TS_Transform(void *);

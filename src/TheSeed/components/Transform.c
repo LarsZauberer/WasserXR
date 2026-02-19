@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 void *ts_create_TS_Transform() {
-  TS_Transform_t *t = (TS_Transform_t *)malloc(sizeof(TS_Transform_t));
+  TS_Transform *t = (TS_Transform *)malloc(sizeof(TS_Transform));
 
   glm_vec3_zero(t->position);
   glm_vec3_zero(t->rotation);
@@ -19,7 +19,7 @@ void ts_destroy_TS_Transform(void *t) {
 }
 
 void ts_serialize_TS_Transform(void *t, TS_Serialization *serialization) {
-  TS_Transform_t *transform = (TS_Transform_t *)t;
+  TS_Transform *transform = (TS_Transform *)t;
 
   vec3 *position = (vec3 *)malloc(sizeof(vec3));
   vec3 *rotation = (vec3 *)malloc(sizeof(vec3));
@@ -44,7 +44,7 @@ void ts_serialize_TS_Transform(void *t, TS_Serialization *serialization) {
 }
 
 void ts_deserialize_TS_Transform(void *t, TS_Serialization *serialization) {
-  TS_Transform_t *transform = (TS_Transform_t *)t;
+  TS_Transform *transform = (TS_Transform *)t;
 
   vec3 *position = (vec3 *)ts_get_serialization(serialization, "position");
   vec3 *rotation = (vec3 *)ts_get_serialization(serialization, "rotation");

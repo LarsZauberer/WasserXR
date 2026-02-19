@@ -44,7 +44,7 @@ TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene *scene,
 void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
                                 size_t *n) {
   TS_Entity camera_entity;
-  TS_Transform_t *cam_transform;
+  TS_Transform *cam_transform;
 
   TS_Entity window_entity;
   TS_Window *window;
@@ -62,15 +62,15 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
       (TS_Window *)ts_entity_get_component(scene, window_entity, "TS_Window");
 
   camera_entity = entities[1][0];
-  cam_transform = (TS_Transform_t *)ts_entity_get_component(
-      scene, camera_entity, "TS_Transform");
+  cam_transform = (TS_Transform *)ts_entity_get_component(scene, camera_entity,
+                                                          "TS_Transform");
 
   for (size_t i = 0; i < n[2]; i++) {
     // Normal mesh entity
     TS_Entity entity = entities[2][i];
 
     TS_Model *model = ts_entity_get_component(scene, entity, "TS_Model");
-    TS_Transform_t *transform =
+    TS_Transform *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");
 
     // Check if the model is loaded yet
