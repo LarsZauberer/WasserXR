@@ -3,7 +3,7 @@
 #ifndef TS_Scene_H
 #define TS_Scene_H
 
-typedef struct TS_Scene_t TS_Scene_t;
+typedef struct TS_Scene TS_Scene;
 typedef struct TS_Serialization TS_Serialization;
 typedef size_t TS_Entity;
 
@@ -25,8 +25,8 @@ typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Activator)(void *);
 
 typedef int TS_System_Groups;
-typedef void (*TS_System_Function)(TS_Scene_t *, TS_Entity **, size_t *);
-typedef TS_System_Groups (*TS_System_Selector)(TS_Scene_t *, const size_t);
+typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, size_t *);
+typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const size_t);
 typedef void (*TS_System_Attacher)(void);
 typedef void (*TS_System_Detacher)(void);
 
@@ -36,14 +36,14 @@ typedef void (*TS_System_Detacher)(void);
  * systems.
  * @return Pointer to the newly created scene object
  */
-TS_Scene_t *ts_create_scene();
+TS_Scene *ts_create_scene();
 
 /**
  * Creates an entity in the scene and returns the id of it.
  * @param scene The scene to create it in
  * @return The id of the entity
  */
-size_t ts_add_entity(TS_Scene_t *scene);
+size_t ts_add_entity(TS_Scene *scene);
 
 /**
  * Removes a previously created entity. With it, it removes all the associated
@@ -53,7 +53,7 @@ size_t ts_add_entity(TS_Scene_t *scene);
  * @return 0 if it successfully removed the entity and 1 if it didn't remove the
  * entity (may happen if the entity doesn't exist)
  */
-int ts_remove_entity(TS_Scene_t *scene, const size_t entity_id);
+int ts_remove_entity(TS_Scene *scene, const size_t entity_id);
 
 /**
  * Load a plugin into the scene.
@@ -61,7 +61,7 @@ int ts_remove_entity(TS_Scene_t *scene, const size_t entity_id);
  * @param plugin_path Path to the plugin shared library
  * @return 0 on success, non-zero on failure
  */
-int ts_load_plugin(TS_Scene_t *scene, const char *plugin_path);
+int ts_load_plugin(TS_Scene *scene, const char *plugin_path);
 
 /**
  * Unload a plugin from the scene. It destroys all the components and systems
@@ -71,7 +71,7 @@ int ts_load_plugin(TS_Scene_t *scene, const char *plugin_path);
  * @param plugin_name Name of the plugin to unload
  * @return 0 on success, non-zero on failure
  */
-int ts_unload_plugin(TS_Scene_t *scene, const char *plugin_name);
+int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
 
 /**
  * Reload a certain plugin in the scene. It automatically replaces all the
@@ -82,7 +82,7 @@ int ts_unload_plugin(TS_Scene_t *scene, const char *plugin_name);
  * instead
  * @return 0 on success, non-zero on failure
  */
-int ts_reload_plugin(TS_Scene_t *scene, const char *plugin_name,
+int ts_reload_plugin(TS_Scene *scene, const char *plugin_name,
                      const char *new_plugin_name);
 
 /**
@@ -95,7 +95,7 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *plugin_name,
  * instead
  * @return 0 on success, non-zero on failure
  */
-int ts_reload_all_plugins(TS_Scene_t *scene);
+int ts_reload_all_plugins(TS_Scene *scene);
 
 /**
  * Add a component to an entity.
@@ -104,7 +104,7 @@ int ts_reload_all_plugins(TS_Scene_t *scene);
  * @param component_name Name of the component type to add
  * @return 0 on success, non-zero on failure
  */
-int ts_add_component(TS_Scene_t *scene, const size_t entity_id,
+int ts_add_component(TS_Scene *scene, const size_t entity_id,
                      const char *component_name,
                      TS_Serialization *serialization);
 
@@ -115,7 +115,7 @@ int ts_add_component(TS_Scene_t *scene, const size_t entity_id,
  * @param component_name Name of the component type to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_component(TS_Scene_t *scene, const size_t entity_id,
+int ts_remove_component(TS_Scene *scene, const size_t entity_id,
                         const char *component_name);
 
 /**
@@ -125,7 +125,7 @@ int ts_remove_component(TS_Scene_t *scene, const size_t entity_id,
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene_t *scene, const size_t entity_id,
+void *ts_entity_get_component(TS_Scene *scene, const size_t entity_id,
                               const char *component_name);
 
 /**
@@ -136,7 +136,7 @@ void *ts_entity_get_component(TS_Scene_t *scene, const size_t entity_id,
  * execute first)
  * @return 0 on success, non-zero on failure
  */
-int ts_add_system(TS_Scene_t *scene, const char *system_name, int priority);
+int ts_add_system(TS_Scene *scene, const char *system_name, int priority);
 
 /**
  * Remove a system from the scene.
@@ -144,31 +144,31 @@ int ts_add_system(TS_Scene_t *scene, const char *system_name, int priority);
  * @param system_name Name of the system to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_system(TS_Scene_t *scene, const char *system_name);
+int ts_remove_system(TS_Scene *scene, const char *system_name);
 
 /**
  * Sort systems in the scene by their priority values.
  * @param scene The scene whose systems should be sorted
  */
-void ts_sort_systems(TS_Scene_t *scene);
+void ts_sort_systems(TS_Scene *scene);
 
 /**
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
  */
-void ts_tick_scene(TS_Scene_t *scene);
+void ts_tick_scene(TS_Scene *scene);
 
 /**
  * Destroy a scene and free all associated memory.
  * @param scene The scene to destroy
  */
-void ts_destroy_scene(TS_Scene_t *scene);
+void ts_destroy_scene(TS_Scene *scene);
 
 /**
  * Tells the scene to reload at the end of a tick all the systems and components
  * @param scene The scene to destroy
  */
-void ts_set_scene_reload(TS_Scene_t *scene);
+void ts_set_scene_reload(TS_Scene *scene);
 
 void *ts_get_serialization(TS_Serialization *serialization, char *name);
 
@@ -184,25 +184,25 @@ int ts_set_serialization(TS_Serialization *serialization, char *name,
  * Print all entities in the scene to stdout.
  * @param scene The scene to print entities from
  */
-void ts_print_entities(TS_Scene_t *scene);
+void ts_print_entities(TS_Scene *scene);
 
 /**
  * Print all loaded plugins in the scene to stdout.
  * @param scene The scene to print plugins from
  */
-void ts_print_plugins(TS_Scene_t *scene);
+void ts_print_plugins(TS_Scene *scene);
 
 /**
  * Print all registered components in the scene to stdout.
  * @param scene The scene to print components from
  */
-void ts_print_components(TS_Scene_t *scene);
+void ts_print_components(TS_Scene *scene);
 
 /**
  * Print all systems in the scene to stdout.
  * @param scene The scene to print systems from
  */
-void ts_print_systems(TS_Scene_t *scene);
+void ts_print_systems(TS_Scene *scene);
 
 /** @} */
 

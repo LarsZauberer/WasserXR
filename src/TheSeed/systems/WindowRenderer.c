@@ -8,7 +8,7 @@
 
 TS_System_Groups ts_groups_ts_window_pre_renderer = 1;
 
-TS_System_Groups ts_select_ts_window_pre_renderer(TS_Scene_t *scene,
+TS_System_Groups ts_select_ts_window_pre_renderer(TS_Scene *scene,
                                                   const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
@@ -17,7 +17,7 @@ TS_System_Groups ts_select_ts_window_pre_renderer(TS_Scene_t *scene,
   }
 }
 
-void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, TS_Entity **entities,
+void ts_system_ts_window_pre_renderer(TS_Scene *scene, TS_Entity **entities,
                                       size_t *n) {
   for (size_t i = 0; i < *n; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(
@@ -34,7 +34,7 @@ void ts_system_ts_window_pre_renderer(TS_Scene_t *scene, TS_Entity **entities,
 
 TS_System_Groups ts_groups_ts_window_post_renderer = 1;
 
-TS_System_Groups ts_select_ts_window_post_renderer(TS_Scene_t *scene,
+TS_System_Groups ts_select_ts_window_post_renderer(TS_Scene *scene,
                                                    const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
@@ -43,7 +43,7 @@ TS_System_Groups ts_select_ts_window_post_renderer(TS_Scene_t *scene,
   }
 }
 
-void ts_system_ts_window_post_renderer(TS_Scene_t *scene, TS_Entity **entities,
+void ts_system_ts_window_post_renderer(TS_Scene *scene, TS_Entity **entities,
                                        size_t *n) {
   for (size_t i = 0; i < *n; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(
@@ -60,7 +60,7 @@ void ts_system_ts_window_post_renderer(TS_Scene_t *scene, TS_Entity **entities,
 
 TS_System_Groups ts_groups_ts_window_quiter = 1;
 
-TS_System_Groups ts_select_ts_window_quiter(TS_Scene_t *scene,
+TS_System_Groups ts_select_ts_window_quiter(TS_Scene *scene,
                                             const size_t entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
@@ -69,8 +69,7 @@ TS_System_Groups ts_select_ts_window_quiter(TS_Scene_t *scene,
   }
 }
 
-void ts_system_ts_window_quiter(TS_Scene_t *scene, size_t **entities,
-                                size_t *n) {
+void ts_system_ts_window_quiter(TS_Scene *scene, size_t **entities, size_t *n) {
   if (*n == 0) {
     glfwTerminate();
     exit(0);
@@ -79,7 +78,7 @@ void ts_system_ts_window_quiter(TS_Scene_t *scene, size_t **entities,
 
 TS_System_Groups ts_groups_ts_window_reloader = 1;
 
-TS_System_Groups ts_select_ts_window_reloader(TS_Scene_t *scene,
+TS_System_Groups ts_select_ts_window_reloader(TS_Scene *scene,
                                               const size_t entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
@@ -88,7 +87,7 @@ TS_System_Groups ts_select_ts_window_reloader(TS_Scene_t *scene,
   }
 }
 
-void ts_system_ts_window_reloader(TS_Scene_t *scene, size_t **entities,
+void ts_system_ts_window_reloader(TS_Scene *scene, size_t **entities,
                                   size_t *n) {
   for (size_t i = 0; i < *n; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(

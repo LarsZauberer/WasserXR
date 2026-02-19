@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 int main() {
-  TS_Scene_t *scene = ts_create_scene();
+  TS_Scene *scene = ts_create_scene();
 
   int status = ts_load_plugin(scene, "build/libtheseed_components.so");
   status = ts_load_plugin(scene, "build/libtheseed_systems.so");

@@ -22,7 +22,7 @@
 
 TS_System_Groups ts_groups_ts_mesh_renderer = 3;
 
-TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene_t *scene,
+TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene *scene,
                                             const TS_Entity entity) {
   size_t normal_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&
@@ -41,7 +41,7 @@ TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene_t *scene,
   return 0;
 }
 
-void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity **entities,
+void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
                                 size_t *n) {
   TS_Entity camera_entity;
   TS_Transform_t *cam_transform;
