@@ -1,4 +1,5 @@
 #include "TheSeed/ecs/Scene.h"
+#include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
 #include <dlfcn.h>
 #include <glib.h>
@@ -60,6 +61,8 @@ struct TS_Serialization {
                                   plugin_var)                                  \
   for (size_t i = 0; i < plugins->len; i++) {                                  \
     TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);  \
+    ts_assert(plugin,                                                          \
+              "Plugin was null while searching for symbol in plugins");        \
     GString *symbol = g_string_new(id);                                        \
     g_string_prepend(symbol, prefix);                                          \
     function_var = dlsym(plugin->fd, symbol->str);                             \
@@ -72,6 +75,7 @@ struct TS_Serialization {
 
 TS_Scene *ts_create_scene() {
   TS_Scene *p = (TS_Scene *)malloc(sizeof(TS_Scene));
+  ts_assert(p, "Malloc failed while creating a scene");
   p->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Loaded_Plugin *));
   p->entities = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
   p->entity_counter = 0;
@@ -107,13 +111,16 @@ void ts_destroy_scene(TS_Scene *scene) {
 }
 
 TS_Entity ts_add_entity(TS_Scene *scene) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during entity creation");
   TS_Entity entity = scene->entity_counter;
   scene->entity_counter += 1;
   g_array_append_val(scene->entities, entity);
+  ts_debug("Created Entity: %ld", entity);
   return entity;
 }
 
 static long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {
+  ts_assert(scene, "Scene is NULL during ts_get_entity_index");
   for (size_t i = 0; i < scene->entities->len; i++) {
     const TS_Entity e = g_array_index(scene->entities, TS_Entity, i);
     if (e == entity) {
@@ -124,8 +131,11 @@ static long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {
 }
 
 int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_remove_entity");
+  ts_debug("Removing entity %ld", entity);
   long index = ts_get_entity_index(scene, entity);
   if (index == -1L) {
+    ts_warn("The entity %ld doesn't exist", entity);
     return 1;
   }
   g_array_remove_index(scene->entities, index);
@@ -146,6 +156,7 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
 }
 
 static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
+  ts_assert(scene, "Scene is NULL during ts_get_plugin_index");
   for (size_t i = 0; i < scene->plugins->len; i++) {
     const TS_Loaded_Plugin *plugin =
         g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
@@ -157,29 +168,35 @@ static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
 }
 
 int ts_load_plugin(TS_Scene *scene, const char *path) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_load_plugin");
   long does_exist = ts_get_plugin_index(scene, path);
   if (does_exist != -1L) {
+    ts_warn("Plugin `%s` already loaded", path);
     return 1;
   }
   TS_Loaded_Plugin *plugin =
       (TS_Loaded_Plugin *)malloc(sizeof(TS_Loaded_Plugin));
+  ts_assert(plugin, "Malloc failed during ts_load_plugin");
 
   plugin->path = ts_copy_char_ptr(path);
 
   plugin->fd = dlopen(path, RTLD_NOW);
   if (!plugin->fd) {
-    printf("%s\n", dlerror());
+    ts_error("Failed to dlopen plugin `%s`: %s", path, dlerror());
     free(plugin->path);
     free(plugin);
     return 1;
   }
   g_array_append_val(scene->plugins, plugin);
+  ts_debug("Loaded Plugin: %s", path);
   return 0;
 }
 
 int ts_unload_plugin(TS_Scene *scene, const char *path) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_unload_plugin");
   long index = ts_get_plugin_index(scene, path);
   if (index == -1L) {
+    ts_warn("Plugin `%s` is not loaded", path);
     return 1;
   }
 
@@ -213,14 +230,18 @@ int ts_unload_plugin(TS_Scene *scene, const char *path) {
   free(plugin);
   g_array_remove_index(scene->plugins, index);
 
+  ts_debug("Unloaded Plugin: %s", path);
+
   return 0;
 }
 
 TS_Serialization *ts_create_serialization(char *name, size_t entity) {
+  ts_assert(name, "Name is empty in ts_create_serialization");
   GArray *data = g_array_new(FALSE, FALSE, sizeof(TS_Serialization));
 
   TS_Serialization *serialization =
       (TS_Serialization *)malloc(sizeof(TS_Serialization));
+  ts_assert(serialization, "Malloc failed during ts_create_serialization");
   serialization->name = ts_copy_char_ptr(name);
   serialization->entity = entity;
   serialization->fields = data;
@@ -228,6 +249,9 @@ TS_Serialization *ts_create_serialization(char *name, size_t entity) {
 }
 
 void ts_destroy_serialization(TS_Serialization *serialization) {
+  if (!serialization) {
+    return;
+  }
   for (size_t i = 0; i < serialization->fields->len; i++) {
     TS_Serialization_Field field =
         g_array_index(serialization->fields, TS_Serialization_Field, i);
@@ -241,6 +265,7 @@ void ts_destroy_serialization(TS_Serialization *serialization) {
 }
 
 void *ts_get_serialization(TS_Serialization *serialization, char *name) {
+  ts_assert(serialization, "Serialization is NULL during ts_get_serialization");
   for (size_t i = 0; i < serialization->fields->len; i++) {
     TS_Serialization_Field field =
         g_array_index(serialization->fields, TS_Serialization_Field, i);
@@ -248,17 +273,20 @@ void *ts_get_serialization(TS_Serialization *serialization, char *name) {
       return field.data;
     }
   }
+  ts_debug("Failed to find in serialization the field `%s`", name);
   return NULL;
 }
 
 int ts_set_serialization(TS_Serialization *serialization, char *name,
                          size_t size, void *data) {
+  ts_assert(serialization, "Serialization is NULL during ts_set_serialization");
   for (size_t i = 0; i < serialization->fields->len; i++) {
     TS_Serialization_Field field =
         g_array_index(serialization->fields, TS_Serialization_Field, i);
     if (strcmp(name, field.name) == 0) {
       // Replace the value
       // The user is required to free the value stored in there beforehand
+      ts_warn("Data was overwritten during ts_set_serialization");
       field.data = data;
       return 1;
     }
@@ -275,9 +303,12 @@ int ts_set_serialization(TS_Serialization *serialization, char *name,
 
 int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
                      TS_Serialization *serialization) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_component");
+  ts_assert_abort_value(id, -1, "Id is NULL during ts_add_component");
   // Check if the entity exists
   long does_exist = ts_get_entity_index(scene, entity);
   if (does_exist == -1) {
+    ts_warn("Component `%s` already exists on entity %ld", id, entity);
     return 1;
   }
 
@@ -303,33 +334,37 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
                             activator, plugin5);
 
   if (!creator) {
+    ts_error("Failed to find creator for `%s`", id);
     return 2;
   }
   if (!destroyer) {
+    ts_error("Failed to find destroyer for `%s`", id);
     return 2;
   }
-  // TODO: Fix the plugin checking
-  //
-  // if (!(plugin1 != plugin2 && (plugin1 != plugin3 || !plugin3) &&
-  //       (plugin1 != plugin4 || !plugin4))) {
-  //   return 2;
-  // }
   // Note that only the creator and the destroyer are required for a component
   // to exist
 
   // Create the actual data container
+  ts_debug("Running creator for component `%s` on entity %ld", id, entity);
   void *component = creator();
   if (deserializer) {
     if (!serialization) {
       TS_Serialization *serialization =
           ts_create_serialization(ts_copy_char_ptr(id), entity);
+      ts_debug("Running deserializer for component `%s` on entity %ld with "
+               "default serializer",
+               id, entity);
       deserializer(component, serialization);
       ts_destroy_serialization(serialization);
     } else {
+      ts_debug("Running deserializer for component `%s` on entity %ld with "
+               "existing serializer",
+               id, entity);
       deserializer(component, serialization);
     }
   }
   if (activator) {
+    ts_debug("Running activator for component `%s` on entity %ld", id, entity);
     activator(component);
   }
 
@@ -349,12 +384,16 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   // Add the component
   g_array_append_val(scene->components, component_handler);
 
+  ts_debug("Component `%s` added to entity %ld", id, entity);
+
   return 0;
 }
 
 static long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
                                                       const TS_Entity entity,
                                                       const char *id) {
+  ts_assert(scene,
+            "Scene is NULL during ts_get_component_index_from_entity_and_id");
   // Entity and id can uniquely identify a component
   for (size_t i = 0; i < scene->components->len; i++) {
     const TS_Component_Handler *component =
@@ -368,6 +407,7 @@ static long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
 
 void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
                               const char *id) {
+  ts_assert(scene, "Scene is NULL during ts_entity_get_component");
   long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
   if (index == -1L) {
     return NULL;
@@ -380,9 +420,11 @@ void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
 
 int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
                         const char *id) {
+  ts_assert(scene, "Scene is NULL during ts_remove_component");
   // There can only be one association between the entity and the component
   long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
   if (index == -1L) {
+    ts_warn("Component `%s` doesn't exist on entity %ld", scene, entity);
     return 1;
   }
 
@@ -395,6 +437,8 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
       component->component); // Call the destroyer for the component
   // The component pointer itself should be destroyed by the destroyer function
   free(component);
+
+  ts_debug("Removed component `%s` from entity %ld", id, entity);
   return 0;
 }
 

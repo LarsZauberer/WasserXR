@@ -7,17 +7,13 @@
 
 int main() {
   // Create the logging
-  ts_logging_init();
+  ts_logging_init(TS_LOG_DEBUG);
   ts_add_logger(ts_stdout_logger);
 
   ts_info("Logging Initialized!");
 
   // Create the ecs scene
   TS_Scene *scene = ts_create_scene();
-
-  ts_debug("Scene created: %dl", scene);
-
-  ts_assert(!scene, "Scene wasn't successfully initialized");
 
   int status = ts_load_plugin(scene, "build/libtheseed_components.so");
   status = ts_load_plugin(scene, "build/libtheseed_systems.so");
