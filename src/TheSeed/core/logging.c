@@ -5,6 +5,7 @@
 
 // Globals
 
+TS_Log_Level ts_lowest_level = TS_LOG_INFO;
 GArray *ts_loggers = NULL;
 
 static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, char *fmt,
@@ -28,7 +29,8 @@ static void ts_send_entry_to_loggers(TS_Log_Entry entry) {
   return;
 }
 
-void ts_logging_init() {
+void ts_logging_init(TS_Log_Level level) {
+  ts_lowest_level = level;
   ts_loggers = g_array_new(FALSE, FALSE, sizeof(TS_Logger));
   return;
 }
@@ -68,6 +70,9 @@ void ts_debug(char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
+  if (ts_lowest_level > TS_LOG_DEBUG) {
+    return;
+  }
   va_list args;
   va_start(args, fmt);
   TS_Log_Entry entry = ts_create_entry(TS_LOG_DEBUG, fmt, args);
@@ -79,6 +84,9 @@ void ts_debug(char *fmt, ...) {
 
 void ts_info(char *fmt, ...) {
   if (!ts_loggers) {
+    return;
+  }
+  if (ts_lowest_level > TS_LOG_INFO) {
     return;
   }
   va_list args;
@@ -94,6 +102,9 @@ void ts_warn(char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
+  if (ts_lowest_level > TS_LOG_WARN) {
+    return;
+  }
   va_list args;
   va_start(args, fmt);
   TS_Log_Entry entry = ts_create_entry(TS_LOG_WARN, fmt, args);
@@ -107,6 +118,9 @@ void ts_error(char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
+  if (ts_lowest_level > TS_LOG_ERROR) {
+    return;
+  }
   va_list args;
   va_start(args, fmt);
   TS_Log_Entry entry = ts_create_entry(TS_LOG_ERROR, fmt, args);
@@ -118,6 +132,9 @@ void ts_error(char *fmt, ...) {
 
 void ts_critical(char *fmt, ...) {
   if (!ts_loggers) {
+    return;
+  }
+  if (ts_lowest_level > TS_LOG_CRITICAL) {
     return;
   }
   va_list args;

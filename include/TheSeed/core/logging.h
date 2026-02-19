@@ -53,4 +53,4 @@ void ts_add_logger(TS_Logger);
 void ts_stdout_logger(TS_Log_Entry entry);
 
 // Init
-void ts_logging_init();
+void ts_logging_init(TS_Log_Level lowest_level);
