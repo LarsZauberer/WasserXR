@@ -42,27 +42,34 @@ void ts_add_logger(TS_Logger logger) {
 
 void ts_stdout_logger(TS_Log_Entry entry) {
   char *level = NULL;
+  char *color = NULL;
   switch (entry.level) {
   case TS_LOG_DEBUG:
     level = "DEBUG";
+    color = "37";
     break;
   case TS_LOG_INFO:
     level = "INFO";
+    color = "34";
     break;
   case TS_LOG_WARN:
     level = "WARN";
+    color = "33";
     break;
   case TS_LOG_ERROR:
     level = "ERROR";
+    color = "31";
     break;
   case TS_LOG_CRITICAL:
     level = "CRITICAL";
+    color = "41";
     break;
   default:
     level = "CUSTOM";
+    color = "36";
     break;
   }
-  printf("[%s]: %s\n", level, entry.msg);
+  printf("[\033[%sm%s\033[0m]: %s\n", color, level, entry.msg);
   return;
 }
 
