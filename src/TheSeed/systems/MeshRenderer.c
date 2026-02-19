@@ -51,10 +51,12 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
 
   if (!n[0]) {
     printf("No window!\n");
+    return;
   }
 
   if (!n[1]) {
     printf("No camera!\n");
+    return;
   }
 
   window_entity = entities[0][0];
