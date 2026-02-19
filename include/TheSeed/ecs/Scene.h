@@ -16,14 +16,17 @@ typedef size_t TS_Entity;
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 #define SYSTEM_ATTACH_PREFIX "ts_attach_"
 #define SYSTEM_DETACH_PREFIX "ts_detach_"
+#define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
 typedef void *(*TS_Component_Creator)(void);
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Serializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Activator)(void *);
-typedef void (*TS_System_Function)(TS_Scene_t *, size_t *, size_t);
-typedef int (*TS_System_Selector)(TS_Scene_t *, const size_t);
+
+typedef int TS_System_Groups;
+typedef void (*TS_System_Function)(TS_Scene_t *, TS_Entity **, size_t *);
+typedef TS_System_Groups (*TS_System_Selector)(TS_Scene_t *, const size_t);
 typedef void (*TS_System_Attacher)(void);
 typedef void (*TS_System_Detacher)(void);
 
