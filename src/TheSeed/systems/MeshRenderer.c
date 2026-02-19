@@ -20,7 +20,10 @@
 #define NEAR 0.1f
 #define FAR 100.0f
 
-int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const TS_Entity entity) {
+TS_System_Groups ts_groups_ts_mesh_renderer = 3;
+
+TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene_t *scene,
+                                            const TS_Entity entity) {
   size_t normal_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&
       ts_entity_get_component(scene, entity, "TS_Model");
@@ -28,15 +31,18 @@ int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const TS_Entity entity) {
       ts_entity_get_component(scene, entity, "TS_Transform") &&
       ts_entity_get_component(scene, entity, "TS_Camera");
   size_t window = (size_t)ts_entity_get_component(scene, entity, "TS_Window");
-  if (normal_object || camera_object || window) {
+  if (window) {
     return 1;
-  } else {
-    return 0;
+  } else if (camera_object) {
+    return 2;
+  } else if (normal_object) {
+    return 3;
   }
+  return 0;
 }
 
-void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
-                                size_t n) {
+void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity **entities,
+                                size_t *n) {
   TS_Entity camera_entity;
   TS_Camera *cam;
   TS_Transform_t *cam_transform;
@@ -44,43 +50,27 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity *entities,
   TS_Entity window_entity;
   TS_Window *window;
 
-  // Find the camera
-  for (size_t i = 0; i < n; i++) {
-    TS_Entity entity = entities[i];
-    cam = ts_entity_get_component(scene, entity, "TS_Camera");
-    cam_transform = ts_entity_get_component(scene, entity, "TS_Transform");
-    if (cam) {
-      camera_entity = entity;
-      break;
-    }
-  }
-  if (!cam) {
-    // No camera found
-    printf("No camera found!\n");
-    return;
+  if (!n[0]) {
+    printf("No window!\n");
   }
 
-  // Find the window
-  for (size_t i = 0; i < n; i++) {
-    TS_Entity entity = entities[i];
-    window = ts_entity_get_component(scene, entity, "TS_Window");
-    if (window) {
-      window_entity = entity;
-      break;
-    }
-  }
-  if (!window) {
-    // No window found
-    printf("No window found!\n");
-    return;
+  if (!n[1]) {
+    printf("No camera!\n");
   }
 
-  for (size_t i = 0; i < n; i++) {
+  window_entity = entities[0][0];
+  window =
+      (TS_Window *)ts_entity_get_component(scene, window_entity, "TS_Window");
+
+  camera_entity = entities[1][0];
+  cam = (TS_Camera *)ts_entity_get_component(scene, camera_entity, "TS_Camera");
+  cam_transform = (TS_Transform_t *)ts_entity_get_component(
+      scene, camera_entity, "TS_Transform");
+
+  for (size_t i = 0; i < n[2]; i++) {
     // Normal mesh entity
-    TS_Entity entity = entities[i];
-    if (entity == camera_entity || entity == window_entity) {
-      continue;
-    }
+    TS_Entity entity = entities[2][i];
+
     TS_Model *model = ts_entity_get_component(scene, entity, "TS_Model");
     TS_Transform_t *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");

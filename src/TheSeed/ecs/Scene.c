@@ -28,6 +28,7 @@ typedef struct {
   int priority;
   int active;
   TS_Loaded_Plugin *plugin;
+  TS_System_Groups *groups;
   TS_System_Selector selector;
   TS_System_Attacher attacher;
   TS_System_Detacher detacher;
@@ -419,10 +420,12 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   TS_Loaded_Plugin *plugin2;
   TS_Loaded_Plugin *plugin3;
   TS_Loaded_Plugin *plugin4;
+  TS_Loaded_Plugin *plugin5;
   TS_System_Selector selector;
   TS_System_Function system;
   TS_System_Attacher attacher;
   TS_System_Detacher detacher;
+  TS_System_Groups *groups;
 
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_SELECTOR_PREFIX,
                             selector, plugin1);
@@ -432,11 +435,17 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
                             plugin3);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_DETACH_PREFIX, detacher,
                             plugin4);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_GROUPS_PREFIX, groups,
+                            plugin5);
 
   if (!selector) {
     return 2;
   }
   if (!system) {
+    return 2;
+  }
+  if (!groups) {
+    printf("System %s has groups not defined\n", id);
     return 2;
   }
   if (plugin1 != plugin2) {
@@ -450,6 +459,7 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   system_handler->active = 1;
   system_handler->priority = priority;
   system_handler->system = system;
+  system_handler->groups = groups;
   system_handler->selector = selector;
   system_handler->attacher = attacher;
   system_handler->detacher = detacher;
@@ -467,12 +477,12 @@ int ts_add_system(TS_Scene_t *scene, const char *id, int priority) {
   return 0;
 }
 
-static GArray *ts_find_entities_with_selector(TS_Scene_t *scene,
-                                              TS_System_Selector selector) {
+static GArray *ts_find_entities_with_selector_and_groups(
+    TS_Scene_t *scene, TS_System_Selector selector, int group) {
   GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
   for (size_t i = 0; i < scene->entities->len; i++) {
     TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
-    if (selector(scene, entity)) {
+    if (selector(scene, entity) == group) {
       g_array_append_val(res, entity);
     }
   }
@@ -483,15 +493,37 @@ void ts_tick_scene(TS_Scene_t *scene) {
   for (size_t i = 0; i < scene->systems->len; i++) {
     TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
+
+    // Check if the system is active and should tick
     if (!system->active) {
       continue;
     }
-    GArray *entities_array =
-        ts_find_entities_with_selector(scene, system->selector);
-    size_t n = entities_array->len;
-    TS_Entity *entities = (TS_Entity *)g_array_free(entities_array, FALSE);
-    system->system(scene, entities, n);
-    free(entities);
+
+    // Create helper arrays
+    GArray *entity_groups = g_array_new(FALSE, FALSE, sizeof(TS_Entity *));
+    GArray *entity_groups_size = g_array_new(FALSE, FALSE, sizeof(size_t));
+    TS_System_Groups groups = *system->groups;
+
+    // Create all the helper arrays
+    for (TS_System_Groups i = 1; i <= groups; i++) {
+      GArray *entities_array =
+          ts_find_entities_with_selector_and_groups(scene, system->selector, i);
+      size_t n = entities_array->len;
+      TS_Entity *entities = (TS_Entity *)g_array_free(entities_array, FALSE);
+
+      g_array_append_val(entity_groups_size, n);
+      g_array_append_val(entity_groups, entities);
+    }
+    size_t *size_array = (size_t *)g_array_free(entity_groups_size, FALSE);
+    TS_Entity **entity_array = (TS_Entity **)g_array_free(entity_groups, FALSE);
+
+    system->system(scene, entity_array, size_array);
+
+    free(size_array);
+    for (int i = 0; i < groups; i++) {
+      free(entity_array[i]);
+    }
+    free(entity_array);
   }
 
   // Check if the scene should reload
