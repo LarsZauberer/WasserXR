@@ -135,7 +135,9 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
     TS_Component_Handler *c =
         g_array_index(scene->components, TS_Component_Handler *, i);
     if (c->entity == entity) {
-      ts_remove_component(scene, entity, c->id);
+      char *copy_id = ts_copy_char_ptr(c->id);
+      ts_remove_component(scene, entity, copy_id);
+      free(copy_id);
       i--;
     }
   }
@@ -196,7 +198,9 @@ int ts_unload_plugin(TS_Scene *scene, const char *path) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
     if (strcmp(component->plugin->path, path) == 0) {
-      ts_remove_component(scene, component->entity, component->id);
+      char *copy_id = ts_copy_char_ptr(component->id);
+      ts_remove_component(scene, component->entity, copy_id);
+      free(copy_id);
       i--;
     }
   }
@@ -595,7 +599,9 @@ int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
       g_array_append_val(components_to_reconstruct, serialization);
 
       // Delete the component
-      ts_remove_component(scene, component->entity, component->id);
+      char *copy_id = ts_copy_char_ptr(component->id);
+      ts_remove_component(scene, component->entity, copy_id);
+      free(copy_id);
       i--;
     }
   }
