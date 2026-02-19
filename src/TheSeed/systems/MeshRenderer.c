@@ -44,7 +44,6 @@ TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene_t *scene,
 void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity **entities,
                                 size_t *n) {
   TS_Entity camera_entity;
-  TS_Camera *cam;
   TS_Transform_t *cam_transform;
 
   TS_Entity window_entity;
@@ -63,7 +62,6 @@ void ts_system_ts_mesh_renderer(TS_Scene_t *scene, TS_Entity **entities,
       (TS_Window *)ts_entity_get_component(scene, window_entity, "TS_Window");
 
   camera_entity = entities[1][0];
-  cam = (TS_Camera *)ts_entity_get_component(scene, camera_entity, "TS_Camera");
   cam_transform = (TS_Transform_t *)ts_entity_get_component(
       scene, camera_entity, "TS_Transform");
 
