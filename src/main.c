@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 int main() {
-  TS_Scene_t *scene = ts_create_scene();
+  TS_Scene *scene = ts_create_scene();
 
   int status = ts_load_plugin(scene, "build/libtheseed_components.so");
   status = ts_load_plugin(scene, "build/libtheseed_systems.so");
@@ -17,14 +17,14 @@ int main() {
   status = ts_add_component(scene, camera, "TS_Camera", NULL);
   status = ts_add_component(scene, camera, "TS_Transform", NULL);
 
-  TS_Transform_t *camera_transform =
+  TS_Transform *camera_transform =
       ts_entity_get_component(scene, camera, "TS_Transform");
   camera_transform->position[2] = 3.0f;
 
   size_t triangle = ts_add_entity(scene);
   ts_add_component(scene, triangle, "TS_Transform", NULL);
   ts_add_component(scene, triangle, "TS_Model", NULL);
-  TS_Transform_t *triangle_transform =
+  TS_Transform *triangle_transform =
       ts_entity_get_component(scene, triangle, "TS_Transform");
   triangle_transform->position[0] = 0.0f;
   triangle_transform->rotation[1] = 45.0f;
