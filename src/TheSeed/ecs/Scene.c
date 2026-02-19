@@ -570,6 +570,24 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
     }
   }
 
+  GArray *systems_to_reconstruct = g_array_new(FALSE, FALSE, sizeof(char *));
+  GArray *systems_to_reconstruct_priority =
+      g_array_new(FALSE, FALSE, sizeof(int));
+  for (size_t i = 0; i < scene->systems->len; i++) {
+    TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+
+    if (system->plugin == plugin) {
+      char *copy_id = ts_copy_char_ptr(system->id);
+      g_array_append_val(systems_to_reconstruct, copy_id);
+      g_array_append_val(systems_to_reconstruct_priority, system->priority);
+
+      // Unregistering the system (also calls the detacher)
+      ts_remove_system(scene, copy_id);
+      i--;
+    }
+  }
+
   // Loading the new plugin
 
   // Copy the path and the new_path over since it might be in a systems memory
@@ -593,38 +611,22 @@ int ts_reload_plugin(TS_Scene_t *scene, const char *path,
   int status = 0;
 
   // Replace all the bindings of the systems
-  for (size_t i = 0; i < scene->systems->len; i++) {
-    TS_System_Handler *system =
-        g_array_index(scene->systems, TS_System_Handler *, i);
+  for (size_t i = 0; i < systems_to_reconstruct->len; i++) {
+    g_assert(systems_to_reconstruct->len ==
+             systems_to_reconstruct_priority->len);
+    char *system_id = g_array_index(systems_to_reconstruct, char *, i);
+    int system_priority =
+        g_array_index(systems_to_reconstruct_priority, int, i);
 
-    // Check if the same plugin handler is assigned
-    if (system->plugin == plugin) {
-      GString *id = g_string_new(system->id);
-      GString *id_selector = g_string_copy(id);
-      GString *id_function = g_string_copy(id);
+    ts_add_system(scene, system_id, system_priority);
 
-      g_string_prepend(id_selector, SYSTEM_SELECTOR_PREFIX);
-      g_string_prepend(id_function, SYSTEM_FUNCTION_PREFIX);
-
-      TS_System_Selector selector = dlsym(plugin->fd, id_selector->str);
-      TS_System_Function function = dlsym(plugin->fd, id_function->str);
-
-      g_string_free(id_selector, TRUE);
-      g_string_free(id_function, TRUE);
-      g_string_free(id, TRUE);
-
-      if (!selector || !function) {
-        // The systems are not defined anymore and hence need to be deleted
-        status = 2;
-        ts_remove_system(scene, system->id);
-        i--;
-        continue;
-      }
-
-      system->selector = selector;
-      system->system = function;
-    }
+    free(system_id);
+    system_id = NULL;
   }
+  g_array_free(systems_to_reconstruct, TRUE);
+  systems_to_reconstruct = NULL;
+  g_array_free(systems_to_reconstruct_priority, TRUE);
+  systems_to_reconstruct_priority = NULL;
 
   // Reconstruct all the components
   for (size_t i = 0; i < components_to_reconstruct->len; i++) {
