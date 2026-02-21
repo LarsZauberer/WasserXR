@@ -420,7 +420,8 @@ void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
 
 int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
                         const char *id) {
-  ts_assert(scene, "Scene is NULL during ts_remove_component");
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_remove_component");
+  ts_assert_abort_value(id, -1, "Id is NULL during ts_remove_component");
   // There can only be one association between the entity and the component
   long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
   if (index == -1L) {
@@ -443,6 +444,8 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
 }
 
 static long ts_get_system_index_from_id(TS_Scene *scene, const char *id) {
+  ts_assert(scene, "Scene is NULL during ts_get_system_index_from_id");
+  ts_assert(id, "Id is NULL during ts_get_system_index_from_id");
   for (size_t i = 0; i < scene->systems->len; i++) {
     const TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
@@ -454,6 +457,8 @@ static long ts_get_system_index_from_id(TS_Scene *scene, const char *id) {
 }
 
 int ts_add_system(TS_Scene *scene, const char *id, int priority) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
+  ts_assert_abort_value(id, -1, "Id is NULL during ts_add_system");
   long index = ts_get_system_index_from_id(scene, id);
   if (index != -1L) {
     // Already exists, won't add
@@ -486,16 +491,15 @@ int ts_add_system(TS_Scene *scene, const char *id, int priority) {
                             plugin5);
 
   if (!selector) {
+    ts_warn("Failed to find selector in the system `%s`", id);
     return 2;
   }
   if (!system) {
+    ts_warn("Failed to find system function in the system `%s`", id);
     return 2;
   }
   if (!groups) {
-    printf("System %s has groups not defined\n", id);
-    return 2;
-  }
-  if (plugin1 != plugin2) {
+    ts_warn("System `%s` has groups not defined", id);
     return 2;
   }
 
@@ -515,18 +519,26 @@ int ts_add_system(TS_Scene *scene, const char *id, int priority) {
 
   // Execute the attacher
   if (attacher) {
+    ts_debug("Running attacher for system `%s`", id);
     attacher();
   }
 
   // Sort for priority
+  ts_debug("Sorting Systems");
   ts_sort_systems(scene);
+
+  ts_debug("System `%s` added with priority %d", id, priority);
 
   return 0;
 }
 
 static GArray *ts_find_entities_with_selector_and_groups(
     TS_Scene *scene, TS_System_Selector selector, int group) {
-  GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
+  ts_assert(scene,
+            "Scene is NULL during ts_find_entities_with_selector_and_groups");
+  ts_assert(selector,
+            "Selector is NULL during ts_find_entities_with_selector_and_groups")
+      GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
   for (size_t i = 0; i < scene->entities->len; i++) {
     TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
     if (selector(scene, entity) == group) {
@@ -537,6 +549,8 @@ static GArray *ts_find_entities_with_selector_and_groups(
 }
 
 void ts_tick_scene(TS_Scene *scene) {
+  ts_assert(scene,
+            "Scene is NULL during ts_find_entities_with_selector_and_groups");
   for (size_t i = 0; i < scene->systems->len; i++) {
     TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
@@ -561,6 +575,9 @@ void ts_tick_scene(TS_Scene *scene) {
       g_array_append_val(entity_groups_size, n);
       g_array_append_val(entity_groups, entities);
     }
+    // size_array has length groups
+    // entity_array has length groups
+    // entity_array[i] has length size_array[i]
     size_t *size_array = (size_t *)g_array_free(entity_groups_size, FALSE);
     TS_Entity **entity_array = (TS_Entity **)g_array_free(entity_groups, FALSE);
 
@@ -575,6 +592,7 @@ void ts_tick_scene(TS_Scene *scene) {
 
   // Check if the scene should reload
   if (scene->should_reload) {
+    ts_debug("ECS system should be reloaded");
     scene->should_reload = 0; // Reset
     ts_reload_all_plugins(scene);
   }
@@ -594,9 +612,12 @@ void ts_sort_systems(TS_Scene *scene) {
 }
 
 int ts_remove_system(TS_Scene *scene, const char *id) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_remove_system");
+  ts_assert_abort_value(id, -1, "Id is NULL during ts_remove_system");
   long index = ts_get_system_index_from_id(scene, id);
 
   if (index == -1L) {
+    ts_warn("System `%s` doesn't exist", id);
     return 1;
   }
 
@@ -604,18 +625,27 @@ int ts_remove_system(TS_Scene *scene, const char *id) {
       g_array_index(scene->systems, TS_System_Handler *, index);
 
   if (system->detacher) {
+    ts_debug("Running detacher for system `%s`", system->id);
     system->detacher();
   }
 
   free(system->id);
   free(system);
   g_array_remove_index(scene->systems, index);
+
+  ts_debug("System `%s` was removed", id);
+
   return 0;
 }
 
 int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
+  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_reload_plugin");
+  ts_assert_abort_value(path, -1, "Path is NULL during ts_reload_plugin");
+  ts_assert_abort_value(new_path, -1,
+                        "New_Path is NULL during ts_reload_plugin");
   long index = ts_get_plugin_index(scene, path);
   if (index == -1L) {
+    ts_warn("Plugin `%s` isn't loaded", path);
     return 1;
   }
 
@@ -699,6 +729,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
         g_array_index(systems_to_reconstruct_priority, int, i);
 
     ts_add_system(scene, system_id, system_priority);
+    ts_debug("System `%s` was reloaded", system_id);
 
     free(system_id);
     system_id = NULL;
@@ -716,28 +747,41 @@ int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
     // Silently fail if something doesn't work
     status = ts_add_component(scene, reconstruction->entity,
                               reconstruction->name, reconstruction);
+    ts_debug("Component `%s` was reloaded", reconstruction->name);
 
     // Clean up the helper array and the serialization
     ts_destroy_serialization(reconstruction);
   }
   g_array_free(components_to_reconstruct, TRUE);
 
+  ts_debug("Reloaded Plugin `%s` with `%s`", path, new_path);
+
   return status;
 }
 
 int ts_reload_all_plugins(TS_Scene *scene) {
+  ts_assert_abort_value(scene, -1,
+                        "Scene is NULL during ts_reload_all_plugins");
   GArray *plugins = g_array_copy(scene->plugins);
 
   for (size_t i = 0; i < plugins->len; i++) {
     TS_Loaded_Plugin *p = g_array_index(plugins, TS_Loaded_Plugin *, i);
-    ts_reload_plugin(scene, p->path, p->path);
+    char *path_before = ts_copy_char_ptr(p->path);
+    char *path_after = ts_copy_char_ptr(p->path);
+    ts_reload_plugin(scene, path_before, path_after);
+    free(path_before);
+    free(path_after);
   }
 
   g_array_free(plugins, TRUE);
+
+  ts_debug("Full reload of all plugins finished");
+
   return 0;
 }
 
 void ts_set_scene_reload(TS_Scene *scene) {
+  ts_assert(scene, "Scene is NULL during ts_set_scene_reload");
   scene->should_reload = 1;
   return;
 }
