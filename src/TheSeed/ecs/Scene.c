@@ -58,14 +58,14 @@ struct TS_Serialization {
 
 #define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
                                   plugin_var)                                  \
-  for (size_t i = 0; i < plugins->len; i++) {                                  \
+  for (size_t i = 0; i < (plugins)->len; i++) {                                \
     TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);  \
     GString *symbol = g_string_new(id);                                        \
     g_string_prepend(symbol, prefix);                                          \
-    function_var = dlsym(plugin->fd, symbol->str);                             \
+    (function_var) = dlsym(plugin->fd, symbol->str);                           \
     g_string_free(symbol, TRUE);                                               \
     if (function_var) {                                                        \
-      plugin_var = plugin;                                                     \
+      (plugin_var) = plugin;                                                   \
       break;                                                                   \
     }                                                                          \
   }
@@ -103,7 +103,6 @@ void ts_destroy_scene(TS_Scene *scene) {
   g_array_free(scene->systems, TRUE);
 
   free(scene);
-  return;
 }
 
 TS_Entity ts_add_entity(TS_Scene *scene) {
@@ -233,7 +232,6 @@ void ts_destroy_serialization(TS_Serialization *serialization) {
   g_array_free(serialization->fields, TRUE);
   free(serialization->name);
   free(serialization);
-  return;
 }
 
 void *ts_get_serialization(TS_Serialization *serialization, char *name) {
@@ -542,7 +540,6 @@ static int ts_compare_systems_priority(const gconstpointer a,
 
 void ts_sort_systems(TS_Scene *scene) {
   g_array_sort(scene->systems, ts_compare_systems_priority);
-  return;
 }
 
 int ts_remove_system(TS_Scene *scene, const char *id) {
@@ -687,10 +684,7 @@ int ts_reload_all_plugins(TS_Scene *scene) {
   return 0;
 }
 
-void ts_set_scene_reload(TS_Scene *scene) {
-  scene->should_reload = 1;
-  return;
-}
+void ts_set_scene_reload(TS_Scene *scene) { scene->should_reload = 1; }
 
 // Debug Functions
 
@@ -700,7 +694,6 @@ void ts_print_entities(TS_Scene *scene) {
     const TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
     printf("- Entity %ld\n", entity);
   }
-  return;
 }
 
 void ts_print_plugins(TS_Scene *scene) {
@@ -735,5 +728,4 @@ void ts_print_systems(TS_Scene *scene) {
     printf("- %s (Priority: %d) (%s)\n", system->id, system->priority,
            system->plugin->path);
   }
-  return;
 }

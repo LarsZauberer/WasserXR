@@ -53,7 +53,7 @@ size_t ts_add_entity(TS_Scene *scene);
  * @return 0 if it successfully removed the entity and 1 if it didn't remove the
  * entity (may happen if the entity doesn't exist)
  */
-int ts_remove_entity(TS_Scene *scene, const size_t entity_id);
+int ts_remove_entity(TS_Scene *scene, size_t entity_id);
 
 /**
  * Load a plugin into the scene.
@@ -104,7 +104,7 @@ int ts_reload_all_plugins(TS_Scene *scene);
  * @param component_name Name of the component type to add
  * @return 0 on success, non-zero on failure
  */
-int ts_add_component(TS_Scene *scene, const size_t entity_id,
+int ts_add_component(TS_Scene *scene, size_t entity_id,
                      const char *component_name,
                      TS_Serialization *serialization);
 
@@ -115,7 +115,7 @@ int ts_add_component(TS_Scene *scene, const size_t entity_id,
  * @param component_name Name of the component type to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_component(TS_Scene *scene, const size_t entity_id,
+int ts_remove_component(TS_Scene *scene, size_t entity_id,
                         const char *component_name);
 
 /**
@@ -125,7 +125,7 @@ int ts_remove_component(TS_Scene *scene, const size_t entity_id,
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene *scene, const size_t entity_id,
+void *ts_entity_get_component(TS_Scene *scene, size_t entity_id,
                               const char *component_name);
 
 /**
