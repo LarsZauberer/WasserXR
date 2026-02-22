@@ -18,7 +18,7 @@ typedef size_t TS_Entity;
 #define SYSTEM_DETACH_PREFIX "ts_detach_"
 #define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
-typedef void *(*TS_Component_Creator)(void);
+typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Serializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
