@@ -7,6 +7,9 @@ set(CMAKE_CLANG_TIDY clang-tidy)
 
 add_compile_options(-std=c99 -Wall -Wextra -O0 -g -fno-omit-frame-pointer)
 
+add_compile_options(-fsanitize=address)# -fsanitize=undefined)
+add_link_options(-fsanitize=address)# -fsanitize=undefined)
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(CGLM REQUIRED cglm)

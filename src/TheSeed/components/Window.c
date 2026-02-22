@@ -3,6 +3,7 @@
 #include "GL/gl.h"
 #include "TheSeed/components/Window.h"
 #include <GLFW/glfw3.h>
+#include <sanitizer/lsan_interface.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -23,9 +24,12 @@ void *ts_create_TS_Window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
   glfwWindowHint(GLFW_SAMPLES, ANTIALIASING);
 
+  __lsan_disable();
   this->window = glfwCreateWindow(WIDTH, HEIGHT, "TheSeed", NULL, NULL);
+  __lsan_enable();
 
   if (!this->window) {
     printf("Failed to create window");
