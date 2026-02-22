@@ -347,6 +347,10 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   // Create the actual data container
   ts_debug("Running creator for component `%s` on entity %ld", id, entity);
   void *component = creator();
+  ts_assert(
+      component,
+      "The component returned by the creator of the component `%s` was NULL",
+      component);
   if (deserializer) {
     if (!serialization) {
       TS_Serialization *serialization =
@@ -354,6 +358,10 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
       ts_debug("Running deserializer for component `%s` on entity %ld with "
                "default serializer",
                id, entity);
+      ts_assert(serialization,
+                "Default Serializer was non before running the deserializer "
+                "for component `%s`",
+                id);
       deserializer(component, serialization);
       ts_destroy_serialization(serialization);
     } else {
