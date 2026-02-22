@@ -3,6 +3,7 @@ set(CMAKE_C_COMPILER clang)
 project(TheSeed LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CLANG_TIDY clang-tidy)
 
 add_compile_options(-std=c99 -Wall -Wextra -O0 -g -fno-omit-frame-pointer)
 

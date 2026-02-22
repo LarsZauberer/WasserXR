@@ -1,0 +1,11 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  cert-*,
+  readability-*,
+  performance-*,
+  portability-*,
+  -readability-magic-numbers
+HeaderFilterRegex: ".*"
+FormatStyle: file
