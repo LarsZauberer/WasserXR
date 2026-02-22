@@ -4,22 +4,19 @@
 #include <stdlib.h>
 
 void *ts_create_TS_Transform() {
-  TS_Transform *t = (TS_Transform *)malloc(sizeof(TS_Transform));
+  TS_Transform *ptr = (TS_Transform *)malloc(sizeof(TS_Transform));
 
-  glm_vec3_zero(t->position);
-  glm_vec3_zero(t->rotation);
-  glm_vec3_one(t->scale);
+  glm_vec3_zero(ptr->position);
+  glm_vec3_zero(ptr->rotation);
+  glm_vec3_one(ptr->scale);
 
-  return t;
+  return ptr;
 }
 
-void ts_destroy_TS_Transform(void *t) {
-  free(t);
-  return;
-}
+void ts_destroy_TS_Transform(void *ptr) { free(ptr); }
 
-void ts_serialize_TS_Transform(void *t, TS_Serialization *serialization) {
-  TS_Transform *transform = (TS_Transform *)t;
+void ts_serialize_TS_Transform(void *ptr, TS_Serialization *serialization) {
+  TS_Transform *transform = (TS_Transform *)ptr;
 
   vec3 *position = (vec3 *)malloc(sizeof(vec3));
   vec3 *rotation = (vec3 *)malloc(sizeof(vec3));
@@ -40,11 +37,10 @@ void ts_serialize_TS_Transform(void *t, TS_Serialization *serialization) {
   ts_set_serialization(serialization, "position", sizeof(vec3), position);
   ts_set_serialization(serialization, "rotation", sizeof(vec3), rotation);
   ts_set_serialization(serialization, "scale", sizeof(vec3), scale);
-  return;
 }
 
-void ts_deserialize_TS_Transform(void *t, TS_Serialization *serialization) {
-  TS_Transform *transform = (TS_Transform *)t;
+void ts_deserialize_TS_Transform(void *ptr, TS_Serialization *serialization) {
+  TS_Transform *transform = (TS_Transform *)ptr;
 
   vec3 *position = (vec3 *)ts_get_serialization(serialization, "position");
   vec3 *rotation = (vec3 *)ts_get_serialization(serialization, "rotation");
@@ -67,6 +63,4 @@ void ts_deserialize_TS_Transform(void *t, TS_Serialization *serialization) {
     transform->scale[1] = (*scale)[1];
     transform->scale[2] = (*scale)[2];
   }
-
-  return;
 }

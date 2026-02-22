@@ -61,7 +61,7 @@ int ts_remove_entity(TS_Scene *scene, size_t entity_id);
  * @param plugin_path Path to the plugin shared library
  * @return 0 on success, non-zero on failure
  */
-int ts_load_plugin(TS_Scene *scene, const char *plugin_path);
+int ts_load_plugin(TS_Scene *scene, const char *plugin_name);
 
 /**
  * Unload a plugin from the scene. It destroys all the components and systems
@@ -82,8 +82,8 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
  * instead
  * @return 0 on success, non-zero on failure
  */
-int ts_reload_plugin(TS_Scene *scene, const char *plugin_name,
-                     const char *new_plugin_name);
+int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
+                     const char *new_plugin_path);
 
 /**
  * Reload all plugins in the scene. It automatically replaces all the systems
@@ -105,8 +105,7 @@ int ts_reload_all_plugins(TS_Scene *scene);
  * @return 0 on success, non-zero on failure
  */
 int ts_add_component(TS_Scene *scene, size_t entity_id,
-                     const char *component_name,
-                     TS_Serialization *serialization);
+                     const char *component_id, TS_Serialization *serialization);
 
 /**
  * Remove a component from an entity.
@@ -116,7 +115,7 @@ int ts_add_component(TS_Scene *scene, size_t entity_id,
  * @return 0 on success, non-zero on failure
  */
 int ts_remove_component(TS_Scene *scene, size_t entity_id,
-                        const char *component_name);
+                        const char *component_id);
 
 /**
  * Get a component from an entity.
@@ -126,7 +125,7 @@ int ts_remove_component(TS_Scene *scene, size_t entity_id,
  * @return Pointer to the component data, or NULL if not found
  */
 void *ts_entity_get_component(TS_Scene *scene, size_t entity_id,
-                              const char *component_name);
+                              const char *component_id);
 
 /**
  * Add a system to the scene.
@@ -136,7 +135,7 @@ void *ts_entity_get_component(TS_Scene *scene, size_t entity_id,
  * execute first)
  * @return 0 on success, non-zero on failure
  */
-int ts_add_system(TS_Scene *scene, const char *system_name, int priority);
+int ts_add_system(TS_Scene *scene, const char *system_id, int priority);
 
 /**
  * Remove a system from the scene.
@@ -144,7 +143,7 @@ int ts_add_system(TS_Scene *scene, const char *system_name, int priority);
  * @param system_name Name of the system to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_system(TS_Scene *scene, const char *system_name);
+int ts_remove_system(TS_Scene *scene, const char *system_id);
 
 /**
  * Sort systems in the scene by their priority values.

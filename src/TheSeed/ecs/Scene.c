@@ -71,14 +71,14 @@ struct TS_Serialization {
   }
 
 TS_Scene *ts_create_scene() {
-  TS_Scene *p = (TS_Scene *)malloc(sizeof(TS_Scene));
-  p->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Loaded_Plugin *));
-  p->entities = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
-  p->entity_counter = 0;
-  p->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
-  p->systems = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
-  p->should_reload = 0;
-  return p;
+  TS_Scene *scene = (TS_Scene *)malloc(sizeof(TS_Scene));
+  scene->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Loaded_Plugin *));
+  scene->entities = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
+  scene->entity_counter = 0;
+  scene->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
+  scene->systems = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
+  scene->should_reload = 0;
+  return scene;
 }
 
 void ts_destroy_scene(TS_Scene *scene) {
@@ -113,9 +113,9 @@ TS_Entity ts_add_entity(TS_Scene *scene) {
 }
 
 static long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {
-  for (size_t i = 0; i < scene->entities->len; i++) {
-    const TS_Entity e = g_array_index(scene->entities, TS_Entity, i);
-    if (e == entity) {
+  for (long i = 0; i < scene->entities->len; i++) {
+    const TS_Entity eentity = g_array_index(scene->entities, TS_Entity, i);
+    if (eentity == entity) {
       return i;
     }
   }
@@ -131,10 +131,10 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
 
   // Cleanup the components
   for (size_t i = 0; i < scene->components->len; i++) {
-    TS_Component_Handler *c =
+    TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
-    if (c->entity == entity) {
-      ts_remove_component(scene, entity, c->id);
+    if (component->entity == entity) {
+      ts_remove_component(scene, entity, component->id);
       i--;
     }
   }
@@ -143,7 +143,7 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
 }
 
 static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
-  for (size_t i = 0; i < scene->plugins->len; i++) {
+  for (long i = 0; i < scene->plugins->len; i++) {
     const TS_Loaded_Plugin *plugin =
         g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
     if (strcmp(plugin->path, path) == 0) {
@@ -153,17 +153,17 @@ static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
   return -1;
 }
 
-int ts_load_plugin(TS_Scene *scene, const char *path) {
-  long does_exist = ts_get_plugin_index(scene, path);
+int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
+  long does_exist = ts_get_plugin_index(scene, plugin_name);
   if (does_exist != -1L) {
     return 1;
   }
   TS_Loaded_Plugin *plugin =
       (TS_Loaded_Plugin *)malloc(sizeof(TS_Loaded_Plugin));
 
-  plugin->path = ts_copy_char_ptr(path);
+  plugin->path = ts_copy_char_ptr(plugin_name);
 
-  plugin->fd = dlopen(path, RTLD_NOW);
+  plugin->fd = dlopen(plugin_name, RTLD_NOW);
   if (!plugin->fd) {
     printf("%s\n", dlerror());
     free(plugin->path);
@@ -174,8 +174,8 @@ int ts_load_plugin(TS_Scene *scene, const char *path) {
   return 0;
 }
 
-int ts_unload_plugin(TS_Scene *scene, const char *path) {
-  long index = ts_get_plugin_index(scene, path);
+int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
+  long index = ts_get_plugin_index(scene, plugin_name);
   if (index == -1L) {
     return 1;
   }
@@ -184,7 +184,7 @@ int ts_unload_plugin(TS_Scene *scene, const char *path) {
   for (size_t i = 0; i < scene->systems->len; i++) {
     TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
-    if (strcmp(system->plugin->path, path) == 0) {
+    if (strcmp(system->plugin->path, plugin_name) == 0) {
       ts_remove_system(scene, system->id);
       i--;
     }
@@ -194,7 +194,7 @@ int ts_unload_plugin(TS_Scene *scene, const char *path) {
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
-    if (strcmp(component->plugin->path, path) == 0) {
+    if (strcmp(component->plugin->path, plugin_name) == 0) {
       ts_remove_component(scene, component->entity, component->id);
       i--;
     }
@@ -267,10 +267,11 @@ int ts_set_serialization(TS_Serialization *serialization, char *name,
   return 0;
 }
 
-int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
+int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
+                     const char *component_id,
                      TS_Serialization *serialization) {
   // Check if the entity exists
-  long does_exist = ts_get_entity_index(scene, entity);
+  long does_exist = ts_get_entity_index(scene, entity_id);
   if (does_exist == -1) {
     return 1;
   }
@@ -285,16 +286,17 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   TS_Component_Serializer serializer;
   TS_Component_Deserializer deserializer;
   TS_Component_Activator activator;
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, CREATOR_FUNCION_PREFIX, creator,
-                            plugin1);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESTROYER_FUNCION_PREFIX,
-                            destroyer, plugin2);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SERIALIZER_FUNCTION_PREFIX,
-                            serializer, plugin3);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, DESERIALIZER_FUNCTION_PREFIX,
-                            deserializer, plugin4);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, ACTIVATOR_FUNCTION_PREFIX,
-                            activator, plugin5);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
+                            CREATOR_FUNCION_PREFIX, creator, plugin1);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
+                            DESTROYER_FUNCION_PREFIX, destroyer, plugin2);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
+                            SERIALIZER_FUNCTION_PREFIX, serializer, plugin3);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
+                            DESERIALIZER_FUNCTION_PREFIX, deserializer,
+                            plugin4);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
+                            ACTIVATOR_FUNCTION_PREFIX, activator, plugin5);
 
   if (!creator) {
     return 2;
@@ -316,7 +318,7 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   if (deserializer) {
     if (!serialization) {
       TS_Serialization *serialization =
-          ts_create_serialization(ts_copy_char_ptr(id), entity);
+          ts_create_serialization(ts_copy_char_ptr(component_id), entity_id);
       deserializer(component, serialization);
       ts_destroy_serialization(serialization);
     } else {
@@ -331,8 +333,8 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   TS_Component_Handler *component_handler =
       (TS_Component_Handler *)malloc(sizeof(TS_Component_Handler));
 
-  component_handler->id = ts_copy_char_ptr(id);
-  component_handler->entity = entity;
+  component_handler->id = ts_copy_char_ptr(component_id);
+  component_handler->entity = entity_id;
   component_handler->plugin = plugin1;
   component_handler->destroyer = destroyer;
   component_handler->serializer = serializer;
@@ -346,14 +348,14 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity, const char *id,
   return 0;
 }
 
-static long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
-                                                      const TS_Entity entity,
-                                                      const char *id) {
+static long ts_get_component_index_from_entity_and_id(
+    TS_Scene *scene, const TS_Entity entity, const char *component_id) {
   // Entity and id can uniquely identify a component
-  for (size_t i = 0; i < scene->components->len; i++) {
+  for (long i = 0; i < scene->components->len; i++) {
     const TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
-    if (strcmp(component->id, id) == 0 && component->entity == entity) {
+    if (strcmp(component->id, component_id) == 0 &&
+        component->entity == entity) {
       return i;
     }
   }
@@ -361,8 +363,9 @@ static long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
 }
 
 void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
-                              const char *id) {
-  long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
+                              const char *component_id) {
+  long index =
+      ts_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
     return NULL;
   }
@@ -373,9 +376,10 @@ void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
 }
 
 int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
-                        const char *id) {
+                        const char *component_id) {
   // There can only be one association between the entity and the component
-  long index = ts_get_component_index_from_entity_and_id(scene, entity, id);
+  long index =
+      ts_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
     return 1;
   }
@@ -392,19 +396,20 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   return 0;
 }
 
-static long ts_get_system_index_from_id(TS_Scene *scene, const char *id) {
-  for (size_t i = 0; i < scene->systems->len; i++) {
+static long ts_get_system_index_from_id(TS_Scene *scene,
+                                        const char *system_id) {
+  for (long i = 0; i < scene->systems->len; i++) {
     const TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
-    if (strcmp(system->id, id) == 0) {
+    if (strcmp(system->id, system_id) == 0) {
       return i;
     }
   }
   return -1L;
 }
 
-int ts_add_system(TS_Scene *scene, const char *id, int priority) {
-  long index = ts_get_system_index_from_id(scene, id);
+int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
+  long index = ts_get_system_index_from_id(scene, system_id);
   if (index != -1L) {
     // Already exists, won't add
     return 1;
@@ -424,16 +429,16 @@ int ts_add_system(TS_Scene *scene, const char *id, int priority) {
   TS_System_Detacher detacher;
   TS_System_Groups *groups;
 
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_SELECTOR_PREFIX,
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_SELECTOR_PREFIX,
                             selector, plugin1);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_FUNCTION_PREFIX, system,
-                            plugin2);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_ATTACH_PREFIX, attacher,
-                            plugin3);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_DETACH_PREFIX, detacher,
-                            plugin4);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, id, SYSTEM_GROUPS_PREFIX, groups,
-                            plugin5);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_FUNCTION_PREFIX,
+                            system, plugin2);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_ATTACH_PREFIX,
+                            attacher, plugin3);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_DETACH_PREFIX,
+                            detacher, plugin4);
+  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_GROUPS_PREFIX,
+                            groups, plugin5);
 
   if (!selector) {
     return 2;
@@ -442,7 +447,7 @@ int ts_add_system(TS_Scene *scene, const char *id, int priority) {
     return 2;
   }
   if (!groups) {
-    printf("System %s has groups not defined\n", id);
+    printf("System %s has groups not defined\n", system_id);
     return 2;
   }
   if (plugin1 != plugin2) {
@@ -452,7 +457,7 @@ int ts_add_system(TS_Scene *scene, const char *id, int priority) {
   // Found everything -> We can build the system handler
   TS_System_Handler *system_handler =
       (TS_System_Handler *)malloc(sizeof(TS_System_Handler));
-  system_handler->id = ts_copy_char_ptr(id);
+  system_handler->id = ts_copy_char_ptr(system_id);
   system_handler->active = 1;
   system_handler->priority = priority;
   system_handler->system = system;
@@ -505,10 +510,10 @@ void ts_tick_scene(TS_Scene *scene) {
     for (TS_System_Groups i = 1; i <= groups; i++) {
       GArray *entities_array =
           ts_find_entities_with_selector_and_groups(scene, system->selector, i);
-      size_t n = entities_array->len;
+      size_t num_entities = entities_array->len;
       TS_Entity *entities = (TS_Entity *)g_array_free(entities_array, FALSE);
 
-      g_array_append_val(entity_groups_size, n);
+      g_array_append_val(entity_groups_size, num_entities);
       g_array_append_val(entity_groups, entities);
     }
     size_t *size_array = (size_t *)g_array_free(entity_groups_size, FALSE);
@@ -530,10 +535,11 @@ void ts_tick_scene(TS_Scene *scene) {
   }
 }
 
-static int ts_compare_systems_priority(const gconstpointer a,
-                                       const gconstpointer b) {
-  const TS_System_Handler *system_a = *(const TS_System_Handler **)a;
-  const TS_System_Handler *system_b = *(const TS_System_Handler **)b;
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+static int ts_compare_systems_priority(const gconstpointer left,
+                                       const gconstpointer right) {
+  const TS_System_Handler *system_a = *(const TS_System_Handler **)left;
+  const TS_System_Handler *system_b = *(const TS_System_Handler **)right;
 
   return system_a->priority - system_b->priority;
 }
@@ -542,8 +548,8 @@ void ts_sort_systems(TS_Scene *scene) {
   g_array_sort(scene->systems, ts_compare_systems_priority);
 }
 
-int ts_remove_system(TS_Scene *scene, const char *id) {
-  long index = ts_get_system_index_from_id(scene, id);
+int ts_remove_system(TS_Scene *scene, const char *system_id) {
+  long index = ts_get_system_index_from_id(scene, system_id);
 
   if (index == -1L) {
     return 1;
@@ -562,8 +568,10 @@ int ts_remove_system(TS_Scene *scene, const char *id) {
   return 0;
 }
 
-int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
-  long index = ts_get_plugin_index(scene, path);
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
+                     const char *new_plugin_path) {
+  long index = ts_get_plugin_index(scene, plugin_path);
   if (index == -1L) {
     return 1;
   }
@@ -619,9 +627,9 @@ int ts_reload_plugin(TS_Scene *scene, const char *path, const char *new_path) {
 
   // Copy the path and the new_path over since it might be in a systems memory
   // location
-  char *p = ts_copy_char_ptr(new_path);
+  char *new_plugin_path_copy = ts_copy_char_ptr(new_plugin_path);
   free(plugin->path);
-  plugin->path = p;
+  plugin->path = new_plugin_path_copy;
 
   // Close and Check if you can open the new one
   dlclose(plugin->fd);
@@ -676,8 +684,8 @@ int ts_reload_all_plugins(TS_Scene *scene) {
   GArray *plugins = g_array_copy(scene->plugins);
 
   for (size_t i = 0; i < plugins->len; i++) {
-    TS_Loaded_Plugin *p = g_array_index(plugins, TS_Loaded_Plugin *, i);
-    ts_reload_plugin(scene, p->path, p->path);
+    TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);
+    ts_reload_plugin(scene, plugin->path, plugin->path);
   }
 
   g_array_free(plugins, TRUE);

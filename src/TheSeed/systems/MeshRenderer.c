@@ -1,7 +1,6 @@
 #include "glad/gl.h"
 
 #include "GLFW/glfw3.h"
-#include "TheSeed/components/Camera.h"
 #include "TheSeed/components/Model.h"
 #include "TheSeed/components/Transform.h"
 #include "TheSeed/components/Window.h"
@@ -33,28 +32,30 @@ TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene *scene,
   size_t window = (size_t)ts_entity_get_component(scene, entity, "TS_Window");
   if (window) {
     return 1;
-  } else if (camera_object) {
+  }
+  if (camera_object) {
     return 2;
-  } else if (normal_object) {
+  }
+  if (normal_object) {
     return 3;
   }
   return 0;
 }
 
 void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
-                                size_t *n) {
+                                const size_t *sizes) {
   TS_Entity camera_entity;
   TS_Transform *cam_transform;
 
   TS_Entity window_entity;
   TS_Window *window;
 
-  if (!n[0]) {
+  if (!sizes[0]) {
     printf("No window!\n");
     return;
   }
 
-  if (!n[1]) {
+  if (!sizes[1]) {
     printf("No camera!\n");
     return;
   }
@@ -67,7 +68,7 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
   cam_transform = (TS_Transform *)ts_entity_get_component(scene, camera_entity,
                                                           "TS_Transform");
 
-  for (size_t i = 0; i < n[2]; i++) {
+  for (size_t i = 0; i < sizes[2]; i++) {
     // Normal mesh entity
     TS_Entity entity = entities[2][i];
 
@@ -102,12 +103,13 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
 
     // Camera placement
     vec4 camera_pos_4;
-    glm_vec4(cam_transform->position, 1.0f, camera_pos_4);
+    glm_vec4(cam_transform->position, 1.0F, camera_pos_4);
     glm_vec4_negate(camera_pos_4);
     glm_translate(view_transform, camera_pos_4);
 
     // Perspective
-    int width, height;
+    int width;
+    int height;
     glfwGetWindowSize(window->window, &width, &height);
     glm_perspective(glm_rad(FOV), (float)width / (float)height, NEAR, FAR,
                     projection_transform);
@@ -126,5 +128,4 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
                      GL_UNSIGNED_INT, 0);
     }
   }
-  return;
 }

@@ -24,8 +24,8 @@ void *ts_create_TS_Model() {
   return model;
 }
 
-void ts_destroy_TS_Model(void *p) {
-  TS_Model *model = (TS_Model *)p;
+void ts_destroy_TS_Model(void *ptr) {
+  TS_Model *model = (TS_Model *)ptr;
   CHECKED_FREE(model->model_name);
   CHECKED_FREE(model->shader_name);
 
@@ -40,7 +40,6 @@ void ts_destroy_TS_Model(void *p) {
 
   // Free the model
   free(model);
-  return;
 }
 
 void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization) {
@@ -63,7 +62,6 @@ void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization) {
                          sizeof(char) * (strlen(model->shader_name) + 1),
                          shader_name_copy);
   }
-  return;
 }
 
 void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
@@ -86,7 +84,6 @@ void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
 
     model->shader_name = ts_copy_char_ptr(serialization_shader_name);
   }
-  return;
 }
 
 void ts_activate_TS_Model(void *ptr) {
@@ -120,5 +117,4 @@ void ts_activate_TS_Model(void *ptr) {
 
     model->meshes = meshes;
   }
-  return;
 }
