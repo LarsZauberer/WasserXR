@@ -7,11 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CHECKED_FREE(ptr)                                                      \
-  if (ptr) {                                                                   \
-    free(ptr);                                                                 \
-  }
-
 void *ts_create_TS_Model() {
   TS_Model *model = (TS_Model *)malloc(sizeof(TS_Model));
 
@@ -26,14 +21,14 @@ void *ts_create_TS_Model() {
 
 void ts_destroy_TS_Model(void *p) {
   TS_Model *model = (TS_Model *)p;
-  CHECKED_FREE(model->model_name);
-  CHECKED_FREE(model->shader_name);
+  free(model->model_name);
+  free(model->shader_name);
 
   // Free all the meshes
   for (unsigned int i = 0; i < model->numMeshes; i++) {
     ts_destroy_mesh(model->meshes[i]);
   }
-  CHECKED_FREE(model->meshes);
+  free(model->meshes);
 
   // Free the shader
   ts_destroy_shader(model->shader);
