@@ -56,4 +56,6 @@ int main() {
   while (1) {
     ts_tick_scene(scene);
   }
+
+  ts_destroy_scene(scene);
 }
