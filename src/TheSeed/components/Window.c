@@ -2,6 +2,7 @@
 
 #include "GL/gl.h"
 #include "TheSeed/components/Window.h"
+#include "TheSeed/core/logging.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@ static void setViewport(GLFWwindow *window, int width, int height) {
 
 void *ts_create_TS_Window() {
   TS_Window *this = (TS_Window *)malloc(sizeof(TS_Window));
+  ts_assert(this, "Malloc failed during ts_create_TS_Window");
 
   glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
   glfwInit();

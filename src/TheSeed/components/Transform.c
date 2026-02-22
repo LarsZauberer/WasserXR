@@ -1,10 +1,12 @@
 #include "TheSeed/components/Transform.h"
+#include "TheSeed/core/logging.h"
 #include "cglm/types.h"
 #include "cglm/vec3.h"
 #include <stdlib.h>
 
 void *ts_create_TS_Transform() {
   TS_Transform *t = (TS_Transform *)malloc(sizeof(TS_Transform));
+  ts_assert(t, "Malloc failed during ts_create_TS_Transform");
 
   glm_vec3_zero(t->position);
   glm_vec3_zero(t->rotation);

@@ -1,14 +1,15 @@
 #include "TheSeed/components/Model.h"
 #include "TheSeed/core/Mesh.h"
 #include "TheSeed/core/Shader.h"
+#include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
-#include "TheSeed/ecs/Scene.h"
 #include <glad/gl.h>
 #include <stdlib.h>
 #include <string.h>
 
 void *ts_create_TS_Model() {
   TS_Model *model = (TS_Model *)malloc(sizeof(TS_Model));
+  ts_assert(model, "Malloc failed during ts_create_TS_Model");
 
   model->model_name = NULL;
   model->shader_name = NULL;
@@ -85,25 +86,34 @@ void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
 }
 
 void ts_activate_TS_Model(void *ptr) {
+  ts_assert(ptr, "Pointer passed to ts_activate_TS_Model");
   TS_Model *model = (TS_Model *)ptr;
-
-  if (!model) {
-    return;
-  }
 
   if (model->shader_name) {
     model->shader = ts_create_shader(model->shader_name);
-    ts_load_shader(model->shader);
-    ts_compile_shader(model->shader);
+    int status = ts_load_shader(model->shader);
+    if (status) {
+      ts_warn("Failed to load the shader: %s", model->shader_name);
+    } else {
+      status = ts_compile_shader(model->shader);
+      if (status) {
+        ts_warn("Failed to compile the shader: %s", model->shader_name);
+      }
+    }
   }
 
   if (model->model_name) {
     // Read all the mesh data (array)
     TS_Mesh_Data *mesh_data =
         ts_read_mesh_data(&model->numMeshes, model->model_name);
+    if (!mesh_data) {
+      ts_warn("Failed to read the mesh data of `%s`", model->model_name);
+    }
 
     // Array of pointers
     TS_Mesh **meshes = (TS_Mesh **)malloc(sizeof(TS_Mesh *) * model->numMeshes);
+    ts_assert(meshes, "Malloc failed during creation of the meshes array in "
+                      "ts_activate_TS_Model");
 
     // Load the mesh with opengl
     for (unsigned int i = 0; i < model->numMeshes; i++) {

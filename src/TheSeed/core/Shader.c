@@ -21,6 +21,7 @@ struct TS_Shader {
 
 TS_Shader *ts_create_shader(char *path) {
   TS_Shader *shader = (TS_Shader *)malloc(sizeof(TS_Shader));
+  ts_assert(shader, "Malloc returned NULL in ts_create_shader");
 
   shader->path = ts_copy_char_ptr(path);
   shader->vertex_source = NULL;

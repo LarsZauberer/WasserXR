@@ -1,11 +1,11 @@
 #include "glad/gl.h"
 
 #include "GLFW/glfw3.h"
-#include "TheSeed/components/Camera.h"
 #include "TheSeed/components/Model.h"
 #include "TheSeed/components/Transform.h"
 #include "TheSeed/components/Window.h"
 #include "TheSeed/core/Shader.h"
+#include "TheSeed/core/logging.h"
 #include "TheSeed/ecs/Scene.h"
 #include "cglm/affine-pre.h"
 #include "cglm/affine.h"
@@ -50,12 +50,12 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
   TS_Window *window;
 
   if (!n[0]) {
-    printf("No window!\n");
+    ts_warn("No window!\n");
     return;
   }
 
   if (!n[1]) {
-    printf("No camera!\n");
+    ts_warn("No camera!\n");
     return;
   }
 
@@ -80,7 +80,14 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
       continue;
     }
 
-    ts_use_shader(model->shader);
+    int status = ts_use_shader(model->shader);
+    if (status) {
+      ts_warn("Shader couldn't be applied to the mesh of entity %ld. Skipping "
+              "rendering of entity",
+              entity);
+      continue;
+    }
+
     mat4 model_transform;
     mat4 view_transform;
     mat4 projection_transform;
