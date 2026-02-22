@@ -22,9 +22,9 @@
           name = "devShell";
 
           buildInputs = [
-            pkgs.gcc
+            pkgs.clang-tools
+            pkgs.clang
             pkgs.cmake
-            pkgs.ninja
             pkgs.gdb
             pkgs.valgrind
 
