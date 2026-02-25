@@ -4,7 +4,7 @@
 #include <stddef.h>
 typedef struct {
   size_t vertices_size;
-  size_t faces_size;
+  unsigned int faces_size;
 
   float *vertices;
   float *normals;
@@ -12,7 +12,7 @@ typedef struct {
 } TS_Mesh_Data;
 
 typedef struct {
-  unsigned int numIndices;
+  int numIndices;
   unsigned int vao;
   unsigned int vbo;
   unsigned int ebo;

@@ -1,4 +1,5 @@
 #include "TheSeed/core/Shader.h"
+#include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
 #include <cglm/cglm.h>
 #include <glad/gl.h>
@@ -20,6 +21,7 @@ struct TS_Shader {
 
 TS_Shader *ts_create_shader(char *path) {
   TS_Shader *shader = (TS_Shader *)malloc(sizeof(TS_Shader));
+  ts_assert(shader, "Malloc returned NULL in ts_create_shader");
 
   shader->path = ts_copy_char_ptr(path);
   shader->vertex_source = NULL;
@@ -32,10 +34,9 @@ TS_Shader *ts_create_shader(char *path) {
 }
 
 int ts_load_shader(TS_Shader *shader) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(
+      shader, 1,
+      "Shader is NULL during ts_load_shader. Call `ts_create_shader` first");
 
   // Build vertex shader path
   size_t path_len = strlen(shader->path);
@@ -76,15 +77,11 @@ int ts_load_shader(TS_Shader *shader) {
 }
 
 int ts_compile_shader(TS_Shader *shader) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, 1, "Shader is NULL during ts_compile_shader");
 
-  if (!shader->is_loaded) {
-    fprintf(stderr, "Error: Shader not loaded. Call ts_load_shader() first\n");
-    return 1;
-  }
+  ts_assert_abort_value(
+      shader->is_loaded, 1,
+      "Error: Shader not loaded. Call ts_load_shader() first");
 
   int success;
   char info_log[512];
@@ -101,7 +98,7 @@ int ts_compile_shader(TS_Shader *shader) {
   glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
-    fprintf(stderr, "Error: Vertex shader compilation failed\n%s\n", info_log);
+    ts_error("Error: Vertex shader compilation failed\n%s", info_log);
     free(shader->vertex_source);
     free(shader->fragment_source);
     shader->is_loaded = 0;
@@ -117,8 +114,7 @@ int ts_compile_shader(TS_Shader *shader) {
   glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
-    fprintf(stderr, "Error: Fragment shader compilation failed\n%s\n",
-            info_log);
+    ts_error("Error: Fragment shader compilation failed\n%s", info_log);
     free(shader->vertex_source);
     free(shader->fragment_source);
     glDeleteShader(vertex_shader);
@@ -135,7 +131,7 @@ int ts_compile_shader(TS_Shader *shader) {
   glGetProgramiv(shader->program, GL_LINK_STATUS, &success);
   if (!success) {
     glGetProgramInfoLog(shader->program, 512, NULL, info_log);
-    fprintf(stderr, "Error: Shader program linking failed\n%s\n", info_log);
+    ts_error("Error: Shader program linking failed\n%s", info_log);
     free(shader->vertex_source);
     free(shader->fragment_source);
     glDeleteShader(vertex_shader);
@@ -157,14 +153,11 @@ int ts_compile_shader(TS_Shader *shader) {
 }
 
 int ts_use_shader(TS_Shader *shader) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1, "Shader is NULL during ts_use_shader");
 
   if (!shader->is_compiled) {
-    fprintf(stderr,
-            "Error: Shader not compiled. Call ts_compile_shader() first\n");
+    ts_error("Error: Shader not compiled. Call ts_compile_shader() first "
+             "before trying to use the shader");
     return 1;
   }
 
@@ -189,19 +182,17 @@ void ts_destroy_shader(TS_Shader *shader) {
 }
 
 int ts_set_shader_uniform_1f(TS_Shader *shader, char *name, float value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_1f");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -210,19 +201,17 @@ int ts_set_shader_uniform_1f(TS_Shader *shader, char *name, float value) {
 }
 
 int ts_set_shader_uniform_1i(TS_Shader *shader, char *name, int value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_1i");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -231,19 +220,17 @@ int ts_set_shader_uniform_1i(TS_Shader *shader, char *name, int value) {
 }
 
 int ts_set_shader_uniform_2f(TS_Shader *shader, char *name, const vec2 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_2f");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -252,19 +239,17 @@ int ts_set_shader_uniform_2f(TS_Shader *shader, char *name, const vec2 value) {
 }
 
 int ts_set_shader_uniform_3f(TS_Shader *shader, char *name, const vec3 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_3f");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -273,19 +258,17 @@ int ts_set_shader_uniform_3f(TS_Shader *shader, char *name, const vec3 value) {
 }
 
 int ts_set_shader_uniform_4f(TS_Shader *shader, char *name, const vec4 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_4f");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -295,19 +278,17 @@ int ts_set_shader_uniform_4f(TS_Shader *shader, char *name, const vec4 value) {
 
 int ts_set_shader_uniform_mat2(TS_Shader *shader, char *name,
                                const mat2 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_mat2");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -317,19 +298,17 @@ int ts_set_shader_uniform_mat2(TS_Shader *shader, char *name,
 
 int ts_set_shader_uniform_mat3(TS_Shader *shader, char *name,
                                const mat3 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_mat3");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 
@@ -339,19 +318,17 @@ int ts_set_shader_uniform_mat3(TS_Shader *shader, char *name,
 
 int ts_set_shader_uniform_mat4(TS_Shader *shader, char *name,
                                const mat4 value) {
-  if (!shader) {
-    fprintf(stderr, "Error: NULL shader pointer\n");
-    return 1;
-  }
+  ts_assert_abort_value(shader, -1,
+                        "Shader is NULL during ts_set_shader_uniform_mat4");
 
   if (!shader->is_compiled) {
-    fprintf(stderr, "Error: Shader not compiled\n");
+    ts_error("Error: Shader not compiled");
     return 1;
   }
 
   GLint location = glGetUniformLocation(shader->program, name);
   if (location == -1) {
-    fprintf(stderr, "Warning: Uniform '%s' not found in shader\n", name);
+    ts_warn("Warning: Uniform '%s' not found in shader", name);
     return 1;
   }
 

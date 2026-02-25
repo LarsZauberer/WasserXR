@@ -1,0 +1,13 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-casting-through-void,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  cert-*,
+  readability-*,
+  performance-*,
+  portability-*,
+  -readability-magic-numbers,
+HeaderFilterRegex: ".*/include/TheSeed/.*"
+FormatStyle: file

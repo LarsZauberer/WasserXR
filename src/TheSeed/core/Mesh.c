@@ -1,6 +1,7 @@
 #include <glad/gl.h>
 
 #include "TheSeed/core/Mesh.h"
+#include "TheSeed/core/logging.h"
 #include "assimp/mesh.h"
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
@@ -20,14 +21,20 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
 
   float *vertices = malloc(sizeof(float) * mesh->mNumVertices * 3);
   float *normals = malloc(sizeof(float) * mesh->mNumVertices * 3);
+  ts_assert(
+      vertices,
+      "Malloc returned null for the vertices creation during ts_process_mesh");
+  ts_assert(
+      normals,
+      "Malloc returned null for the normals creation during ts_process_mesh");
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-    vertices[i * 3 + 0] = mesh->mVertices[i].x;
-    vertices[i * 3 + 1] = mesh->mVertices[i].y;
-    vertices[i * 3 + 2] = mesh->mVertices[i].z;
+    vertices[(i * 3) + 0] = mesh->mVertices[i].x;
+    vertices[(i * 3) + 1] = mesh->mVertices[i].y;
+    vertices[(i * 3) + 2] = mesh->mVertices[i].z;
 
-    normals[i * 3 + 0] = mesh->mNormals[i].x;
-    normals[i * 3 + 1] = mesh->mNormals[i].y;
-    normals[i * 3 + 2] = mesh->mNormals[i].z;
+    normals[(i * 3) + 0] = mesh->mNormals[i].x;
+    normals[(i * 3) + 1] = mesh->mNormals[i].y;
+    normals[(i * 3) + 2] = mesh->mNormals[i].z;
   }
 
   mesh_data.vertices_size = mesh->mNumVertices;
@@ -35,12 +42,17 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
   mesh_data.normals = normals;
 
   unsigned int *indices = malloc(sizeof(unsigned int) * mesh->mNumFaces * 3);
+  ts_assert(
+      indices,
+      "Malloc returned null for indicies creation during ts_process_mesh");
 
   for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
     aiFace face = mesh->mFaces[i];
-    g_assert(face.mNumIndices == 3);
+    ts_assert(face.mNumIndices == 3,
+              "The mesh being processed is not a triangle mesh. Meshes other "
+              "than triangle meshes are not supported");
     for (unsigned int j = 0; j < face.mNumIndices; j++) {
-      indices[i * 3 + j] = face.mIndices[j];
+      indices[(i * 3) + j] = face.mIndices[j];
     }
   }
 
@@ -61,8 +73,6 @@ static void ts_process_node(GArray *mesh_data, const aiScene *scene,
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
     ts_process_node(mesh_data, scene, node->mChildren[i]);
   }
-
-  return;
 }
 
 TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
@@ -70,8 +80,8 @@ TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
       aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
 
   if (!scene) {
-    printf("Failed to load the model file %s: %s\n", filename,
-           aiGetErrorString());
+    ts_error("Failed to load the model file %s: %s", filename,
+             aiGetErrorString());
     *n = 0;
     return NULL;
   }
@@ -87,30 +97,34 @@ void ts_destroy_mesh_data(TS_Mesh_Data *mesh) {
   free(mesh->indices);
   free(mesh->normals);
   free(mesh->vertices);
-  return;
 }
 
 TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
   TS_Mesh *mesh = (TS_Mesh *)malloc(sizeof(TS_Mesh));
+  ts_assert(mesh, "Malloc returned NULL during ts_create_mesh_from_data");
 
-  mesh->numIndices = mesh_data->faces_size * 3;
+  mesh->numIndices = (int)mesh_data->faces_size * 3;
 
   // Generate the buffers
   glGenVertexArrays(1, &mesh->vao);
+  ts_assert(mesh->vao, "Vertex Array couldn't be allocated");
   glGenBuffers(1, &mesh->vbo);
+  ts_assert(mesh->vbo, "Vertex Buffer couldn't be allocated");
   glGenBuffers(1, &mesh->ebo);
+  ts_assert(mesh->ebo, "Element Buffer couldn't be allocated");
 
   // // Bind the buffers
   glBindVertexArray(mesh->vao);
 
   // Move vertices over
   glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * mesh_data->vertices_size,
+  glBufferData(GL_ARRAY_BUFFER,
+               (long)sizeof(float) * 3 * (long)mesh_data->vertices_size,
                mesh_data->vertices, GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-               sizeof(unsigned int) * 3 * mesh_data->faces_size,
+               (long)sizeof(unsigned int) * 3 * mesh_data->faces_size,
                mesh_data->indices, GL_STATIC_DRAW);
 
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);

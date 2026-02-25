@@ -1,9 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
+set(CMAKE_C_COMPILER clang)
 project(TheSeed LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CLANG_TIDY clang-tidy)
 
-add_compile_options(-std=c99 -Wall -Wextra -O0 -g -fno-omit-frame-pointer)
+option(BUILD_DEBUG "Debug build" OFF)
+
+add_compile_options(-std=c99 -Wall -Wextra)
+
+if (BUILD_DEBUG)
+  add_compile_options(-O0 -g -fno-omit-frame-pointer)
+  add_compile_options(-fsanitize=address -fsanitize=undefined)
+  add_link_options(-fsanitize=address -fsanitize=undefined)
+else()
+  add_compile_options(-O3)
+endif()
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
