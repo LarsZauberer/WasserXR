@@ -15,10 +15,7 @@ static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, char *fmt,
   return entry;
 }
 
-static void ts_destroy_entry(TS_Log_Entry entry) {
-  free(entry.msg);
-  return;
-}
+static void ts_destroy_entry(TS_Log_Entry entry) { free(entry.msg); }
 
 static void ts_send_entry_to_loggers(TS_Log_Entry entry) {
   g_assert(ts_loggers);
@@ -26,19 +23,14 @@ static void ts_send_entry_to_loggers(TS_Log_Entry entry) {
     TS_Logger logger = g_array_index(ts_loggers, TS_Logger, i);
     logger(entry);
   }
-  return;
 }
 
 void ts_logging_init(TS_Log_Level level) {
   ts_lowest_level = level;
   ts_loggers = g_array_new(FALSE, FALSE, sizeof(TS_Logger));
-  return;
 }
 
-void ts_add_logger(TS_Logger logger) {
-  g_array_append_val(ts_loggers, logger);
-  return;
-}
+void ts_add_logger(TS_Logger logger) { g_array_append_val(ts_loggers, logger); }
 
 void ts_stdout_logger(TS_Log_Entry entry) {
   char *level = NULL;
@@ -70,7 +62,6 @@ void ts_stdout_logger(TS_Log_Entry entry) {
     break;
   }
   printf("[\033[%sm%s\033[0m]: %s\n", color, level, entry.msg);
-  return;
 }
 
 void ts_debug(char *fmt, ...) {
@@ -86,7 +77,6 @@ void ts_debug(char *fmt, ...) {
   va_end(args);
   ts_send_entry_to_loggers(entry);
   ts_destroy_entry(entry);
-  return;
 }
 
 void ts_info(char *fmt, ...) {
@@ -102,7 +92,6 @@ void ts_info(char *fmt, ...) {
   va_end(args);
   ts_send_entry_to_loggers(entry);
   ts_destroy_entry(entry);
-  return;
 }
 
 void ts_warn(char *fmt, ...) {
@@ -118,7 +107,6 @@ void ts_warn(char *fmt, ...) {
   va_end(args);
   ts_send_entry_to_loggers(entry);
   ts_destroy_entry(entry);
-  return;
 }
 
 void ts_error(char *fmt, ...) {
@@ -134,7 +122,6 @@ void ts_error(char *fmt, ...) {
   va_end(args);
   ts_send_entry_to_loggers(entry);
   ts_destroy_entry(entry);
-  return;
 }
 
 void ts_critical(char *fmt, ...) {

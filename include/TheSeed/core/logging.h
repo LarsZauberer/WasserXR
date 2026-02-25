@@ -14,11 +14,11 @@ typedef struct {
 
 // Logging functions
 
-void ts_debug(char *, ...);
-void ts_info(char *, ...);
-void ts_warn(char *, ...);
-void ts_error(char *, ...);
-void ts_critical(char *, ...);
+void ts_debug(char * /*fmt*/, ...);
+void ts_info(char * /*fmt*/, ...);
+void ts_warn(char * /*fmt*/, ...);
+void ts_error(char * /*fmt*/, ...);
+void ts_critical(char * /*fmt*/, ...);
 
 #define ts_assert(exp, fmt, ...)                                               \
   if (!(exp)) {                                                                \
@@ -46,7 +46,7 @@ void ts_critical(char *, ...);
 
 typedef void (*TS_Logger)(TS_Log_Entry);
 
-void ts_add_logger(TS_Logger);
+void ts_add_logger(TS_Logger /*logger*/);
 
 // Default loggers
 
