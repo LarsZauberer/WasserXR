@@ -44,7 +44,7 @@ target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES})
 file(GLOB COMPONENTS_SRC src/TheSeed/components/*.c)
 add_library(theseed_components SHARED ${COMPONENTS_SRC})
 target_include_directories(theseed_components PUBLIC include)
-target_link_libraries(theseed_components PRIVATE glad glfw)
+target_link_libraries(theseed_components PRIVATE glad glfw theseed_core)
 
 # Systems
 file(GLOB SYSTEMS_SRC src/TheSeed/systems/*.c)

@@ -1,5 +1,6 @@
 #include "TheSeed/components/Model.h"
 #include "TheSeed/core/Mesh.h"
+#include "TheSeed/core/Mesh_Data.h"
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
