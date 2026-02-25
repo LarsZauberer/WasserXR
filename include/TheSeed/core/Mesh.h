@@ -1,15 +1,8 @@
 #ifndef TS_MESH_H
 #define TS_MESH_H
 
+#include "TheSeed/core/Mesh_Data.h"
 #include <stddef.h>
-typedef struct {
-  size_t vertices_size;
-  unsigned int faces_size;
-
-  float *vertices;
-  float *normals;
-  unsigned int *indices;
-} TS_Mesh_Data;
 
 typedef struct {
   int numIndices;
@@ -17,9 +10,6 @@ typedef struct {
   unsigned int vbo;
   unsigned int ebo;
 } TS_Mesh;
-
-TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename);
-void ts_destroy_mesh_data(TS_Mesh_Data *mesh);
 
 TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data);
 void ts_destroy_mesh(TS_Mesh *mesh);
