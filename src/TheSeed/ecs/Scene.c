@@ -800,7 +800,6 @@ int ts_reload_all_plugins(TS_Scene *scene) {
 
   for (size_t i = 0; i < plugins->len; i++) {
     TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);
-    ts_reload_plugin(scene, plugin->path, plugin->path);
     char *path_before = ts_copy_char_ptr(plugin->path);
     char *path_after = ts_copy_char_ptr(plugin->path);
     ts_reload_plugin(scene, path_before, path_after);
