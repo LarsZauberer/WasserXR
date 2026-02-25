@@ -1,4 +1,4 @@
-char *ts_copy_char_ptr(const char *);
+char *ts_copy_char_ptr(const char *src);
 
 /**
  * Reads the contents of a file into a dynamically allocated string.
