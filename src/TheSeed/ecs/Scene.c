@@ -304,6 +304,7 @@ int ts_set_serialization(TS_Serialization *serialization, char *name,
   return 0;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
                      const char *component_id,
                      TS_Serialization *serialization) {
@@ -482,6 +483,7 @@ static long ts_get_system_index_from_id(TS_Scene *scene,
   return -1L;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
   ts_assert_abort_value(system_id, -1, "Id is NULL during ts_add_system");
