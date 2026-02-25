@@ -360,9 +360,10 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
             component);
   if (deserializer) {
     if (!serialization) {
+      char *component_id_copy = ts_copy_char_ptr(component_id);
       TS_Serialization *serialization =
-          // Bug: Memory leak here
-          ts_create_serialization(ts_copy_char_ptr(component_id), entity_id);
+          ts_create_serialization(component_id_copy, entity_id);
+      free(component_id_copy);
       ts_debug("Running deserializer for component `%s` on entity "
                "%ld with "
                "default serializer",
