@@ -754,8 +754,9 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
 
   // Replace all the bindings of the systems
   for (size_t i = 0; i < systems_to_reconstruct->len; i++) {
-    g_assert(systems_to_reconstruct->len ==
-             systems_to_reconstruct_priority->len);
+    ts_assert(systems_to_reconstruct->len ==
+                  systems_to_reconstruct_priority->len,
+              "Reconstruction arrays are not the same length");
     char *system_id = g_array_index(systems_to_reconstruct, char *, i);
     int system_priority =
         g_array_index(systems_to_reconstruct_priority, int, i);
