@@ -89,6 +89,8 @@ TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
   GArray *output_meshes = g_array_new(FALSE, FALSE, sizeof(TS_Mesh_Data));
   ts_process_node(output_meshes, scene, scene->mRootNode);
 
+  aiReleaseImport(scene);
+
   *n = output_meshes->len;
   return (TS_Mesh_Data *)g_array_free(output_meshes, FALSE);
 }
