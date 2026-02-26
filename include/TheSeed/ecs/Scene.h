@@ -27,8 +27,8 @@ typedef void (*TS_Component_Activator)(void *);
 typedef int TS_System_Groups;
 typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, const size_t *);
 typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const TS_Entity);
-typedef void (*TS_System_Attacher)();
-typedef void (*TS_System_Detacher)();
+typedef void (*TS_System_Attacher)(TS_Scene *);
+typedef void (*TS_System_Detacher)(TS_Scene *);
 
 /**
  * Create a new scene object.
@@ -173,6 +173,9 @@ void *ts_get_serialization(TS_Serialization *serialization, char *name);
 
 int ts_set_serialization(TS_Serialization *serialization, char *name,
                          size_t size, void *data);
+
+TS_Entity *ts_find_entities_with_selector_and_groups(
+    size_t *size, TS_Scene *scene, TS_System_Selector selector, int group);
 
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
