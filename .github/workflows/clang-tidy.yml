@@ -1,0 +1,37 @@
+name: Clang-Tidy Check
+
+on:
+  pull_request:
+    branches: [ "*" ]
+  push:
+    branches: [ "main" ]
+
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Nix
+      uses: cachix/install-nix-action@v26
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+    
+    - name: Build project
+      run: |
+        nix develop --command bash -c "
+          mkdir -p build
+          cd build
+          cmake -DBUILD_DEBUG=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+          cmake --build .
+        "
+    
+    - name: Run clang-tidy
+      run: |
+        nix develop --command bash -c "
+          cd build
+          run-clang-tidy -p . './src/TheSeed/.*\.c$'
+        "
