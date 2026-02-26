@@ -52,6 +52,8 @@ int main() {
   // triangle2_transform->position[0] = -1.0f;
 
   // Add the systems
+  ts_add_system(scene, "ts_console_system", 100);
+
   ts_add_system(scene, "ts_window_pre_renderer", 50);
   ts_add_system(scene, "ts_window_post_renderer", 150);
 

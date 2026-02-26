@@ -54,8 +54,8 @@ target_link_libraries(theseed_components PRIVATE glad glfw theseed_core)
 # Systems
 file(GLOB SYSTEMS_SRC src/TheSeed/systems/*.c)
 add_library(theseed_systems SHARED ${SYSTEMS_SRC})
-target_include_directories(theseed_systems PUBLIC include)
-target_link_libraries(theseed_systems PRIVATE glad glfw)
+target_include_directories(theseed_systems PUBLIC include ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_systems PRIVATE glad glfw pthread ${GLIB_LIBRARIES})
 
 # Generate main executable
 add_executable(theseed src/main.c)
