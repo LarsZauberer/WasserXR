@@ -25,10 +25,10 @@ typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
 typedef void (*TS_Component_Activator)(void *);
 
 typedef int TS_System_Groups;
-typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, size_t *);
-typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const size_t);
-typedef void (*TS_System_Attacher)(void);
-typedef void (*TS_System_Detacher)(void);
+typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, const size_t *);
+typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const TS_Entity);
+typedef void (*TS_System_Attacher)();
+typedef void (*TS_System_Detacher)();
 
 /**
  * Create a new scene object.
