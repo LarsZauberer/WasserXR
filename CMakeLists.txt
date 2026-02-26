@@ -6,6 +6,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CLANG_TIDY clang-tidy)
 
 option(BUILD_DEBUG "Debug build" OFF)
+option(TS_NO_ASSERTS "Asserts are removed" OFF)
 
 add_compile_options(-std=c99 -Wall -Wextra)
 
@@ -15,6 +16,10 @@ if (BUILD_DEBUG)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 else()
   add_compile_options(-O3)
+endif()
+
+if (TS_NO_ASSERTS)
+  add_compile_definitions(TS_NO_ASSERTS)
 endif()
 
 find_package(PkgConfig REQUIRED)

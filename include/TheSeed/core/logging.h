@@ -20,6 +20,8 @@ void ts_warn(char * /*fmt*/, ...);
 void ts_error(char * /*fmt*/, ...);
 void ts_critical(char * /*fmt*/, ...);
 
+#ifndef TS_NO_ASSERTS
+
 #define ts_assert(exp, fmt, ...)                                               \
   if (!(exp)) {                                                                \
     ts_critical(fmt __VA_OPT__(, ) __VA_ARGS__);                               \
@@ -41,6 +43,18 @@ void ts_critical(char * /*fmt*/, ...);
     ts_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
     return value;                                                              \
   }
+
+#else
+
+#define ts_assert(exp, fmt, ...)
+
+#define ts_assert_recoverable(exp, fmt, ...)
+
+#define ts_assert_abort(exp, fmt, ...)
+
+#define ts_assert_abort_value(exp, value, fmt, ...)
+
+#endif
 
 // Logger registry
 
