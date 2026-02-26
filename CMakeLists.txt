@@ -85,3 +85,12 @@ add_custom_target(docs ALL
 install(DIRECTORY ${CMAKE_BINARY_DIR}/docs/man/man3
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man
         OPTIONAL)
+
+# Tests
+enable_testing()
+
+add_executable(test_utils tests/test_utils.c)
+target_include_directories(test_utils PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(test_utils PRIVATE theseed_core ${GLIB_LIBRARIES})
+
+add_test(NAME test_utils COMMAND test_utils)

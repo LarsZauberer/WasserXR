@@ -7,6 +7,9 @@
 #include <string.h>
 
 char *ts_copy_char_ptr(const char *src) {
+  if (!src) {
+    return NULL;
+  }
   size_t path_length = strlen(src);
   char *out = (char *)malloc(sizeof(char) * (path_length + 1));
   g_strlcpy(out, src, strlen(src) + 1);

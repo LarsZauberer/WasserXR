@@ -3,6 +3,7 @@ build/
 .direnv/
 vgcore*
 compile_commands.json
-opencode.json
+Testing/*
 
+opencode.json
 AGENTS.md
