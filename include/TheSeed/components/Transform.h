@@ -10,7 +10,7 @@ typedef struct {
 } TS_Transform;
 
 void *ts_create_TS_Transform();
-void ts_destroy_TS_Transform(void *);
+void ts_destroy_TS_Transform(void *ptr);
 void ts_serializer_TS_Transform(void *transform,
                                 TS_Serialization *serialization);
 void ts_deserialization_TS_Transform(void *transform,

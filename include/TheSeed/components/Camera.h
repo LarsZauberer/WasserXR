@@ -8,6 +8,6 @@ typedef struct {
 } TS_Camera;
 
 void *ts_create_TS_Camera();
-void ts_destroy_TS_Camera(void *);
+void ts_destroy_TS_Camera(void *cam);
 
 #endif

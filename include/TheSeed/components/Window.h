@@ -8,6 +8,6 @@ typedef struct {
 } TS_Window;
 
 void *ts_create_TS_Window();
-void ts_destroy_TS_Window(void *);
+void ts_destroy_TS_Window(void *window);
 
 #endif

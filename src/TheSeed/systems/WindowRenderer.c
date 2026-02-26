@@ -12,19 +12,18 @@ TS_System_Groups ts_select_ts_window_pre_renderer(TS_Scene *scene,
                                                   const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
-  } else {
-    return 0;
   }
+  return 0;
 }
 
 void ts_system_ts_window_pre_renderer(TS_Scene *scene, TS_Entity **entities,
-                                      size_t *n) {
-  for (size_t i = 0; i < *n; i++) {
+                                      const size_t *size) {
+  for (size_t i = 0; i < *size; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
     if (!glfwWindowShouldClose(window->window)) {
-      glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+      glClearColor(0.1F, 0.1F, 0.1F, 1.0F);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     } else {
       ts_remove_component(scene, entities[0][i], "TS_Window");
@@ -38,14 +37,13 @@ TS_System_Groups ts_select_ts_window_post_renderer(TS_Scene *scene,
                                                    const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
-  } else {
-    return 0;
   }
+  return 0;
 }
 
 void ts_system_ts_window_post_renderer(TS_Scene *scene, TS_Entity **entities,
-                                       size_t *n) {
-  for (size_t i = 0; i < *n; i++) {
+                                       const size_t *size) {
+  for (size_t i = 0; i < *size; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
@@ -64,13 +62,13 @@ TS_System_Groups ts_select_ts_window_quiter(TS_Scene *scene,
                                             const size_t entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
-  } else {
-    return 0;
   }
+  return 0;
 }
 
-void ts_system_ts_window_quiter(TS_Scene *scene, size_t **entities, size_t *n) {
-  if (*n == 0) {
+void ts_system_ts_window_quiter(TS_Scene *scene, size_t **entities,
+                                const size_t *size) {
+  if (*size == 0) {
     glfwTerminate();
     exit(0);
   }
@@ -82,14 +80,13 @@ TS_System_Groups ts_select_ts_window_reloader(TS_Scene *scene,
                                               const size_t entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
-  } else {
-    return 0;
   }
+  return 0;
 }
 
 void ts_system_ts_window_reloader(TS_Scene *scene, size_t **entities,
-                                  size_t *n) {
-  for (size_t i = 0; i < *n; i++) {
+                                  const size_t *size) {
+  for (size_t i = 0; i < *size; i++) {
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 

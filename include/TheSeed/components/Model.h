@@ -13,7 +13,7 @@ typedef struct {
 } TS_Model;
 
 void *ts_create_TS_Model();
-void ts_destroy_TS_Model(void *);
+void ts_destroy_TS_Model(void *ptr);
 void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization);
 void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization);
 void ts_activate_TS_Model(void *ptr);

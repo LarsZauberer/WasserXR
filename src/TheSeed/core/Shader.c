@@ -39,17 +39,14 @@ int ts_load_shader(TS_Shader *shader) {
       "Shader is NULL during ts_load_shader. Call `ts_create_shader` first");
 
   // Build vertex shader path
-  size_t path_len = strlen(shader->path);
-  char *vertex_path =
-      (char *)malloc(path_len + 6); // +5 for ".vert" +1 for null
-  strcpy(vertex_path, shader->path);
-  strcat(vertex_path, ".vert");
+  GString *vertex_path_gstring = g_string_new(shader->path);
+  g_string_append(vertex_path_gstring, ".vert");
+  char *vertex_path = g_string_free(vertex_path_gstring, FALSE);
 
   // Build fragment shader path
-  char *fragment_path =
-      (char *)malloc(path_len + 6); // +5 for ".frag" +1 for null
-  strcpy(fragment_path, shader->path);
-  strcat(fragment_path, ".frag");
+  GString *fragment_path_gstring = g_string_new(shader->path);
+  g_string_append(fragment_path_gstring, ".frag");
+  char *fragment_path = g_string_free(fragment_path_gstring, FALSE);
 
   // Load vertex shader
   shader->vertex_source = ts_read_file(vertex_path);

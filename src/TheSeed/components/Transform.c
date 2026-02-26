@@ -6,7 +6,8 @@
 
 void *ts_create_TS_Transform() {
   TS_Transform *ptr = (TS_Transform *)malloc(sizeof(TS_Transform));
-  ts_assert(ptr, "Malloc failed during ts_create_TS_Transform");
+  ts_assert_abort_value(ptr, NULL,
+                        "Malloc failed during ts_create_TS_Transform");
 
   glm_vec3_zero(ptr->position);
   glm_vec3_zero(ptr->rotation);

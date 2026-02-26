@@ -12,13 +12,13 @@
 #define ANTIALIASING 8
 
 // LSAN fixes
-#if defined(__has_feature)
+#ifdef __has_feature
 #if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
 #define HAVE_LSAN 1
 #endif
 #endif
 
-#if !defined(HAVE_LSAN)
+#ifndef HAVE_LSAN
 #if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_LEAK__)
 #define HAVE_LSAN 1
 #endif
