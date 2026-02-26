@@ -65,7 +65,6 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
   }
 
   ts_debug("Running command %s", console_buffer);
-  ts_debug("Hello World!");
 
   if (strcmp(console_buffer, "reload") == 0) {
     ts_set_scene_reload(scene);
@@ -78,6 +77,8 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
     }
 
     free(windows);
+  } else if (strcmp(console_buffer, "addEntity") == 0) {
+    ts_add_entity(scene);
   }
 
   free(console_buffer);
