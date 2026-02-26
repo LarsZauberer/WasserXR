@@ -8,7 +8,7 @@ set(CMAKE_CLANG_TIDY clang-tidy)
 option(BUILD_DEBUG "Debug build" OFF)
 option(TS_NO_ASSERTS "Asserts are removed" OFF)
 
-add_compile_options(-std=c99 -Wall -Wextra)
+add_compile_options(-std=c99 -Wall -Wextra -Wno-unused-parameter)
 
 if (BUILD_DEBUG)
   add_compile_options(-O0 -g -fno-omit-frame-pointer)
