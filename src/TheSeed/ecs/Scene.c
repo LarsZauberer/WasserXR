@@ -564,8 +564,8 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   return 0;
 }
 
-static GArray *ts_find_entities_with_selector_and_groups(
-    TS_Scene *scene, TS_System_Selector selector, int group) {
+TS_Entity *ts_find_entities_with_selector_and_groups(
+    size_t *size, TS_Scene *scene, TS_System_Selector selector, int group) {
   ts_assert(scene,
             "Scene is NULL during ts_find_entities_with_selector_and_groups");
   ts_assert(selector,
@@ -577,7 +577,8 @@ static GArray *ts_find_entities_with_selector_and_groups(
       g_array_append_val(res, entity);
     }
   }
-  return res;
+  *size = res->len;
+  return (TS_Entity *)g_array_free(res, FALSE);
 }
 
 void ts_tick_scene(TS_Scene *scene) {
@@ -599,10 +600,9 @@ void ts_tick_scene(TS_Scene *scene) {
 
     // Create all the helper arrays
     for (TS_System_Groups i = 1; i <= groups; i++) {
-      GArray *entities_array =
-          ts_find_entities_with_selector_and_groups(scene, system->selector, i);
-      size_t num_entities = entities_array->len;
-      TS_Entity *entities = (TS_Entity *)g_array_free(entities_array, FALSE);
+      size_t num_entities = 0;
+      TS_Entity *entities = ts_find_entities_with_selector_and_groups(
+          &num_entities, scene, system->selector, i);
 
       g_array_append_val(entity_groups_size, num_entities);
       g_array_append_val(entity_groups, entities);
