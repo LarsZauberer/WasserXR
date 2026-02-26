@@ -552,7 +552,7 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   // Execute the attacher
   if (attacher) {
     ts_debug("Running attacher for system `%s`", system_id);
-    attacher();
+    attacher(scene);
   }
 
   // Sort for priority
@@ -658,7 +658,7 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
 
   if (system->detacher) {
     ts_debug("Running detacher for system `%s`", system->id);
-    system->detacher();
+    system->detacher(scene);
   }
 
   free(system->id);
