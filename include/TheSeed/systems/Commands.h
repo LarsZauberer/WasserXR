@@ -9,7 +9,9 @@ typedef struct {
 
 void ts_command_reload(char **args, TS_Scene *scene);
 void ts_command_exit(char **args, TS_Scene *scene);
+void ts_command_addEntity(char **args, TS_Scene *scene);
 void ts_command_removeEntity(char **args, TS_Scene *scene);
+void ts_command_addComponent(char **args, TS_Scene *scene);
 
 TS_Command *ts_create_command_list(size_t *size);
 void ts_destroy_command_list(TS_Command *ptr);

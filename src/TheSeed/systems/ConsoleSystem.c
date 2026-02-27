@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define TS_MAX_COMMAND_LENGTH 265
+#define TS_MAX_COMMAND_LENGTH 2048
 
 pthread_t ts_console_thread;
 char *ts_console_buffer = NULL;
@@ -71,6 +71,13 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
       char *args_begin = ts_console_buffer + strlen(cmd_list[i].command) + 1;
       char **args = g_strsplit(args_begin, " ", -1);
       cmd_list[i].func(args, scene);
+      size_t clear_i = 0;
+      while (1) {
+        if (!args[clear_i]) {
+          break;
+        }
+        free(args[clear_i++]);
+      }
       free(args);
     }
   }
