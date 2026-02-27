@@ -66,6 +66,8 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
 
   ts_debug("Running command %s", console_buffer);
 
+  int removeEntity = g_str_has_prefix(console_buffer, "removeEntity");
+
   if (strcmp(console_buffer, "reload") == 0) {
     ts_set_scene_reload(scene);
   } else if (strcmp(console_buffer, "exit") == 0) {
@@ -78,7 +80,12 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
 
     free(windows);
   } else if (strcmp(console_buffer, "addEntity") == 0) {
-    ts_add_entity(scene);
+    TS_Entity entity_id = ts_add_entity(scene);
+    ts_info("Entity with id %ld created", entity_id);
+  } else if (removeEntity) {
+    char *args = console_buffer + strlen("removeEntity ");
+    size_t entity_id = strtol(args, NULL, 10);
+    ts_remove_entity(scene, entity_id);
   }
 
   free(console_buffer);
