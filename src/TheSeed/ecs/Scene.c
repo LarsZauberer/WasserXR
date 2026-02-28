@@ -483,6 +483,10 @@ static long ts_get_system_index_from_id(TS_Scene *scene,
   return -1L;
 }
 
+static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
+  return 0;
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
@@ -519,17 +523,18 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_GROUPS_PREFIX,
                             groups, plugin5);
 
-  if (!selector) {
-    ts_warn("Failed to find selector in the system `%s`", system_id);
-    return 2;
-  }
   if (!system) {
     ts_warn("Failed to find system function in the system `%s`", system_id);
     return 2;
   }
+  // Set default functions
+  if (!selector) {
+    ts_debug("Failed to find selector in the system `%s`", system_id);
+    selector = ts_default_selector;
+  }
   if (!groups) {
-    ts_warn("System %s has groups not defined", system_id);
-    return 2;
+    ts_debug("System %s has groups not defined", system_id);
+    groups = 0;
   }
   if (plugin1 != plugin2) {
     return 2;
