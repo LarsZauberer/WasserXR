@@ -37,12 +37,13 @@ typedef struct {
 typedef struct {
   char *field_name;
   void *data;
-} TS_Component_Reconstruction_Item;
+} TS_Component_Serialization_Item;
 
 typedef struct {
+  TS_Entity entity_id;
   char *component_name;
   GArray *fields;
-} TS_Component_Reconstruction;
+} TS_Component_Serialization;
 
 struct TS_Scene {
   GArray *plugins;
@@ -583,6 +584,69 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
   return 0;
 }
 
+static TS_Component_Serialization *
+ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
+  TS_Component_Serialization *serialization =
+      (TS_Component_Serialization *)malloc(sizeof(TS_Component_Serialization));
+  serialization->entity_id = entity_id;
+  serialization->component_name = ts_copy_char_ptr(component_name);
+  serialization->fields =
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item));
+  return serialization;
+}
+
+static void
+ts_destroy_component_serialization(TS_Component_Serialization *serialization) {
+  free(serialization->component_name);
+  free(serialization);
+}
+
+static TS_Component_Serialization_Item *
+ts_create_component_serialization_item(char *field_name, void *data,
+                                       size_t size) {
+  TS_Component_Serialization_Item *field =
+      (TS_Component_Serialization_Item *)malloc(
+          sizeof(TS_Component_Serialization_Item));
+  field->field_name = ts_copy_char_ptr(field_name);
+
+  void *data_loc = malloc(size);
+  memcpy(data_loc, data, size);
+  field->data = data_loc;
+  return field;
+}
+
+static void
+ts_destroy_component_serialization_item(TS_Component_Serialization_Item *item) {
+  free(item->field_name);
+  free(item->data);
+  free(item);
+}
+
+static TS_Component_Serialization *
+ts_serialize_component(TS_Component_Handler *handler) {
+  TS_Component_Serialization *serialization =
+      ts_create_component_serialization(handler->entity, handler->id);
+
+  ts_assert(handler->schema,
+            "Component `%s` has no schema during serialization", handler->id);
+  for (size_t i = 0; i < handler->schema->fields->len; i++) {
+    TS_Component_Field *field =
+        g_array_index(handler->schema->fields, TS_Component_Field *, i);
+
+    // TODO: Check permissions
+    if (!field->getter) {
+      continue;
+    }
+    void *data = field->getter(handler->component);
+    TS_Component_Serialization_Item *serialization_item =
+        ts_create_component_serialization_item(field->field_name, data,
+                                               field->size);
+    g_array_append_val(serialization->fields, serialization_item);
+  }
+
+  return serialization;
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
                      const char *new_plugin_path) {
@@ -603,17 +667,16 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
   // Pre Unload operations
 
   GArray *components_to_reconstruct =
-      g_array_new(FALSE, FALSE, sizeof(TS_Component_Reconstruction));
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization *));
 
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
 
     if (component->plugin == plugin) {
-      TS_Component_Reconstruction reconstruction = {};
-      reconstruction.component_name = ts_copy_char_ptr(component->id);
-      reconstruction.fields =
-          g_array_new(FALSE, FALSE, sizeof(TS_Component_Reconstruction_Item));
+      TS_Component_Serialization *serialization =
+          ts_serialize_component(component);
+      g_array_append_val(components_to_reconstruct, serialization);
       i--;
     }
   }
