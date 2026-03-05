@@ -866,7 +866,8 @@ void ts_destroy_component_schema(TS_Component_Schema *schema) {
         g_array_index(schema->fields, TS_Component_Field *, i);
     ts_destroy_component_field(field);
   }
-  free(schema->fields);
+  g_array_free(schema->fields, TRUE);
+  free(schema);
 }
 
 void ts_destroy_component_field(TS_Component_Field *field) {
