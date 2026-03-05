@@ -61,6 +61,7 @@ struct TS_Component_Schema {
 struct TS_Component_Field {
   char *field_name;
   size_t size;
+  TS_Primitive_Type type;
   TS_Field_Permission permission;
   TS_Component_Getter getter;
   TS_Component_Setter setter;
@@ -376,6 +377,9 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
     return 1;
   }
 
+  // Copy for the finish debug message the component_id
+  char *copy_id = ts_copy_char_ptr(component_id);
+
   TS_Component_Handler *component =
       g_array_index(scene->components, TS_Component_Handler *, index);
   // This is the one to remove
@@ -387,7 +391,8 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   // The component pointer itself should be destroyed by the destroyer function
   free(component);
 
-  ts_debug("Removed component `%s` from entity %ld", component_id, entity);
+  ts_debug("Removed component `%s` from entity %ld", copy_id, entity);
+  free(copy_id);
   return 0;
 }
 
@@ -604,21 +609,27 @@ ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
   serialization->entity_id = entity_id;
   serialization->component_name = ts_copy_char_ptr(component_name);
   serialization->fields =
-      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item));
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item *));
   return serialization;
 }
 
 static TS_Component_Serialization_Item *
 ts_create_component_serialization_item(char *field_name, void *data,
-                                       size_t size) {
+                                       size_t size, TS_Primitive_Type type) {
   TS_Component_Serialization_Item *field =
       (TS_Component_Serialization_Item *)malloc(
           sizeof(TS_Component_Serialization_Item));
   field->field_name = ts_copy_char_ptr(field_name);
 
-  void *data_loc = malloc(size);
-  memcpy(data_loc, data, size);
-  field->data = data_loc;
+  if (type == TS_S || type == TS_BLOB_ARRAY) {
+    void *data_loc = ts_memcpy_till_null(data, size);
+    field->data = data_loc;
+  } else {
+    void *data_loc = malloc(size);
+    memcpy(data_loc, data, size);
+    field->data = data_loc;
+  }
+
   return field;
 }
 
@@ -653,7 +664,7 @@ ts_serialize_component(TS_Component_Handler *handler) {
         g_array_index(handler->schema->fields, TS_Component_Field *, i);
 
     // Check the serialization bit
-    if (field->permission == TS_Permission_Mask_Serialize) {
+    if (!(field->permission & TS_Permission_Mask_Serialize)) {
       continue;
     }
 
@@ -663,7 +674,7 @@ ts_serialize_component(TS_Component_Handler *handler) {
     void *data = field->getter(handler->component);
     TS_Component_Serialization_Item *serialization_item =
         ts_create_component_serialization_item(field->field_name, data,
-                                               field->size);
+                                               field->size, field->type);
     g_array_append_val(serialization->fields, serialization_item);
   }
 
@@ -788,7 +799,10 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     void *component = ts_entity_get_component(scene, reconstruction->entity_id,
                                               reconstruction->component_name);
     ts_assert(component, "NULL component created during reload");
-    status = ts_deserialize_component(scene, component, reconstruction);
+    TS_Component_Handler *handler =
+        ts_find_handler_for_component(scene, component);
+    ts_assert(handler, "NULL handler created during reload");
+    status = ts_deserialize_component(scene, handler, reconstruction);
     ts_debug("Component `%s` was reloaded for entity %ld",
              reconstruction->component_name, reconstruction->entity_id);
 
@@ -848,6 +862,7 @@ TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
 
   field->field_name = ts_copy_char_ptr(field_name);
   field->size = size;
+  field->type = type;
   field->permission = permission;
   field->getter = getter;
   field->setter = setter;
@@ -937,6 +952,15 @@ size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
   ts_assert(field, "Field `%s` not found during the ts_get_field_size",
             field_name);
   return field->size;
+}
+
+TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
+                                    char *field_name) {
+  ts_assert(schema, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  ts_assert(field, "Field `%s` not found during the ts_get_field_type",
+            field_name);
+  return field->type;
 }
 
 void *ts_get(TS_Scene *scene, void *component, char *field) {

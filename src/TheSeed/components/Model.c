@@ -40,26 +40,26 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
-void ts_schema_TS_Model(TS_Component_Schema *schema) {}
+void ts_schema_TS_Model(TS_Component_Schema *schema) {
+  TS_Component_Field *model_name = ts_create_component_field(
+      "model_name", sizeof(char), TS_S, TS_Permission_All,
+      ts_get_TS_Model_model_name, ts_set_TS_Model_model_name);
+  TS_Component_Field *shader_name = ts_create_component_field(
+      "shader_name", sizeof(char), TS_S, TS_Permission_All,
+      ts_get_TS_Model_shader_name, ts_set_TS_Model_shader_name);
 
-void ts_activate_TS_Model(void *ptr) {
-  ts_assert(ptr, "Pointer passed to ts_activate_TS_Model");
-  TS_Model *model = (TS_Model *)ptr;
+  ts_add_field_to_component_schema(schema, model_name);
+  ts_add_field_to_component_schema(schema, shader_name);
+}
 
-  if (model->shader_name) {
-    model->shader = ts_create_shader(model->shader_name);
-    int status = ts_load_shader(model->shader);
-    if (status) {
-      ts_warn("Failed to load the shader: %s", model->shader_name);
-    } else {
-      status = ts_compile_shader(model->shader);
-      if (status) {
-        ts_warn("Failed to compile the shader: %s", model->shader_name);
-      }
-    }
-  }
+void ts_set_TS_Model_model_name(void *component, void *data) {
+  TS_Model *model = (TS_Model *)component;
+  char *path = (char *)data;
+  if (path) {
+    // Replace the field
+    free(model->model_name);
+    model->model_name = ts_copy_char_ptr(path);
 
-  if (model->model_name) {
     // Read all the mesh data (array)
     TS_Mesh_Data *mesh_data =
         ts_read_mesh_data(&model->numMeshes, model->model_name);
@@ -81,5 +81,40 @@ void ts_activate_TS_Model(void *ptr) {
     free(mesh_data);
 
     model->meshes = meshes;
+  } else {
+    // TODO: Clean the old data and set null
   }
+}
+
+void ts_set_TS_Model_shader_name(void *component, void *data) {
+  TS_Model *model = (TS_Model *)component;
+  char *path = (char *)data;
+  if (path) {
+    // Replace the field
+    free(model->shader_name);
+    model->shader_name = ts_copy_char_ptr(path);
+
+    model->shader = ts_create_shader(model->shader_name);
+    int status = ts_load_shader(model->shader);
+    if (status) {
+      ts_warn("Failed to load the shader: %s", model->shader_name);
+    } else {
+      status = ts_compile_shader(model->shader);
+      if (status) {
+        ts_warn("Failed to compile the shader: %s", model->shader_name);
+      }
+    }
+  } else {
+    // TODO: Clean the old data and set null
+  }
+}
+
+void *ts_get_TS_Model_shader_name(void *component) {
+  TS_Model *model = (TS_Model *)component;
+  return model->shader_name;
+}
+
+void *ts_get_TS_Model_model_name(void *component) {
+  TS_Model *model = (TS_Model *)component;
+  return model->model_name;
 }

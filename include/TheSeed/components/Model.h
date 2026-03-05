@@ -16,5 +16,9 @@ typedef struct {
 void *ts_create_TS_Model();
 void ts_destroy_TS_Model(void *ptr);
 void ts_schema_TS_Model(TS_Component_Schema *schema);
+void *ts_get_TS_Model_model_name(void *component);
+void ts_set_TS_Model_model_name(void *component, void *data);
+void *ts_get_TS_Model_shader_name(void *component);
+void ts_set_TS_Model_shader_name(void *component, void *data);
 
 #endif

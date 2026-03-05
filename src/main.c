@@ -27,7 +27,8 @@ int main() {
 
   TS_Transform *camera_transform =
       ts_entity_get_component(scene, camera, "TS_Transform");
-  camera_transform->position[2] = 3.0F;
+  float camera_z = 3.0F;
+  ts_set(scene, camera_transform, "z", &camera_z);
 
   size_t triangle = ts_add_entity(scene);
   ts_add_component(scene, triangle, "TS_Transform");
@@ -35,9 +36,11 @@ int main() {
   TS_Transform *triangle_transform =
       ts_entity_get_component(scene, triangle, "TS_Transform");
   float triangle_x = 0.0F;
+  float triangle_ry = 45.0F;
+  float triangle_rz = 45.0F;
   ts_set(scene, triangle_transform, "x", &triangle_x);
-  triangle_transform->rotation[1] = 45.0F;
-  triangle_transform->rotation[2] = 45.0F;
+  ts_set(scene, triangle_transform, "ry", &triangle_ry);
+  ts_set(scene, triangle_transform, "rz", &triangle_rz);
 
   TS_Model *triangle_model =
       ts_entity_get_component(scene, triangle, "TS_Model");

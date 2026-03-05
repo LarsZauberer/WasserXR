@@ -41,12 +41,28 @@ static void test_copy_char_null() {
   g_assert(!out); // Check that the output is null
 }
 
+static void test_len_till_null() {
+  char *src = "Hello World!";
+
+  g_assert(ts_len_till_null(src, sizeof(char)) == 12);
+}
+
+static void test_copy_till_null() {
+  char *src = "Hello World!";
+  char *dest = ts_memcpy_till_null(src, sizeof(char));
+  g_assert(src != dest);
+  g_assert(strcmp(src, dest) == 0);
+  free(dest);
+}
+
 int main(int argc, char *argv[]) {
   g_test_init(&argc, &argv, NULL);
 
   g_test_add_func("/theseed/test_copy_char_on_stack", test_copy_char_on_stack);
   g_test_add_func("/theseed/test_copy_char_fuzzy", test_copy_char_fuzzy);
   g_test_add_func("/theseed/test_copy_char_null", test_copy_char_null);
+  g_test_add_func("/theseed/test_len_till_null", test_len_till_null);
+  g_test_add_func("/theseed/test_copy_till_null", test_copy_till_null);
 
   return g_test_run();
 }

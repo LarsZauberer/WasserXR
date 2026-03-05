@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 char *ts_copy_char_ptr(const char *src);
 
 /**
@@ -12,3 +14,7 @@ char *ts_copy_char_ptr(const char *src);
  * Note: On failure, an error message is printed to stdout.
  */
 char *ts_read_file(const char *filepath);
+
+size_t ts_len_till_null(const void *data, size_t element_size);
+
+void *ts_memcpy_till_null(const void *data, size_t element_size);

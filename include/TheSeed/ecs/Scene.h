@@ -13,8 +13,9 @@ typedef enum TS_Primitive_Type {
   TS_L,
   TS_F,
   TS_C,
-  TS_S,
   TS_BLOB,
+  TS_S,
+  TS_BLOB_ARRAY
 } TS_Primitive_Type;
 
 // Primitive Declarations
@@ -66,7 +67,7 @@ TS_Scene *ts_create_scene();
  * @param scene The scene to create it in
  * @return The id of the entity
  */
-size_t ts_add_entity(TS_Scene *scene);
+TS_Entity ts_add_entity(TS_Scene *scene);
 
 /**
  * Removes a previously created entity. With it, it removes all the associated
@@ -76,7 +77,7 @@ size_t ts_add_entity(TS_Scene *scene);
  * @return 0 if it successfully removed the entity and 1 if it didn't remove the
  * entity (may happen if the entity doesn't exist)
  */
-int ts_remove_entity(TS_Scene *scene, size_t entity_id);
+int ts_remove_entity(TS_Scene *scene, TS_Entity entity_id);
 
 /**
  * Load a plugin into the scene.
@@ -127,7 +128,7 @@ int ts_reload_all_plugins(TS_Scene *scene);
  * @param component_name Name of the component type to add
  * @return 0 on success, non-zero on failure
  */
-int ts_add_component(TS_Scene *scene, size_t entity_id,
+int ts_add_component(TS_Scene *scene, TS_Entity entity_id,
                      const char *component_id);
 
 /**
@@ -137,7 +138,7 @@ int ts_add_component(TS_Scene *scene, size_t entity_id,
  * @param component_name Name of the component type to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_component(TS_Scene *scene, size_t entity_id,
+int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
                         const char *component_id);
 
 /**
@@ -147,7 +148,7 @@ int ts_remove_component(TS_Scene *scene, size_t entity_id,
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene *scene, size_t entity_id,
+void *ts_entity_get_component(TS_Scene *scene, TS_Entity entity_id,
                               const char *component_id);
 
 /**
@@ -217,6 +218,8 @@ TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
 TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
                                             char *field_name);
 size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name);
+TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
+                                    char *field_name);
 
 void *ts_get(TS_Scene *scene, void *component, char *field);
 int ts_set(TS_Scene *scene, void *component, char *field, void *data);
