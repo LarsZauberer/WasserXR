@@ -622,9 +622,12 @@ ts_create_component_serialization_item(char *field_name, void *data,
   field->field_name = ts_copy_char_ptr(field_name);
 
   if (type == TS_S || type == TS_BLOB_ARRAY) {
+    // Handling of pointer field types that might have multiple elements.
+    // Note that all the arrays have to be NULL terminated
     void *data_loc = ts_memcpy_till_null(data, size);
     field->data = data_loc;
   } else {
+    // Handling of standard single value fields
     void *data_loc = malloc(size);
     memcpy(data_loc, data, size);
     field->data = data_loc;
@@ -659,11 +662,14 @@ ts_serialize_component(TS_Component_Handler *handler) {
 
   ts_assert(handler->schema,
             "Component `%s` has no schema during serialization", handler->id);
+
+  // Gather all the data from all the fields that are serializable and copy them
+  // into a serialization_item
   for (size_t i = 0; i < handler->schema->fields->len; i++) {
     TS_Component_Field *field =
         g_array_index(handler->schema->fields, TS_Component_Field *, i);
 
-    // Check the serialization bit
+    // Check the serialization bit (is this field exported to be serialized)
     if (!(field->permission & TS_Permission_Mask_Serialize)) {
       continue;
     }
@@ -684,6 +690,9 @@ ts_serialize_component(TS_Component_Handler *handler) {
 static int ts_deserialize_component(TS_Scene *scene,
                                     TS_Component_Handler *handler,
                                     TS_Component_Serialization *serialization) {
+  // Performs all the setter with the data
+  // Note that the setter in the user code is responsible for a potential copy
+  // of the value
   int status = 0;
   for (size_t i = 0; i < serialization->fields->len; i++) {
     TS_Component_Serialization_Item *item = g_array_index(
@@ -693,7 +702,6 @@ static int ts_deserialize_component(TS_Scene *scene,
   return status;
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
                      const char *new_plugin_path) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_reload_plugin");
@@ -720,6 +728,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
         g_array_index(scene->components, TS_Component_Handler *, i);
 
     if (component->plugin == plugin) {
+      // Serialize the component and remove it from the scene.
       TS_Component_Serialization *serialization =
           ts_serialize_component(component);
       g_array_append_val(components_to_reconstruct, serialization);
@@ -793,15 +802,23 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     TS_Component_Serialization *reconstruction = g_array_index(
         components_to_reconstruct, TS_Component_Serialization *, i);
 
-    // Silently fail if something doesn't work
+    // Create and get the component handler
     status = ts_add_component(scene, reconstruction->entity_id,
                               reconstruction->component_name);
+    if (status) {
+      ts_warn("Failed to create component `%s` for entity %ld",
+              reconstruction->component_name, reconstruction->entity_id);
+      ts_destroy_component_serialization(reconstruction);
+      continue;
+    }
     void *component = ts_entity_get_component(scene, reconstruction->entity_id,
                                               reconstruction->component_name);
     ts_assert(component, "NULL component created during reload");
     TS_Component_Handler *handler =
         ts_find_handler_for_component(scene, component);
     ts_assert(handler, "NULL handler created during reload");
+
+    // Perform the deserialization of the component
     status = ts_deserialize_component(scene, handler, reconstruction);
     ts_debug("Component `%s` was reloaded for entity %ld",
              reconstruction->component_name, reconstruction->entity_id);
