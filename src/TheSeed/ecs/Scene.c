@@ -456,14 +456,13 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   }
   // Set default functions
   if (!selector) {
-    ts_debug("Failed to find selector in the system `%s`", system_id);
+    // ts_debug("Failed to find selector in the system `%s`", system_id);
     selector = ts_default_selector;
   }
   if (!groups) {
     ts_debug("System %s has groups not defined", system_id);
-    groups = 0;
   }
-  ts_assert(plugin1,
+  ts_assert(plugin2,
             "System, selector and groups have been found but plugin is null");
   // if (plugin1 != plugin2) {
   //   return 2;
@@ -480,7 +479,7 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   system_handler->selector = selector;
   system_handler->attacher = attacher;
   system_handler->detacher = detacher;
-  system_handler->plugin = plugin1;
+  system_handler->plugin = plugin2;
   g_array_append_val(scene->systems, system_handler);
 
   // Execute the attacher
@@ -530,7 +529,12 @@ void ts_tick_scene(TS_Scene *scene) {
     // Create helper arrays
     GArray *entity_groups = g_array_new(FALSE, FALSE, sizeof(TS_Entity *));
     GArray *entity_groups_size = g_array_new(FALSE, FALSE, sizeof(size_t));
-    TS_System_Groups groups = *system->groups;
+    TS_System_Groups groups = 0;
+    if (system->groups == NULL) {
+      groups = 0;
+    } else {
+      groups = *system->groups;
+    }
 
     // Create all the helper arrays
     for (TS_System_Groups i = 1; i <= groups; i++) {
