@@ -4,6 +4,7 @@
 #include "TheSeed/core/Mesh.h"
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/ecs/Scene.h"
+
 typedef struct {
   char *model_name;
   char *shader_name;
@@ -14,8 +15,6 @@ typedef struct {
 
 void *ts_create_TS_Model();
 void ts_destroy_TS_Model(void *ptr);
-void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization);
-void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization);
-void ts_activate_TS_Model(void *ptr);
+void ts_schema_TS_Model(TS_Component_Schema *schema);
 
 #endif

@@ -1,5 +1,6 @@
 #include "TheSeed/components/Camera.h"
 #include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>
 
 void *ts_create_TS_Camera() {
@@ -14,3 +15,5 @@ void *ts_create_TS_Camera() {
 }
 
 void ts_destroy_TS_Camera(void *cam) { free(cam); }
+
+void ts_schema_TS_Camera(TS_Component_Schema *schema) {}

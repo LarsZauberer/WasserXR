@@ -3,6 +3,7 @@
 #include "GL/gl.h"
 #include "TheSeed/components/Window.h"
 #include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/Scene.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,3 +84,5 @@ void ts_destroy_TS_Window(void *window) {
   }
   free(window);
 }
+
+void ts_schema_TS_Window(TS_Component_Schema *schema) {}

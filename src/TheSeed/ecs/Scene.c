@@ -247,6 +247,19 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   return 0;
 }
 
+static TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
+                                                           void *component) {
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *handler =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (handler->component == component) {
+      return handler;
+    }
+  }
+
+  return NULL;
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
                      const char *component_id) {
@@ -595,12 +608,6 @@ ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
   return serialization;
 }
 
-static void
-ts_destroy_component_serialization(TS_Component_Serialization *serialization) {
-  free(serialization->component_name);
-  free(serialization);
-}
-
 static TS_Component_Serialization_Item *
 ts_create_component_serialization_item(char *field_name, void *data,
                                        size_t size) {
@@ -622,6 +629,18 @@ ts_destroy_component_serialization_item(TS_Component_Serialization_Item *item) {
   free(item);
 }
 
+static void
+ts_destroy_component_serialization(TS_Component_Serialization *serialization) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Component_Serialization_Item *field = g_array_index(
+        serialization->fields, TS_Component_Serialization_Item *, i);
+    ts_destroy_component_serialization_item(field);
+  }
+  g_array_free(serialization->fields, TRUE);
+  free(serialization->component_name);
+  free(serialization);
+}
+
 static TS_Component_Serialization *
 ts_serialize_component(TS_Component_Handler *handler) {
   TS_Component_Serialization *serialization =
@@ -633,7 +652,11 @@ ts_serialize_component(TS_Component_Handler *handler) {
     TS_Component_Field *field =
         g_array_index(handler->schema->fields, TS_Component_Field *, i);
 
-    // TODO: Check permissions
+    // Check the serialization bit
+    if (field->permission == TS_Permission_Mask_Serialize) {
+      continue;
+    }
+
     if (!field->getter) {
       continue;
     }
@@ -645,6 +668,18 @@ ts_serialize_component(TS_Component_Handler *handler) {
   }
 
   return serialization;
+}
+
+static int ts_deserialize_component(TS_Scene *scene,
+                                    TS_Component_Handler *handler,
+                                    TS_Component_Serialization *serialization) {
+  int status = 0;
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Component_Serialization_Item *item = g_array_index(
+        serialization->fields, TS_Component_Serialization_Item *, i);
+    status |= ts_set(scene, handler->component, item->field_name, item->data);
+  }
+  return status;
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -677,6 +712,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
       TS_Component_Serialization *serialization =
           ts_serialize_component(component);
       g_array_append_val(components_to_reconstruct, serialization);
+      ts_remove_component(scene, component->entity, component->id);
       i--;
     }
   }
@@ -743,16 +779,21 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
 
   // Reconstruct all the components
   for (size_t i = 0; i < components_to_reconstruct->len; i++) {
-    TS_Serialization *reconstruction =
-        g_array_index(components_to_reconstruct, TS_Serialization *, i);
+    TS_Component_Serialization *reconstruction = g_array_index(
+        components_to_reconstruct, TS_Component_Serialization *, i);
 
     // Silently fail if something doesn't work
-    status = ts_add_component(scene, reconstruction->entity,
-                              reconstruction->name, reconstruction);
-    ts_debug("Component `%s` was reloaded", reconstruction->name);
+    status = ts_add_component(scene, reconstruction->entity_id,
+                              reconstruction->component_name);
+    void *component = ts_entity_get_component(scene, reconstruction->entity_id,
+                                              reconstruction->component_name);
+    ts_assert(component, "NULL component created during reload");
+    status = ts_deserialize_component(scene, component, reconstruction);
+    ts_debug("Component `%s` was reloaded for entity %ld",
+             reconstruction->component_name, reconstruction->entity_id);
 
     // Clean up the helper array and the serialization
-    ts_destroy_serialization(reconstruction);
+    ts_destroy_component_serialization(reconstruction);
   }
   g_array_free(components_to_reconstruct, TRUE);
 
@@ -844,6 +885,7 @@ int ts_add_field_to_component_schema(TS_Component_Schema *schema,
                           "Schema field has been added twice")
   }
   g_array_append_val(schema->fields, field);
+  return 0;
 }
 
 TS_Component_Field *ts_get_field(TS_Component_Schema *schema,
@@ -894,19 +936,6 @@ size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
   ts_assert(field, "Field `%s` not found during the ts_get_field_size",
             field_name);
   return field->size;
-}
-
-static TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
-                                                           void *component) {
-  for (size_t i = 0; i < scene->components->len; i++) {
-    TS_Component_Handler *handler =
-        g_array_index(scene->components, TS_Component_Handler *, i);
-    if (handler->component == component) {
-      return handler;
-    }
-  }
-
-  return NULL;
 }
 
 void *ts_get(TS_Scene *scene, void *component, char *field) {

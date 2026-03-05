@@ -4,6 +4,7 @@
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/Scene.h"
 #include <glad/gl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,49 +40,7 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
-void ts_serialize_TS_Model(void *ptr, TS_Serialization *serialization) {
-  TS_Model *model = (TS_Model *)ptr;
-
-  if (!ptr || !serialization) {
-    return;
-  }
-
-  if (model->model_name) {
-    char *model_name_copy = ts_copy_char_ptr(model->model_name);
-    ts_set_serialization(serialization, "model_name",
-                         sizeof(char) * (strlen(model->model_name) + 1),
-                         model_name_copy);
-  }
-
-  if (model->shader_name) {
-    char *shader_name_copy = ts_copy_char_ptr(model->shader_name);
-    ts_set_serialization(serialization, "shader_name",
-                         sizeof(char) * (strlen(model->shader_name) + 1),
-                         shader_name_copy);
-  }
-}
-
-void ts_deserialize_TS_Model(void *ptr, TS_Serialization *serialization) {
-  TS_Model *model = (TS_Model *)ptr;
-
-  if (!ptr || !serialization) {
-    return;
-  }
-
-  if (ts_get_serialization(serialization, "model_name")) {
-    char *serialization_model_name =
-        (char *)ts_get_serialization(serialization, "model_name");
-
-    model->model_name = ts_copy_char_ptr(serialization_model_name);
-  }
-
-  if (ts_get_serialization(serialization, "shader_name")) {
-    char *serialization_shader_name =
-        (char *)ts_get_serialization(serialization, "shader_name");
-
-    model->shader_name = ts_copy_char_ptr(serialization_shader_name);
-  }
-}
+void ts_schema_TS_Model(TS_Component_Schema *schema) {}
 
 void ts_activate_TS_Model(void *ptr) {
   ts_assert(ptr, "Pointer passed to ts_activate_TS_Model");

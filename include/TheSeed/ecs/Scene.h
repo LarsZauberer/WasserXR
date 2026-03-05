@@ -16,12 +16,10 @@ typedef enum TS_Primitive_Type {
   TS_S,
   TS_BLOB,
 } TS_Primitive_Type;
-typedef enum TS_Field_Permission {
-  TS_ALL,
-} TS_Field_Permission;
 
 // Primitive Declarations
 typedef size_t TS_Entity;
+typedef int TS_Field_Permission;
 
 // Function Prefix Macros
 #define CREATOR_FUNCION_PREFIX "ts_create_"
@@ -47,6 +45,13 @@ typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, const size_t *);
 typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const TS_Entity);
 typedef void (*TS_System_Attacher)(TS_Scene *);
 typedef void (*TS_System_Detacher)(TS_Scene *);
+
+// Permission Bits
+#define TS_Permission_Mask_Serialize 1
+
+// Permission Groups
+#define TS_Permission_All TS_Permission_Mask_Serialize
+#define TS_Permission_No_Serialize 0
 
 /**
  * Create a new scene object.

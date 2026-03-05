@@ -64,5 +64,5 @@ void ts_command_addComponent(char **args, TS_Scene *scene) {
     return;
   }
   size_t entity_id = strtol(args[0], NULL, 10);
-  ts_add_component(scene, entity_id, args[1], NULL);
+  ts_add_component(scene, entity_id, args[1]);
 }
