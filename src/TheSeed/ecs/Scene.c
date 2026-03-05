@@ -428,16 +428,16 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   // Find the selector and system function
 
   // Working string
-  TS_Loaded_Plugin *plugin1;
-  TS_Loaded_Plugin *plugin2;
-  TS_Loaded_Plugin *plugin3;
-  TS_Loaded_Plugin *plugin4;
-  TS_Loaded_Plugin *plugin5;
-  TS_System_Selector selector;
-  TS_System_Function system;
-  TS_System_Attacher attacher;
-  TS_System_Detacher detacher;
-  TS_System_Groups *groups;
+  TS_Loaded_Plugin *plugin1 = NULL;
+  TS_Loaded_Plugin *plugin2 = NULL;
+  TS_Loaded_Plugin *plugin3 = NULL;
+  TS_Loaded_Plugin *plugin4 = NULL;
+  TS_Loaded_Plugin *plugin5 = NULL;
+  TS_System_Selector selector = NULL;
+  TS_System_Function system = NULL;
+  TS_System_Attacher attacher = NULL;
+  TS_System_Detacher detacher = NULL;
+  TS_System_Groups *groups = NULL;
 
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_SELECTOR_PREFIX,
                             selector, plugin1);
@@ -463,9 +463,11 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
     ts_debug("System %s has groups not defined", system_id);
     groups = 0;
   }
-  if (plugin1 != plugin2) {
-    return 2;
-  }
+  ts_assert(plugin1,
+            "System, selector and groups have been found but plugin is null");
+  // if (plugin1 != plugin2) {
+  //   return 2;
+  // }
 
   // Found everything -> We can build the system handler
   TS_System_Handler *system_handler =
