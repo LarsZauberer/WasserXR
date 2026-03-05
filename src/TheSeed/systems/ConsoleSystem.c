@@ -27,17 +27,16 @@ static char *ts_preprocess_cmd(char *raw) {
 
 static void *ts_console_loop(void *arg) {
   while (1) {
-    char *buffer = (char *)malloc(sizeof(char) * TS_MAX_COMMAND_LENGTH);
+    char *buffer_array[TS_MAX_COMMAND_LENGTH];
+    char *buffer = (char *)buffer_array;
     size_t bytes_read = read(STDIN_FILENO, buffer, TS_MAX_COMMAND_LENGTH);
     buffer[bytes_read] = '\0';
     ts_info("Console input: %s", buffer);
     if (ts_console_buffer) {
-      free(buffer);
       continue;
     }
     // Preprocessing by removing the \n from the end
     ts_console_buffer = ts_preprocess_cmd(buffer);
-    free(buffer);
   }
   return NULL;
 }
