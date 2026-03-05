@@ -1,24 +1,21 @@
 #ifndef TS_MODEL_H
 #define TS_MODEL_H
 
-#include "TheSeed/core/Mesh.h"
-#include "TheSeed/core/Shader.h"
 #include "TheSeed/ecs/Scene.h"
 
-typedef struct {
-  char *model_name;
-  char *shader_name;
-  TS_Shader *shader;
-  unsigned int numMeshes;
-  TS_Mesh **meshes;
-} TS_Model;
+typedef struct TS_Model TS_Model;
 
 void *ts_create_TS_Model();
 void ts_destroy_TS_Model(void *ptr);
 void ts_schema_TS_Model(TS_Component_Schema *schema);
+
 void *ts_get_TS_Model_model_name(void *component);
 void ts_set_TS_Model_model_name(void *component, void *data);
 void *ts_get_TS_Model_shader_name(void *component);
 void ts_set_TS_Model_shader_name(void *component, void *data);
+
+void *ts_get_TS_Model_meshes(void *component);
+void *ts_get_TS_Model_numMeshes(void *component);
+void *ts_get_TS_Model_shader(void *component);
 
 #endif

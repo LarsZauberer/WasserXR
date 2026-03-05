@@ -4,6 +4,12 @@
 #include "cglm/vec3.h"
 #include <stdlib.h>
 
+struct TS_Transform {
+  vec3 position;
+  vec3 rotation;
+  vec3 scale;
+};
+
 void *ts_create_TS_Transform() {
   TS_Transform *ptr = (TS_Transform *)malloc(sizeof(TS_Transform));
   ts_assert_abort_value(ptr, NULL,

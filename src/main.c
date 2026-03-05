@@ -18,6 +18,9 @@ int main() {
   ts_load_plugin(scene, "build/libtheseed_components.so");
   ts_load_plugin(scene, "build/libtheseed_systems.so");
 
+  size_t console = ts_add_entity(scene);
+  ts_add_component(scene, console, "TS_Console");
+
   size_t window = ts_add_entity(scene);
   ts_add_component(scene, window, "TS_Window");
 

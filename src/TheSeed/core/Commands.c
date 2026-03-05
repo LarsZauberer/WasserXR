@@ -1,5 +1,5 @@
 // This is not a System
-#include "TheSeed/systems/Commands.h"
+#include "TheSeed/core/Commands.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>
@@ -118,13 +118,12 @@ void ts_command_get(char **args, TS_Scene *scene) {
     char c_data = *(char *)data;
     ts_info("%s: %c", args[2], c_data);
   } else if (type == TS_BLOB) {
-    long l_data = *(long *)data;
-    ts_info("%s: 0x%lx", args[2], l_data);
+    ts_info("%s: 0x%lx", args[2], data);
   } else if (type == TS_S) {
     char *s_data = (char *)data;
     ts_info("%s: %s", args[2], s_data);
   } else if (type == TS_BLOB_ARRAY) {
-    ts_info("%s: BLOB Array", args[2]);
+    ts_info("%s: 0x%lx (Blob Array)", args[2], data);
   } else {
     ts_critical("TS_Primitive_Type is not valid");
   }
@@ -181,8 +180,9 @@ void ts_command_set(char **args, TS_Scene *scene) {
     char c_data = *args[3];
     ts_set(scene, component, args[2], &c_data);
   } else if (type == TS_S) {
-    ts_set(scene, component, args[2], args[2]);
+    ts_set(scene, component, args[2], args[3]);
   } else {
     ts_warn("Cannot handle such a primitive type");
   }
+  ts_info("Field `%s` set", args[2]);
 }

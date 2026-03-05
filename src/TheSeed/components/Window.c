@@ -34,6 +34,10 @@
 #define LSAN_ENABLE() ((void)0)
 #endif
 
+struct TS_Window {
+  GLFWwindow *window;
+};
+
 static void setViewport(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
 }
@@ -85,4 +89,15 @@ void ts_destroy_TS_Window(void *window) {
   free(window);
 }
 
-void ts_schema_TS_Window(TS_Component_Schema *schema) {}
+void ts_schema_TS_Window(TS_Component_Schema *schema) {
+  TS_Component_Field *window_field = ts_create_component_field(
+      "window", sizeof(GLFWwindow *), TS_BLOB, TS_Permission_No_Serialize,
+      ts_get_TS_Window_window, NULL);
+
+  ts_add_field_to_component_schema(schema, window_field);
+}
+
+void *ts_get_TS_Window_window(void *component) {
+  TS_Window *window = (TS_Window *)component;
+  return window->window;
+}
