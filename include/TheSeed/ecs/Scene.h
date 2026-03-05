@@ -209,6 +209,9 @@ void ts_destroy_component_schema(TS_Component_Schema *schema);
 int ts_add_field_to_component_schema(TS_Component_Schema *schema,
                                      TS_Component_Field *field);
 
+TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
+                                                void *component);
+
 TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
 
 TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,

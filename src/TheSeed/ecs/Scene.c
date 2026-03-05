@@ -1007,9 +1007,19 @@ int ts_set(TS_Scene *scene, void *component, char *field, void *data) {
                         "The component pointer couldn't be found in the scene");
 
   TS_Component_Setter setter = ts_get_field_setter(handler->schema, field);
-  ts_assert_abort_value(setter, 1, "No getter found for the field `%s`", field);
+  ts_assert_abort_value(setter, 1, "No setter found for the field `%s`", field);
   setter(component, data);
   return 0;
+}
+
+TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
+                                                void *component) {
+  TS_Component_Handler *handler =
+      ts_find_handler_for_component(scene, component);
+  ts_assert(handler, "Handler is null during ts_get_schema_of_component");
+  ts_assert(handler->schema,
+            "Schema is null during ts_get_schema_of_component");
+  return handler->schema;
 }
 
 // Debug Functions
