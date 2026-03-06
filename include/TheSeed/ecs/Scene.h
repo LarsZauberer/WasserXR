@@ -1,34 +1,58 @@
-#include <stddef.h>
-
 #ifndef TS_Scene_H
 #define TS_Scene_H
 
-typedef struct TS_Scene TS_Scene;
-typedef struct TS_Serialization TS_Serialization;
-typedef size_t TS_Entity;
+#include <stddef.h>
 
+// Struct declarations
+typedef struct TS_Scene TS_Scene;
+typedef struct TS_Component_Schema TS_Component_Schema;
+typedef struct TS_Component_Field TS_Component_Field;
+
+// Enum declarations
+typedef enum TS_Primitive_Type {
+  TS_L,
+  TS_F,
+  TS_C,
+  TS_BLOB,
+  TS_S,
+  TS_BLOB_ARRAY
+} TS_Primitive_Type;
+
+// Primitive Declarations
+typedef size_t TS_Entity;
+typedef int TS_Field_Permission;
+
+// Function Prefix Macros
 #define CREATOR_FUNCION_PREFIX "ts_create_"
 #define DESTROYER_FUNCION_PREFIX "ts_destroy_"
-#define SERIALIZER_FUNCTION_PREFIX "ts_serialize_"
-#define DESERIALIZER_FUNCTION_PREFIX "ts_deserialize_"
-#define ACTIVATOR_FUNCTION_PREFIX "ts_activate_"
+#define SCHEMA_FUNCTION_PREFIX "ts_schema_"
+
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
 #define SYSTEM_SELECTOR_PREFIX "ts_select_"
 #define SYSTEM_ATTACH_PREFIX "ts_attach_"
 #define SYSTEM_DETACH_PREFIX "ts_detach_"
 #define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
+// Component Functions
 typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
-typedef void (*TS_Component_Serializer)(void *, TS_Serialization *);
-typedef void (*TS_Component_Deserializer)(void *, TS_Serialization *);
-typedef void (*TS_Component_Activator)(void *);
+typedef void (*TS_Component_Schema_Function)(TS_Component_Schema *);
+typedef void *(*TS_Component_Getter)(void *);
+typedef void (*TS_Component_Setter)(void *, void *);
 
+// System Functions
 typedef int TS_System_Groups;
 typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, const size_t *);
 typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const TS_Entity);
 typedef void (*TS_System_Attacher)(TS_Scene *);
 typedef void (*TS_System_Detacher)(TS_Scene *);
+
+// Permission Bits
+#define TS_Permission_Mask_Serialize 1
+
+// Permission Groups
+#define TS_Permission_All TS_Permission_Mask_Serialize
+#define TS_Permission_No_Serialize 0
 
 /**
  * Create a new scene object.
@@ -43,7 +67,7 @@ TS_Scene *ts_create_scene();
  * @param scene The scene to create it in
  * @return The id of the entity
  */
-size_t ts_add_entity(TS_Scene *scene);
+TS_Entity ts_add_entity(TS_Scene *scene);
 
 /**
  * Removes a previously created entity. With it, it removes all the associated
@@ -53,7 +77,7 @@ size_t ts_add_entity(TS_Scene *scene);
  * @return 0 if it successfully removed the entity and 1 if it didn't remove the
  * entity (may happen if the entity doesn't exist)
  */
-int ts_remove_entity(TS_Scene *scene, size_t entity_id);
+int ts_remove_entity(TS_Scene *scene, TS_Entity entity_id);
 
 /**
  * Load a plugin into the scene.
@@ -104,8 +128,8 @@ int ts_reload_all_plugins(TS_Scene *scene);
  * @param component_name Name of the component type to add
  * @return 0 on success, non-zero on failure
  */
-int ts_add_component(TS_Scene *scene, size_t entity_id,
-                     const char *component_id, TS_Serialization *serialization);
+int ts_add_component(TS_Scene *scene, TS_Entity entity_id,
+                     const char *component_id);
 
 /**
  * Remove a component from an entity.
@@ -114,7 +138,7 @@ int ts_add_component(TS_Scene *scene, size_t entity_id,
  * @param component_name Name of the component type to remove
  * @return 0 on success, non-zero on failure
  */
-int ts_remove_component(TS_Scene *scene, size_t entity_id,
+int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
                         const char *component_id);
 
 /**
@@ -124,7 +148,7 @@ int ts_remove_component(TS_Scene *scene, size_t entity_id,
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene *scene, size_t entity_id,
+void *ts_entity_get_component(TS_Scene *scene, TS_Entity entity_id,
                               const char *component_id);
 
 /**
@@ -169,13 +193,39 @@ void ts_destroy_scene(TS_Scene *scene);
  */
 void ts_set_scene_reload(TS_Scene *scene);
 
-void *ts_get_serialization(TS_Serialization *serialization, char *name);
-
-int ts_set_serialization(TS_Serialization *serialization, char *name,
-                         size_t size, void *data);
-
 TS_Entity *ts_find_entities_with_selector_and_groups(
     size_t *size, TS_Scene *scene, TS_System_Selector selector, int group);
+
+TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
+                                              TS_Primitive_Type type,
+                                              TS_Field_Permission permission,
+                                              TS_Component_Getter getter,
+                                              TS_Component_Setter setter);
+void ts_destroy_component_field(TS_Component_Field *field);
+
+TS_Component_Schema *ts_create_component_schema();
+void ts_destroy_component_schema(TS_Component_Schema *schema);
+
+int ts_add_field_to_component_schema(TS_Component_Schema *schema,
+                                     TS_Component_Field *field);
+
+TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
+                                                void *component);
+
+TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
+
+TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
+                                        char *field_name);
+TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
+                                        char *field_name);
+TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
+                                            char *field_name);
+size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name);
+TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
+                                    char *field_name);
+
+void *ts_get(TS_Scene *scene, void *component, char *field);
+int ts_set(TS_Scene *scene, void *component, char *field, void *data);
 
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state

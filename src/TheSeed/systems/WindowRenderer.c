@@ -1,6 +1,8 @@
+#include "TheSeed/ecs/Scene.h"
 #include "glad/gl.h"
 
 #include "TheSeed/components/Window.h"
+#include "TheSeed/core/logging.h"
 #include "TheSeed/systems/WindowRenderer.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -22,7 +24,12 @@ void ts_system_ts_window_pre_renderer(TS_Scene *scene, TS_Entity **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    if (!glfwWindowShouldClose(window->window)) {
+    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    if (!glfw_window) {
+      ts_warn("Window attribute is NULL");
+      continue;
+    }
+    if (!glfwWindowShouldClose(glfw_window)) {
       glClearColor(0.1F, 0.1F, 0.1F, 1.0F);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     } else {
@@ -47,8 +54,13 @@ void ts_system_ts_window_post_renderer(TS_Scene *scene, TS_Entity **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    if (!glfwWindowShouldClose(window->window)) {
-      glfwSwapBuffers(window->window);
+    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    if (!glfw_window) {
+      ts_warn("Window attribute is NULL");
+      continue;
+    }
+    if (!glfwWindowShouldClose(glfw_window)) {
+      glfwSwapBuffers(glfw_window);
       glfwPollEvents();
     } else {
       ts_remove_component(scene, entities[0][i], "TS_Window");
@@ -90,7 +102,12 @@ void ts_system_ts_window_reloader(TS_Scene *scene, size_t **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    if (glfwGetKey(window->window, GLFW_KEY_R) == GLFW_PRESS) {
+    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    if (!glfw_window) {
+      ts_warn("Window attribute is NULL");
+      continue;
+    }
+    if (glfwGetKey(glfw_window, GLFW_KEY_R) == GLFW_PRESS) {
       ts_set_scene_reload(scene);
       return;
     }

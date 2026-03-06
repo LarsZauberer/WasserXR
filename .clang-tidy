@@ -4,6 +4,7 @@ Checks: >
   bugprone-*,
   -bugprone-casting-through-void,
   -bugprone-multi-level-implicit-pointer-conversion,
+  -bugprone-easily-swappable-parameters,
   cert-*,
   readability-*,
   performance-*,

@@ -18,9 +18,7 @@ typedef struct {
   TS_Entity entity;
   TS_Loaded_Plugin *plugin;
   TS_Component_Destroyer destroyer;
-  TS_Component_Serializer serializer;
-  TS_Component_Deserializer deserializer;
-  TS_Component_Activator activator;
+  TS_Component_Schema *schema;
   void *component;
 } TS_Component_Handler;
 
@@ -36,6 +34,17 @@ typedef struct {
   TS_System_Function system;
 } TS_System_Handler;
 
+typedef struct {
+  char *field_name;
+  void *data;
+} TS_Component_Serialization_Item;
+
+typedef struct {
+  TS_Entity entity_id;
+  char *component_name;
+  GArray *fields;
+} TS_Component_Serialization;
+
 struct TS_Scene {
   GArray *plugins;
   TS_Entity entity_counter;
@@ -45,16 +54,17 @@ struct TS_Scene {
   int should_reload;
 };
 
-typedef struct {
-  char *name;
-  size_t size;
-  void *data;
-} TS_Serialization_Field;
-
-struct TS_Serialization {
-  char *name;
-  TS_Entity entity;
+struct TS_Component_Schema {
   GArray *fields;
+};
+
+struct TS_Component_Field {
+  char *field_name;
+  size_t size;
+  TS_Primitive_Type type;
+  TS_Field_Permission permission;
+  TS_Component_Getter getter;
+  TS_Component_Setter setter;
 };
 
 #define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
@@ -238,76 +248,22 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   return 0;
 }
 
-TS_Serialization *ts_create_serialization(char *name, size_t entity) {
-  ts_assert(name, "Name is empty in ts_create_serialization");
-  GArray *data = g_array_new(FALSE, FALSE, sizeof(TS_Serialization));
-
-  TS_Serialization *serialization =
-      (TS_Serialization *)malloc(sizeof(TS_Serialization));
-  ts_assert(serialization, "Malloc failed during ts_create_serialization");
-  serialization->name = ts_copy_char_ptr(name);
-  serialization->entity = entity;
-  serialization->fields = data;
-  return serialization;
-}
-
-void ts_destroy_serialization(TS_Serialization *serialization) {
-  if (!serialization) {
-    return;
-  }
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    free(field.name);
-    free(field.data);
-  }
-  g_array_free(serialization->fields, TRUE);
-  free(serialization->name);
-  free(serialization);
-}
-
-void *ts_get_serialization(TS_Serialization *serialization, char *name) {
-  ts_assert(serialization, "Serialization is NULL during ts_get_serialization");
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    if (strcmp(name, field.name) == 0) {
-      return field.data;
+static TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
+                                                           void *component) {
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *handler =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (handler->component == component) {
+      return handler;
     }
   }
-  ts_debug("Failed to find in serialization the field `%s`", name);
+
   return NULL;
-}
-
-int ts_set_serialization(TS_Serialization *serialization, char *name,
-                         size_t size, void *data) {
-  ts_assert(serialization, "Serialization is NULL during ts_set_serialization");
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Serialization_Field field =
-        g_array_index(serialization->fields, TS_Serialization_Field, i);
-    if (strcmp(name, field.name) == 0) {
-      // Replace the value
-      // The user is required to free the value stored in there
-      // beforehand
-      ts_warn("Data was overwritten during ts_set_serialization");
-      field.data = data;
-      return 1;
-    }
-  }
-
-  // Create new field
-  TS_Serialization_Field field;
-  field.name = ts_copy_char_ptr(name);
-  field.size = size;
-  field.data = data;
-  g_array_append_val(serialization->fields, field);
-  return 0;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
-                     const char *component_id,
-                     TS_Serialization *serialization) {
+                     const char *component_id) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_component");
   ts_assert_abort_value(component_id, -1, "Id is NULL during ts_add_component");
   // Check if the entity exists
@@ -321,24 +277,15 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   TS_Loaded_Plugin *plugin1;
   TS_Loaded_Plugin *plugin2;
   TS_Loaded_Plugin *plugin3;
-  TS_Loaded_Plugin *plugin4;
-  TS_Loaded_Plugin *plugin5;
   TS_Component_Creator creator;
   TS_Component_Destroyer destroyer;
-  TS_Component_Serializer serializer;
-  TS_Component_Deserializer deserializer;
-  TS_Component_Activator activator;
+  TS_Component_Schema_Function schema_function;
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
                             CREATOR_FUNCION_PREFIX, creator, plugin1);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
                             DESTROYER_FUNCION_PREFIX, destroyer, plugin2);
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            SERIALIZER_FUNCTION_PREFIX, serializer, plugin3);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            DESERIALIZER_FUNCTION_PREFIX, deserializer,
-                            plugin4);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            ACTIVATOR_FUNCTION_PREFIX, activator, plugin5);
+                            SCHEMA_FUNCTION_PREFIX, schema_function, plugin3);
 
   if (!creator) {
     ts_error("Failed to find creator for `%s`", component_id);
@@ -346,6 +293,10 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   }
   if (!destroyer) {
     ts_error("Failed to find destroyer for `%s`", component_id);
+    return 2;
+  }
+  if (!schema_function) {
+    ts_error("Failed to find schema function for `%s`", component_id);
     return 2;
   }
   // Note that only the creator and the destroyer are required for a
@@ -359,36 +310,9 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
             "The component returned by the creator of the "
             "component `%s` was NULL",
             component);
-  if (deserializer) {
-    if (!serialization) {
-      char *component_id_copy = ts_copy_char_ptr(component_id);
-      TS_Serialization *serialization =
-          ts_create_serialization(component_id_copy, entity_id);
-      free(component_id_copy);
-      ts_debug("Running deserializer for component `%s` on entity "
-               "%ld with "
-               "default serializer",
-               component_id, entity_id);
-      ts_assert(serialization,
-                "Default Serializer was non before running the "
-                "deserializer "
-                "for component `%s`",
-                component_id);
-      deserializer(component, serialization);
-      ts_destroy_serialization(serialization);
-    } else {
-      ts_debug("Running deserializer for component `%s` on entity "
-               "%ld with "
-               "existing serializer",
-               component_id, entity_id);
-      deserializer(component, serialization);
-    }
-  }
-  if (activator) {
-    ts_debug("Running activator for component `%s` on entity %ld", component_id,
-             entity_id);
-    activator(component);
-  }
+
+  TS_Component_Schema *schema = ts_create_component_schema();
+  schema_function(schema);
 
   // Create the component handler object
   TS_Component_Handler *component_handler =
@@ -398,10 +322,8 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   component_handler->entity = entity_id;
   component_handler->plugin = plugin1;
   component_handler->destroyer = destroyer;
-  component_handler->serializer = serializer;
-  component_handler->deserializer = deserializer;
-  component_handler->activator = activator;
   component_handler->component = component;
+  component_handler->schema = schema;
 
   // Add the component
   g_array_append_val(scene->components, component_handler);
@@ -455,6 +377,9 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
     return 1;
   }
 
+  // Copy for the finish debug message the component_id
+  char *copy_id = ts_copy_char_ptr(component_id);
+
   TS_Component_Handler *component =
       g_array_index(scene->components, TS_Component_Handler *, index);
   // This is the one to remove
@@ -462,10 +387,12 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   free(component->id);
   component->destroyer(
       component->component); // Call the destroyer for the component
+  ts_destroy_component_schema(component->schema);
   // The component pointer itself should be destroyed by the destroyer function
   free(component);
 
-  ts_debug("Removed component `%s` from entity %ld", component_id, entity);
+  ts_debug("Removed component `%s` from entity %ld", copy_id, entity);
+  free(copy_id);
   return 0;
 }
 
@@ -483,6 +410,10 @@ static long ts_get_system_index_from_id(TS_Scene *scene,
   return -1L;
 }
 
+static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
+  return 0;
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
@@ -497,16 +428,16 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   // Find the selector and system function
 
   // Working string
-  TS_Loaded_Plugin *plugin1;
-  TS_Loaded_Plugin *plugin2;
-  TS_Loaded_Plugin *plugin3;
-  TS_Loaded_Plugin *plugin4;
-  TS_Loaded_Plugin *plugin5;
-  TS_System_Selector selector;
-  TS_System_Function system;
-  TS_System_Attacher attacher;
-  TS_System_Detacher detacher;
-  TS_System_Groups *groups;
+  TS_Loaded_Plugin *plugin1 = NULL;
+  TS_Loaded_Plugin *plugin2 = NULL;
+  TS_Loaded_Plugin *plugin3 = NULL;
+  TS_Loaded_Plugin *plugin4 = NULL;
+  TS_Loaded_Plugin *plugin5 = NULL;
+  TS_System_Selector selector = NULL;
+  TS_System_Function system = NULL;
+  TS_System_Attacher attacher = NULL;
+  TS_System_Detacher detacher = NULL;
+  TS_System_Groups *groups = NULL;
 
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_SELECTOR_PREFIX,
                             selector, plugin1);
@@ -519,21 +450,23 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_GROUPS_PREFIX,
                             groups, plugin5);
 
-  if (!selector) {
-    ts_warn("Failed to find selector in the system `%s`", system_id);
-    return 2;
-  }
   if (!system) {
     ts_warn("Failed to find system function in the system `%s`", system_id);
     return 2;
   }
+  // Set default functions
+  if (!selector) {
+    // ts_debug("Failed to find selector in the system `%s`", system_id);
+    selector = ts_default_selector;
+  }
   if (!groups) {
-    ts_warn("System %s has groups not defined", system_id);
-    return 2;
+    ts_debug("System %s has groups not defined", system_id);
   }
-  if (plugin1 != plugin2) {
-    return 2;
-  }
+  ts_assert(plugin2,
+            "System, selector and groups have been found but plugin is null");
+  // if (plugin1 != plugin2) {
+  //   return 2;
+  // }
 
   // Found everything -> We can build the system handler
   TS_System_Handler *system_handler =
@@ -546,7 +479,7 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   system_handler->selector = selector;
   system_handler->attacher = attacher;
   system_handler->detacher = detacher;
-  system_handler->plugin = plugin1;
+  system_handler->plugin = plugin2;
   g_array_append_val(scene->systems, system_handler);
 
   // Execute the attacher
@@ -596,7 +529,12 @@ void ts_tick_scene(TS_Scene *scene) {
     // Create helper arrays
     GArray *entity_groups = g_array_new(FALSE, FALSE, sizeof(TS_Entity *));
     GArray *entity_groups_size = g_array_new(FALSE, FALSE, sizeof(size_t));
-    TS_System_Groups groups = *system->groups;
+    TS_System_Groups groups = 0;
+    if (system->groups == NULL) {
+      groups = 0;
+    } else {
+      groups = *system->groups;
+    }
 
     // Create all the helper arrays
     for (TS_System_Groups i = 1; i <= groups; i++) {
@@ -670,7 +608,106 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
   return 0;
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+static TS_Component_Serialization *
+ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
+  TS_Component_Serialization *serialization =
+      (TS_Component_Serialization *)malloc(sizeof(TS_Component_Serialization));
+  serialization->entity_id = entity_id;
+  serialization->component_name = ts_copy_char_ptr(component_name);
+  serialization->fields =
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item *));
+  return serialization;
+}
+
+static TS_Component_Serialization_Item *
+ts_create_component_serialization_item(char *field_name, void *data,
+                                       size_t size, TS_Primitive_Type type) {
+  TS_Component_Serialization_Item *field =
+      (TS_Component_Serialization_Item *)malloc(
+          sizeof(TS_Component_Serialization_Item));
+  field->field_name = ts_copy_char_ptr(field_name);
+
+  if (type == TS_S || type == TS_BLOB_ARRAY) {
+    // Handling of pointer field types that might have multiple elements.
+    // Note that all the arrays have to be NULL terminated
+    void *data_loc = ts_memcpy_till_null(data, size);
+    field->data = data_loc;
+  } else {
+    // Handling of standard single value fields
+    void *data_loc = malloc(size);
+    memcpy(data_loc, data, size);
+    field->data = data_loc;
+  }
+
+  return field;
+}
+
+static void
+ts_destroy_component_serialization_item(TS_Component_Serialization_Item *item) {
+  free(item->field_name);
+  free(item->data);
+  free(item);
+}
+
+static void
+ts_destroy_component_serialization(TS_Component_Serialization *serialization) {
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Component_Serialization_Item *field = g_array_index(
+        serialization->fields, TS_Component_Serialization_Item *, i);
+    ts_destroy_component_serialization_item(field);
+  }
+  g_array_free(serialization->fields, TRUE);
+  free(serialization->component_name);
+  free(serialization);
+}
+
+static TS_Component_Serialization *
+ts_serialize_component(TS_Component_Handler *handler) {
+  TS_Component_Serialization *serialization =
+      ts_create_component_serialization(handler->entity, handler->id);
+
+  ts_assert(handler->schema,
+            "Component `%s` has no schema during serialization", handler->id);
+
+  // Gather all the data from all the fields that are serializable and copy them
+  // into a serialization_item
+  for (size_t i = 0; i < handler->schema->fields->len; i++) {
+    TS_Component_Field *field =
+        g_array_index(handler->schema->fields, TS_Component_Field *, i);
+
+    // Check the serialization bit (is this field exported to be serialized)
+    if (!(field->permission & TS_Permission_Mask_Serialize)) {
+      continue;
+    }
+
+    if (!field->getter) {
+      continue;
+    }
+    void *data = field->getter(handler->component);
+    TS_Component_Serialization_Item *serialization_item =
+        ts_create_component_serialization_item(field->field_name, data,
+                                               field->size, field->type);
+    g_array_append_val(serialization->fields, serialization_item);
+  }
+
+  return serialization;
+}
+
+static int ts_deserialize_component(TS_Scene *scene,
+                                    TS_Component_Handler *handler,
+                                    TS_Component_Serialization *serialization) {
+  // Performs all the setter with the data
+  // Note that the setter in the user code is responsible for a potential copy
+  // of the value
+  int status = 0;
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Component_Serialization_Item *item = g_array_index(
+        serialization->fields, TS_Component_Serialization_Item *, i);
+    status |= ts_set(scene, handler->component, item->field_name, item->data);
+  }
+  return status;
+}
+
 int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
                      const char *new_plugin_path) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_reload_plugin");
@@ -690,27 +727,18 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
   // Pre Unload operations
 
   GArray *components_to_reconstruct =
-      g_array_new(FALSE, FALSE, sizeof(TS_Serialization *));
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization *));
 
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
 
     if (component->plugin == plugin) {
-      // Serialize the component to reconstruct it later
-      TS_Serialization *serialization =
-          ts_create_serialization(component->id, component->entity);
-
-      // Serialize the component
-      if (component->serializer) {
-        component->serializer(component->component, serialization);
-      }
+      // Serialize the component and remove it from the scene.
+      TS_Component_Serialization *serialization =
+          ts_serialize_component(component);
       g_array_append_val(components_to_reconstruct, serialization);
-
-      // Delete the component
-      char *copy_id = ts_copy_char_ptr(component->id);
-      ts_remove_component(scene, component->entity, copy_id);
-      free(copy_id);
+      ts_remove_component(scene, component->entity, component->id);
       i--;
     }
   }
@@ -777,16 +805,32 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
 
   // Reconstruct all the components
   for (size_t i = 0; i < components_to_reconstruct->len; i++) {
-    TS_Serialization *reconstruction =
-        g_array_index(components_to_reconstruct, TS_Serialization *, i);
+    TS_Component_Serialization *reconstruction = g_array_index(
+        components_to_reconstruct, TS_Component_Serialization *, i);
 
-    // Silently fail if something doesn't work
-    status = ts_add_component(scene, reconstruction->entity,
-                              reconstruction->name, reconstruction);
-    ts_debug("Component `%s` was reloaded", reconstruction->name);
+    // Create and get the component handler
+    status = ts_add_component(scene, reconstruction->entity_id,
+                              reconstruction->component_name);
+    if (status) {
+      ts_warn("Failed to create component `%s` for entity %ld",
+              reconstruction->component_name, reconstruction->entity_id);
+      ts_destroy_component_serialization(reconstruction);
+      continue;
+    }
+    void *component = ts_entity_get_component(scene, reconstruction->entity_id,
+                                              reconstruction->component_name);
+    ts_assert(component, "NULL component created during reload");
+    TS_Component_Handler *handler =
+        ts_find_handler_for_component(scene, component);
+    ts_assert(handler, "NULL handler created during reload");
+
+    // Perform the deserialization of the component
+    status = ts_deserialize_component(scene, handler, reconstruction);
+    ts_debug("Component `%s` was reloaded for entity %ld",
+             reconstruction->component_name, reconstruction->entity_id);
 
     // Clean up the helper array and the serialization
-    ts_destroy_serialization(reconstruction);
+    ts_destroy_component_serialization(reconstruction);
   }
   g_array_free(components_to_reconstruct, TRUE);
 
@@ -819,6 +863,163 @@ int ts_reload_all_plugins(TS_Scene *scene) {
 void ts_set_scene_reload(TS_Scene *scene) {
   ts_assert(scene, "Scene is NULL during ts_set_scene_reload");
   scene->should_reload = 1;
+}
+
+TS_Component_Schema *ts_create_component_schema() {
+  TS_Component_Schema *schema =
+      (TS_Component_Schema *)malloc(sizeof(TS_Component_Schema));
+  GArray *fields_array =
+      g_array_new(FALSE, FALSE, sizeof(TS_Component_Field *));
+  schema->fields = fields_array;
+  return schema;
+}
+
+// // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
+                                              TS_Primitive_Type type,
+                                              TS_Field_Permission permission,
+                                              TS_Component_Getter getter,
+                                              TS_Component_Setter setter) {
+  TS_Component_Field *field =
+      (TS_Component_Field *)malloc(sizeof(TS_Component_Field));
+
+  field->field_name = ts_copy_char_ptr(field_name);
+  field->size = size;
+  field->type = type;
+  field->permission = permission;
+  field->getter = getter;
+  field->setter = setter;
+
+  return field;
+}
+
+void ts_destroy_component_schema(TS_Component_Schema *schema) {
+  if (!schema) {
+    return;
+  }
+  ts_assert(schema->fields,
+            "The fields in the schema are NULL during schema destruction");
+  for (size_t i = 0; i < schema->fields->len; i++) {
+    TS_Component_Field *field =
+        g_array_index(schema->fields, TS_Component_Field *, i);
+    ts_destroy_component_field(field);
+  }
+  g_array_free(schema->fields, TRUE);
+  free(schema);
+}
+
+void ts_destroy_component_field(TS_Component_Field *field) {
+  free(field->field_name);
+  free(field);
+}
+
+int ts_add_field_to_component_schema(TS_Component_Schema *schema,
+                                     TS_Component_Field *field) {
+  for (size_t i = 0; i < schema->fields->len; i++) {
+    TS_Component_Field *other =
+        g_array_index(schema->fields, TS_Component_Field *, i);
+    ts_assert_abort_value(field != other, 1,
+                          "Schema field has been added twice");
+    ts_assert_abort_value(strcmp(field->field_name, other->field_name) != 0, 1,
+                          "Schema field has been added twice")
+  }
+  g_array_append_val(schema->fields, field);
+  return 0;
+}
+
+TS_Component_Field *ts_get_field(TS_Component_Schema *schema,
+                                 char *field_name) {
+  ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_field");
+  for (size_t i = 0; i < schema->fields->len; i++) {
+    TS_Component_Field *field =
+        g_array_index(schema->fields, TS_Component_Field *, i);
+    if (strcmp(field->field_name, field_name) == 0) {
+      return field;
+    }
+  }
+  return NULL;
+}
+
+TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
+                                        char *field_name) {
+  ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  if (!field) {
+    return NULL;
+  }
+  return field->getter;
+}
+
+TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
+                                        char *field_name) {
+  ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  if (!field) {
+    return NULL;
+  }
+  return field->setter;
+}
+
+TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
+                                            char *field_name) {
+  ts_assert(schema, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  ts_assert(field, "Field `%s` not found during the ts_get_field_permission",
+            field_name);
+  return field->permission;
+}
+
+size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
+  ts_assert(schema, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  ts_assert(field, "Field `%s` not found during the ts_get_field_size",
+            field_name);
+  return field->size;
+}
+
+TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
+                                    char *field_name) {
+  ts_assert(schema, "Schema is null during ts_get_getter");
+  TS_Component_Field *field = ts_get_field(schema, field_name);
+  ts_assert(field, "Field `%s` not found during the ts_get_field_type",
+            field_name);
+  return field->type;
+}
+
+void *ts_get(TS_Scene *scene, void *component, char *field) {
+  ts_assert_abort_value(scene, NULL, "Scene is null during ts_get");
+  TS_Component_Handler *handler =
+      ts_find_handler_for_component(scene, component);
+  ts_assert_abort_value(handler, NULL,
+                        "The component pointer couldn't be found in the scene");
+
+  TS_Component_Getter getter = ts_get_field_getter(handler->schema, field);
+  ts_assert_abort_value(getter, NULL, "No getter found for the field `%s`",
+                        field);
+  return getter(component);
+}
+
+int ts_set(TS_Scene *scene, void *component, char *field, void *data) {
+  ts_assert_abort_value(scene, 1, "Scene is null during ts_get");
+  TS_Component_Handler *handler =
+      ts_find_handler_for_component(scene, component);
+  ts_assert_abort_value(handler, 1,
+                        "The component pointer couldn't be found in the scene");
+
+  TS_Component_Setter setter = ts_get_field_setter(handler->schema, field);
+  ts_assert_abort_value(setter, 1, "No setter found for the field `%s`", field);
+  setter(component, data);
+  return 0;
+}
+
+TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
+                                                void *component) {
+  TS_Component_Handler *handler =
+      ts_find_handler_for_component(scene, component);
+  ts_assert(handler, "Handler is null during ts_get_schema_of_component");
+  ts_assert(handler->schema,
+            "Schema is null during ts_get_schema_of_component");
+  return handler->schema;
 }
 
 // Debug Functions
