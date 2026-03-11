@@ -172,6 +172,7 @@ int ts_remove_system(TS_Scene *scene, const char *system_id);
 /**
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
+ * @return 1 on a normal tick run and 0 if the Scene should be terminated
  */
 int ts_tick_scene(TS_Scene *scene);
 
@@ -187,6 +188,13 @@ void ts_destroy_scene(TS_Scene *scene);
  */
 void ts_set_scene_reload(TS_Scene *scene);
 
+/**
+ * Tells the scene that at the end of the tick it should tell the main loop to
+ * terminate.
+ * It is the responsibility of the main loop to take this termination
+ * response seriously. It can also ignore it.
+ * @param scene The scene that should be terminated
+ */
 void ts_set_scene_terminate(TS_Scene *scene);
 
 TS_Entity *ts_find_entities_with_selector_and_groups(
