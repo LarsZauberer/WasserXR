@@ -35,7 +35,7 @@ target_include_directories(glad PUBLIC include)
 file(GLOB ECS_SRC src/TheSeed/ecs/*.c)
 add_library(theseed_ecs SHARED ${ECS_SRC})
 target_include_directories(theseed_ecs PUBLIC include)
-target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS})
+target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS} src/TheSeed/ecs)
 target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES})
 
 # Core

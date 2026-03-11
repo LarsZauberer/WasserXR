@@ -1,4 +1,5 @@
 #include "TheSeed/ecs/Scene.h"
+#include "Scene_internal.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
 #include <dlfcn.h>
@@ -8,69 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-  char *path;
-  void *fd;
-} TS_Loaded_Plugin;
-
-typedef struct {
-  char *id;
-  TS_Entity entity;
-  TS_Loaded_Plugin *plugin;
-  TS_Component_Destroyer destroyer;
-  TS_Component_Schema *schema;
-  void *component;
-} TS_Component_Handler;
-
-typedef struct {
-  char *id;
-  int priority;
-  int active;
-  TS_Loaded_Plugin *plugin;
-  TS_System_Groups *groups;
-  TS_System_Selector selector;
-  TS_System_Attacher attacher;
-  TS_System_Detacher detacher;
-  TS_System_Function system;
-} TS_System_Handler;
-
-typedef struct {
-  char *field_name;
-  void *data;
-} TS_Component_Serialization_Item;
-
-typedef struct {
-  TS_Entity entity_id;
-  char *component_name;
-  GArray *fields;
-} TS_Component_Serialization;
-
-struct TS_Scene {
-  GArray *plugins;
-  TS_Entity entity_counter;
-  GArray *entities;
-  GArray *components;
-  GArray *systems;
-  int should_reload;
-};
-
-struct TS_Component_Schema {
-  GArray *fields;
-};
-
-struct TS_Component_Field {
-  char *field_name;
-  size_t size;
-  TS_Primitive_Type type;
-  TS_Field_Permission permission;
-  TS_Component_Getter getter;
-  TS_Component_Setter setter;
-};
-
 #define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
                                   plugin_var)                                  \
   for (size_t i = 0; i < (plugins)->len; i++) {                                \
-    TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);  \
+    TS_Plugin_Handler *plugin =                                                \
+        g_array_index(plugins, TS_Plugin_Handler *, i);                        \
     ts_assert(plugin,                                                          \
               "Plugin was null while searching for symbol in plugins");        \
     GString *symbol = g_string_new(id);                                        \
@@ -86,7 +29,7 @@ struct TS_Component_Field {
 TS_Scene *ts_create_scene() {
   TS_Scene *scene = (TS_Scene *)malloc(sizeof(TS_Scene));
   ts_assert(scene, "Malloc failed while creating a scene");
-  scene->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Loaded_Plugin *));
+  scene->plugins = g_array_new(FALSE, FALSE, sizeof(TS_Plugin_Handler *));
   scene->entities = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
   scene->entity_counter = 0;
   scene->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
@@ -100,8 +43,8 @@ void ts_destroy_scene(TS_Scene *scene) {
   // This will result in destroying all the components and systems with it.
   size_t plugins_len = scene->plugins->len;
   for (size_t i = 0; i < plugins_len; i++) {
-    const TS_Loaded_Plugin *plugin =
-        g_array_index(scene->plugins, TS_Loaded_Plugin *, 0);
+    const TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
     ts_unload_plugin(scene, plugin->path);
   }
   // Clean up all the rest of the entities
@@ -167,8 +110,8 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
 static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
   ts_assert(scene, "Scene is NULL during ts_get_plugin_index");
   for (long i = 0; i < scene->plugins->len; i++) {
-    const TS_Loaded_Plugin *plugin =
-        g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
+    const TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, i);
     if (strcmp(plugin->path, path) == 0) {
       return i;
     }
@@ -183,8 +126,8 @@ int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
     ts_warn("Plugin `%s` already loaded", plugin_name);
     return 1;
   }
-  TS_Loaded_Plugin *plugin =
-      (TS_Loaded_Plugin *)malloc(sizeof(TS_Loaded_Plugin));
+  TS_Plugin_Handler *plugin =
+      (TS_Plugin_Handler *)malloc(sizeof(TS_Plugin_Handler));
   ts_assert(plugin, "Malloc failed during ts_load_plugin");
 
   plugin->path = ts_copy_char_ptr(plugin_name);
@@ -236,8 +179,8 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   }
 
   // Destroy the plugins
-  TS_Loaded_Plugin *plugin =
-      g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
+  TS_Plugin_Handler *plugin =
+      g_array_index(scene->plugins, TS_Plugin_Handler *, index);
   dlclose(plugin->fd);
   free(plugin->path);
   free(plugin);
@@ -274,9 +217,9 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
     return 1;
   }
 
-  TS_Loaded_Plugin *plugin1;
-  TS_Loaded_Plugin *plugin2;
-  TS_Loaded_Plugin *plugin3;
+  TS_Plugin_Handler *plugin1;
+  TS_Plugin_Handler *plugin2;
+  TS_Plugin_Handler *plugin3;
   TS_Component_Creator creator;
   TS_Component_Destroyer destroyer;
   TS_Component_Schema_Function schema_function;
@@ -428,11 +371,11 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   // Find the selector and system function
 
   // Working string
-  TS_Loaded_Plugin *plugin1 = NULL;
-  TS_Loaded_Plugin *plugin2 = NULL;
-  TS_Loaded_Plugin *plugin3 = NULL;
-  TS_Loaded_Plugin *plugin4 = NULL;
-  TS_Loaded_Plugin *plugin5 = NULL;
+  TS_Plugin_Handler *plugin1 = NULL;
+  TS_Plugin_Handler *plugin2 = NULL;
+  TS_Plugin_Handler *plugin3 = NULL;
+  TS_Plugin_Handler *plugin4 = NULL;
+  TS_Plugin_Handler *plugin5 = NULL;
   TS_System_Selector selector = NULL;
   TS_System_Function system = NULL;
   TS_System_Attacher attacher = NULL;
@@ -721,8 +664,8 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     return 1;
   }
 
-  TS_Loaded_Plugin *plugin =
-      g_array_index(scene->plugins, TS_Loaded_Plugin *, index);
+  TS_Plugin_Handler *plugin =
+      g_array_index(scene->plugins, TS_Plugin_Handler *, index);
 
   // Pre Unload operations
 
@@ -845,7 +788,7 @@ int ts_reload_all_plugins(TS_Scene *scene) {
   GArray *plugins = g_array_copy(scene->plugins);
 
   for (size_t i = 0; i < plugins->len; i++) {
-    TS_Loaded_Plugin *plugin = g_array_index(plugins, TS_Loaded_Plugin *, i);
+    TS_Plugin_Handler *plugin = g_array_index(plugins, TS_Plugin_Handler *, i);
     char *path_before = ts_copy_char_ptr(plugin->path);
     char *path_after = ts_copy_char_ptr(plugin->path);
     ts_reload_plugin(scene, path_before, path_after);
@@ -1035,8 +978,8 @@ void ts_print_entities(TS_Scene *scene) {
 void ts_print_plugins(TS_Scene *scene) {
   printf("Loaded Plugins %d:\n", scene->plugins->len);
   for (size_t i = 0; i < scene->plugins->len; i++) {
-    const TS_Loaded_Plugin *plugin =
-        g_array_index(scene->plugins, TS_Loaded_Plugin *, i);
+    const TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, i);
     printf("- %s\n", plugin->path);
   }
 }
