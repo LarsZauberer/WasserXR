@@ -22,6 +22,9 @@ TS_Scene *ts_create_scene() {
 }
 
 void ts_destroy_scene(TS_Scene *scene) {
+  if (!scene) {
+    return;
+  }
   // Unloading all plugins
   // This will result in destroying all the components and systems with it.
   size_t plugins_len = scene->plugins->len;
@@ -128,25 +131,24 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
         g_array_index(scene->components, TS_Component_Handler *, i);
 
     if (strcmp(component->plugin->path, plugin_name) == 0) {
-      ts_remove_component(scene, component->entity, component->id);
-      if (strcmp(component->plugin->path, plugin_name) == 0) {
-        char *copy_id = ts_copy_char_ptr(component->id);
-        ts_remove_component(scene, component->entity, copy_id);
-        free(copy_id);
-        i--;
-      }
+      char *copy_id = ts_copy_char_ptr(component->id);
+      ts_remove_component(scene, component->entity, copy_id);
+      free(copy_id);
+      i--;
     }
   }
 
   // Destroy the plugins
   TS_Plugin_Handler *plugin =
       g_array_index(scene->plugins, TS_Plugin_Handler *, index);
+  char *plugin_name_copy = ts_copy_char_ptr(plugin->path);
   dlclose(plugin->fd);
   free(plugin->path);
   free(plugin);
   g_array_remove_index(scene->plugins, index);
 
   ts_debug("Unloaded Plugin: %s", plugin_name);
+  free(plugin_name_copy);
 
   return 0;
 }
@@ -173,15 +175,15 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
 
   if (!creator) {
     ts_error("Failed to find creator for `%s`", component_id);
-    return 2;
+    return 1;
   }
   if (!destroyer) {
     ts_error("Failed to find destroyer for `%s`", component_id);
-    return 2;
+    return 1;
   }
   if (!schema_function) {
     ts_error("Failed to find schema function for `%s`", component_id);
-    return 2;
+    return 1;
   }
   // Note that only the creator and the destroyer are required for a
   // component to exist
@@ -236,7 +238,8 @@ long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
 
 void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
                               const char *component_id) {
-  ts_assert(scene, "Scene is NULL during ts_entity_get_component");
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_entity_get_component");
   long index =
       ts_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
