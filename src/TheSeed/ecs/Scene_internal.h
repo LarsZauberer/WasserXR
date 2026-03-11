@@ -54,6 +54,7 @@ struct TS_Scene {
   GArray *components;
   GArray *systems;
   int should_reload;
+  int should_terminate;
 };
 
 struct TS_Component_Schema {

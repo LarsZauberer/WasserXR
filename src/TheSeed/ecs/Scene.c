@@ -18,6 +18,7 @@ TS_Scene *ts_create_scene() {
   scene->components = g_array_new(FALSE, FALSE, sizeof(TS_Component_Handler *));
   scene->systems = g_array_new(FALSE, FALSE, sizeof(TS_System_Handler *));
   scene->should_reload = 0;
+  scene->should_terminate = 0;
   return scene;
 }
 
@@ -371,7 +372,7 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
   return (TS_Entity *)g_array_free(res, FALSE);
 }
 
-void ts_tick_scene(TS_Scene *scene) {
+int ts_tick_scene(TS_Scene *scene) {
   ts_assert(scene,
             "Scene is NULL during ts_find_entities_with_selector_and_groups");
   for (size_t i = 0; i < scene->systems->len; i++) {
@@ -417,12 +418,17 @@ void ts_tick_scene(TS_Scene *scene) {
     free(entity_array);
   }
 
+  if (scene->should_terminate) {
+    return 0;
+  }
   // Check if the scene should reload
   if (scene->should_reload) {
     ts_debug("ECS system should be reloaded");
     scene->should_reload = 0; // Reset
     ts_reload_all_plugins(scene);
   }
+
+  return 1;
 }
 
 int ts_remove_system(TS_Scene *scene, const char *system_id) {
@@ -765,6 +771,8 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
             "Schema is null during ts_get_schema_of_component");
   return handler->schema;
 }
+
+void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
 // Debug Functions
 

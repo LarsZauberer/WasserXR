@@ -173,7 +173,7 @@ int ts_remove_system(TS_Scene *scene, const char *system_id);
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
  */
-void ts_tick_scene(TS_Scene *scene);
+int ts_tick_scene(TS_Scene *scene);
 
 /**
  * Destroy a scene and free all associated memory.
@@ -186,6 +186,8 @@ void ts_destroy_scene(TS_Scene *scene);
  * @param scene The scene to destroy
  */
 void ts_set_scene_reload(TS_Scene *scene);
+
+void ts_set_scene_terminate(TS_Scene *scene);
 
 TS_Entity *ts_find_entities_with_selector_and_groups(
     size_t *size, TS_Scene *scene, TS_System_Selector selector, int group);
