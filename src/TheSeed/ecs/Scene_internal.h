@@ -69,4 +69,43 @@ struct TS_Component_Field {
   TS_Component_Setter setter;
 };
 
+// Functions
+
+// Indexers
+long ts_get_entity_index(const TS_Scene *scene, TS_Entity entity);
+
+long ts_get_plugin_index(const TS_Scene *scene, const char *path);
+
+long ts_get_system_index_from_id(TS_Scene *scene, const char *system_id);
+
+TS_Component_Handler *ts_find_handler_for_component(
+    TS_Scene *scene,
+    void *component); // TODO: Make equal to the other functions
+
+// RAII of Component Serialization
+TS_Component_Serialization *
+ts_create_component_serialization(TS_Entity entity_id, char *component_name);
+
+void ts_destroy_component_serialization(
+    TS_Component_Serialization *serialization);
+
+TS_Component_Serialization_Item *
+ts_create_component_serialization_item(char *field_name, void *data,
+                                       size_t size, TS_Primitive_Type type);
+
+void ts_destroy_component_serialization_item(
+    TS_Component_Serialization_Item *item);
+
+// Serialization
+TS_Component_Serialization *
+ts_serialize_component(TS_Component_Handler *handler);
+
+int ts_deserialize_component(TS_Scene *scene, TS_Component_Handler *handler,
+                             TS_Component_Serialization *serialization);
+
+// Other
+
+int ts_default_selector(TS_Scene *scene, TS_Entity entity_id);
+int ts_compare_systems_priority(gconstpointer left, gconstpointer right);
+
 #endif

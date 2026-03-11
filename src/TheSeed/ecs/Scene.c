@@ -71,17 +71,6 @@ TS_Entity ts_add_entity(TS_Scene *scene) {
   return entity;
 }
 
-static long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {
-  for (long i = 0; i < scene->entities->len; i++) {
-    const TS_Entity eentity = g_array_index(scene->entities, TS_Entity, i);
-    if (eentity == entity) {
-      ts_assert(scene, "Scene is NULL during ts_get_entity_index");
-      return i;
-    }
-  }
-  return -1;
-}
-
 int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
   ts_assert_abort_value(scene, 1, "Scene is NULL during ts_remove_entity");
   ts_debug("Removing entity %ld", entity);
@@ -105,18 +94,6 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
   }
 
   return 1;
-}
-
-static long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
-  ts_assert(scene, "Scene is NULL during ts_get_plugin_index");
-  for (long i = 0; i < scene->plugins->len; i++) {
-    const TS_Plugin_Handler *plugin =
-        g_array_index(scene->plugins, TS_Plugin_Handler *, i);
-    if (strcmp(plugin->path, path) == 0) {
-      return i;
-    }
-  }
-  return -1;
 }
 
 int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
@@ -189,19 +166,6 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   ts_debug("Unloaded Plugin: %s", plugin_name);
 
   return 0;
-}
-
-static TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
-                                                           void *component) {
-  for (size_t i = 0; i < scene->components->len; i++) {
-    TS_Component_Handler *handler =
-        g_array_index(scene->components, TS_Component_Handler *, i);
-    if (handler->component == component) {
-      return handler;
-    }
-  }
-
-  return NULL;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -336,24 +300,6 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
 
   ts_debug("Removed component `%s` from entity %ld", copy_id, entity);
   free(copy_id);
-  return 0;
-}
-
-static long ts_get_system_index_from_id(TS_Scene *scene,
-                                        const char *system_id) {
-  ts_assert(scene, "Scene is NULL during ts_get_system_index_from_id");
-  ts_assert(system_id, "Id is NULL during ts_get_system_index_from_id");
-  for (long i = 0; i < scene->systems->len; i++) {
-    const TS_System_Handler *system =
-        g_array_index(scene->systems, TS_System_Handler *, i);
-    if (strcmp(system->id, system_id) == 0) {
-      return i;
-    }
-  }
-  return -1L;
-}
-
-static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
   return 0;
 }
 
@@ -511,15 +457,6 @@ void ts_tick_scene(TS_Scene *scene) {
   }
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-static int ts_compare_systems_priority(const gconstpointer left,
-                                       const gconstpointer right) {
-  const TS_System_Handler *system_a = *(const TS_System_Handler **)left;
-  const TS_System_Handler *system_b = *(const TS_System_Handler **)right;
-
-  return system_a->priority - system_b->priority;
-}
-
 void ts_sort_systems(TS_Scene *scene) {
   g_array_sort(scene->systems, ts_compare_systems_priority);
 }
@@ -549,106 +486,6 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
   ts_debug("System `%s` was removed", system_id);
 
   return 0;
-}
-
-static TS_Component_Serialization *
-ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
-  TS_Component_Serialization *serialization =
-      (TS_Component_Serialization *)malloc(sizeof(TS_Component_Serialization));
-  serialization->entity_id = entity_id;
-  serialization->component_name = ts_copy_char_ptr(component_name);
-  serialization->fields =
-      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item *));
-  return serialization;
-}
-
-static TS_Component_Serialization_Item *
-ts_create_component_serialization_item(char *field_name, void *data,
-                                       size_t size, TS_Primitive_Type type) {
-  TS_Component_Serialization_Item *field =
-      (TS_Component_Serialization_Item *)malloc(
-          sizeof(TS_Component_Serialization_Item));
-  field->field_name = ts_copy_char_ptr(field_name);
-
-  if (type == TS_S || type == TS_BLOB_ARRAY) {
-    // Handling of pointer field types that might have multiple elements.
-    // Note that all the arrays have to be NULL terminated
-    void *data_loc = ts_memcpy_till_null(data, size);
-    field->data = data_loc;
-  } else {
-    // Handling of standard single value fields
-    void *data_loc = malloc(size);
-    memcpy(data_loc, data, size);
-    field->data = data_loc;
-  }
-
-  return field;
-}
-
-static void
-ts_destroy_component_serialization_item(TS_Component_Serialization_Item *item) {
-  free(item->field_name);
-  free(item->data);
-  free(item);
-}
-
-static void
-ts_destroy_component_serialization(TS_Component_Serialization *serialization) {
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Component_Serialization_Item *field = g_array_index(
-        serialization->fields, TS_Component_Serialization_Item *, i);
-    ts_destroy_component_serialization_item(field);
-  }
-  g_array_free(serialization->fields, TRUE);
-  free(serialization->component_name);
-  free(serialization);
-}
-
-static TS_Component_Serialization *
-ts_serialize_component(TS_Component_Handler *handler) {
-  TS_Component_Serialization *serialization =
-      ts_create_component_serialization(handler->entity, handler->id);
-
-  ts_assert(handler->schema,
-            "Component `%s` has no schema during serialization", handler->id);
-
-  // Gather all the data from all the fields that are serializable and copy them
-  // into a serialization_item
-  for (size_t i = 0; i < handler->schema->fields->len; i++) {
-    TS_Component_Field *field =
-        g_array_index(handler->schema->fields, TS_Component_Field *, i);
-
-    // Check the serialization bit (is this field exported to be serialized)
-    if (!(field->permission & TS_Permission_Mask_Serialize)) {
-      continue;
-    }
-
-    if (!field->getter) {
-      continue;
-    }
-    void *data = field->getter(handler->component);
-    TS_Component_Serialization_Item *serialization_item =
-        ts_create_component_serialization_item(field->field_name, data,
-                                               field->size, field->type);
-    g_array_append_val(serialization->fields, serialization_item);
-  }
-
-  return serialization;
-}
-
-static int ts_deserialize_component(TS_Scene *scene,
-                                    TS_Component_Handler *handler,
-                                    TS_Component_Serialization *serialization) {
-  // Performs all the setter with the data
-  // Note that the setter in the user code is responsible for a potential copy
-  // of the value
-  int status = 0;
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Component_Serialization_Item *item = g_array_index(
-        serialization->fields, TS_Component_Serialization_Item *, i);
-    status |= ts_set(scene, handler->component, item->field_name, item->data);
-  }
-  return status;
 }
 
 int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
