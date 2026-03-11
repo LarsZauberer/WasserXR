@@ -9,23 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TS_FIND_SYMBOL_IN_PLUGINS(plugins, id, prefix, function_var,           \
-                                  plugin_var)                                  \
-  for (size_t i = 0; i < (plugins)->len; i++) {                                \
-    TS_Plugin_Handler *plugin =                                                \
-        g_array_index(plugins, TS_Plugin_Handler *, i);                        \
-    ts_assert(plugin,                                                          \
-              "Plugin was null while searching for symbol in plugins");        \
-    GString *symbol = g_string_new(id);                                        \
-    g_string_prepend(symbol, prefix);                                          \
-    (function_var) = dlsym(plugin->fd, symbol->str);                           \
-    g_string_free(symbol, TRUE);                                               \
-    if (function_var) {                                                        \
-      (plugin_var) = plugin;                                                   \
-      break;                                                                   \
-    }                                                                          \
-  }
-
 TS_Scene *ts_create_scene() {
   TS_Scene *scene = (TS_Scene *)malloc(sizeof(TS_Scene));
   ts_assert(scene, "Malloc failed while creating a scene");
@@ -168,7 +151,6 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   return 0;
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
                      const char *component_id) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_component");
@@ -181,18 +163,13 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
     return 1;
   }
 
-  TS_Plugin_Handler *plugin1;
-  TS_Plugin_Handler *plugin2;
-  TS_Plugin_Handler *plugin3;
-  TS_Component_Creator creator;
-  TS_Component_Destroyer destroyer;
-  TS_Component_Schema_Function schema_function;
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            CREATOR_FUNCION_PREFIX, creator, plugin1);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            DESTROYER_FUNCION_PREFIX, destroyer, plugin2);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, component_id,
-                            SCHEMA_FUNCTION_PREFIX, schema_function, plugin3);
+  TS_Plugin_Handler *plugin;
+  TS_Component_Creator creator =
+      ts_get_abi_symbol(&plugin, scene, CREATOR_FUNCION_PREFIX, component_id);
+  TS_Component_Destroyer destroyer = ts_get_abi_symbol_from_plugin(
+      scene, plugin, DESTROYER_FUNCION_PREFIX, component_id);
+  TS_Component_Schema_Function schema_function = ts_get_abi_symbol_from_plugin(
+      scene, plugin, SCHEMA_FUNCTION_PREFIX, component_id);
 
   if (!creator) {
     ts_error("Failed to find creator for `%s`", component_id);
@@ -227,7 +204,7 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
 
   component_handler->id = ts_copy_char_ptr(component_id);
   component_handler->entity = entity_id;
-  component_handler->plugin = plugin1;
+  component_handler->plugin = plugin;
   component_handler->destroyer = destroyer;
   component_handler->component = component;
   component_handler->schema = schema;
@@ -303,11 +280,14 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   return 0;
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
+  return 0;
+}
+
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
   ts_assert_abort_value(system_id, -1, "Id is NULL during ts_add_system");
-  long index = ts_get_system_index_from_id(scene, system_id);
+  long index = ts_get_system_index(scene, system_id);
 
   if (index != -1L) {
     // Already exists, won't add
@@ -317,27 +297,17 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   // Find the selector and system function
 
   // Working string
-  TS_Plugin_Handler *plugin1 = NULL;
-  TS_Plugin_Handler *plugin2 = NULL;
-  TS_Plugin_Handler *plugin3 = NULL;
-  TS_Plugin_Handler *plugin4 = NULL;
-  TS_Plugin_Handler *plugin5 = NULL;
-  TS_System_Selector selector = NULL;
-  TS_System_Function system = NULL;
-  TS_System_Attacher attacher = NULL;
-  TS_System_Detacher detacher = NULL;
-  TS_System_Groups *groups = NULL;
-
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_SELECTOR_PREFIX,
-                            selector, plugin1);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_FUNCTION_PREFIX,
-                            system, plugin2);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_ATTACH_PREFIX,
-                            attacher, plugin3);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_DETACH_PREFIX,
-                            detacher, plugin4);
-  TS_FIND_SYMBOL_IN_PLUGINS(scene->plugins, system_id, SYSTEM_GROUPS_PREFIX,
-                            groups, plugin5);
+  TS_Plugin_Handler *plugin = NULL;
+  TS_System_Function system =
+      ts_get_abi_symbol(&plugin, scene, SYSTEM_FUNCTION_PREFIX, system_id);
+  TS_System_Selector selector = ts_get_abi_symbol_from_plugin(
+      scene, plugin, SYSTEM_SELECTOR_PREFIX, system_id);
+  TS_System_Attacher attacher = ts_get_abi_symbol_from_plugin(
+      scene, plugin, SYSTEM_ATTACH_PREFIX, system_id);
+  TS_System_Detacher detacher = ts_get_abi_symbol_from_plugin(
+      scene, plugin, SYSTEM_DETACH_PREFIX, system_id);
+  TS_System_Groups *groups = ts_get_abi_symbol_from_plugin(
+      scene, plugin, SYSTEM_GROUPS_PREFIX, system_id);
 
   if (!system) {
     ts_warn("Failed to find system function in the system `%s`", system_id);
@@ -351,11 +321,6 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   if (!groups) {
     ts_debug("System %s has groups not defined", system_id);
   }
-  ts_assert(plugin2,
-            "System, selector and groups have been found but plugin is null");
-  // if (plugin1 != plugin2) {
-  //   return 2;
-  // }
 
   // Found everything -> We can build the system handler
   TS_System_Handler *system_handler =
@@ -368,7 +333,7 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   system_handler->selector = selector;
   system_handler->attacher = attacher;
   system_handler->detacher = detacher;
-  system_handler->plugin = plugin2;
+  system_handler->plugin = plugin;
   g_array_append_val(scene->systems, system_handler);
 
   // Execute the attacher
@@ -457,14 +422,10 @@ void ts_tick_scene(TS_Scene *scene) {
   }
 }
 
-void ts_sort_systems(TS_Scene *scene) {
-  g_array_sort(scene->systems, ts_compare_systems_priority);
-}
-
 int ts_remove_system(TS_Scene *scene, const char *system_id) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_remove_system");
   ts_assert_abort_value(system_id, -1, "Id is NULL during ts_remove_system");
-  long index = ts_get_system_index_from_id(scene, system_id);
+  long index = ts_get_system_index(scene, system_id);
 
   if (index == -1L) {
     ts_warn("System `%s` doesn't exist", system_id);

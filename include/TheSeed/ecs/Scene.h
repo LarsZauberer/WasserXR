@@ -170,12 +170,6 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority);
 int ts_remove_system(TS_Scene *scene, const char *system_id);
 
 /**
- * Sort systems in the scene by their priority values.
- * @param scene The scene whose systems should be sorted
- */
-void ts_sort_systems(TS_Scene *scene);
-
-/**
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
  */

@@ -24,7 +24,7 @@ long ts_get_plugin_index(const TS_Scene *scene, const char *path) {
   return -1;
 }
 
-long ts_get_system_index_from_id(TS_Scene *scene, const char *system_id) {
+long ts_get_system_index(TS_Scene *scene, const char *system_id) {
   ts_assert(scene, "Scene is NULL during ts_get_system_index_from_id");
   ts_assert(system_id, "Id is NULL during ts_get_system_index_from_id");
   for (long i = 0; i < scene->systems->len; i++) {

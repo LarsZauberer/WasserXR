@@ -76,11 +76,10 @@ long ts_get_entity_index(const TS_Scene *scene, TS_Entity entity);
 
 long ts_get_plugin_index(const TS_Scene *scene, const char *path);
 
-long ts_get_system_index_from_id(TS_Scene *scene, const char *system_id);
+long ts_get_system_index(TS_Scene *scene, const char *system_id);
 
-TS_Component_Handler *ts_find_handler_for_component(
-    TS_Scene *scene,
-    void *component); // TODO: Make equal to the other functions
+TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
+                                                    void *component);
 
 // RAII of Component Serialization
 TS_Component_Serialization *
@@ -103,9 +102,18 @@ ts_serialize_component(TS_Component_Handler *handler);
 int ts_deserialize_component(TS_Scene *scene, TS_Component_Handler *handler,
                              TS_Component_Serialization *serialization);
 
-// Other
+// ECS functions
 
-int ts_default_selector(TS_Scene *scene, TS_Entity entity_id);
-int ts_compare_systems_priority(gconstpointer left, gconstpointer right);
+/**
+ * Sort systems in the scene by their priority values.
+ * @param scene The scene whose systems should be sorted
+ */
+void ts_sort_systems(TS_Scene *scene);
+
+void *ts_get_abi_symbol_from_plugin(const TS_Scene *scene,
+                                    const TS_Plugin_Handler *handler,
+                                    const char *prefix, const char *symbol);
+void *ts_get_abi_symbol(TS_Plugin_Handler **handler, const TS_Scene *scene,
+                        const char *prefix, const char *symbol);
 
 #endif
