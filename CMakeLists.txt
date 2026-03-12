@@ -32,10 +32,10 @@ add_library(glad SHARED src/glad/gl.c)
 target_include_directories(glad PUBLIC include)
 
 # ECS
-file(GLOB ECS_SRC src/TheSeed/ecs/*.c)
+file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)
 add_library(theseed_ecs SHARED ${ECS_SRC})
 target_include_directories(theseed_ecs PUBLIC include)
-target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS})
+target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS} src/TheSeed/ecs)
 target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES})
 
 # Core
@@ -93,4 +93,9 @@ add_executable(test_utils tests/test_utils.c)
 target_include_directories(test_utils PRIVATE ${GLIB_INCLUDE_DIRS})
 target_link_libraries(test_utils PRIVATE theseed_core ${GLIB_LIBRARIES})
 
+add_executable(test_ecs_add_component tests/test_ecs_add_component.c)
+target_include_directories(test_ecs_add_component PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(test_ecs_add_component PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
+
 add_test(NAME test_utils COMMAND test_utils)
+add_test(NAME test_ecs_add_component COMMAND test_ecs_add_component)

@@ -81,8 +81,7 @@ TS_System_Groups ts_select_ts_window_quiter(TS_Scene *scene,
 void ts_system_ts_window_quiter(TS_Scene *scene, size_t **entities,
                                 const size_t *size) {
   if (*size == 0) {
-    glfwTerminate();
-    exit(0);
+    ts_set_scene_terminate(scene);
   }
 }
 

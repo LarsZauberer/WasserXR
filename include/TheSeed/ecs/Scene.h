@@ -170,16 +170,11 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority);
 int ts_remove_system(TS_Scene *scene, const char *system_id);
 
 /**
- * Sort systems in the scene by their priority values.
- * @param scene The scene whose systems should be sorted
- */
-void ts_sort_systems(TS_Scene *scene);
-
-/**
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
+ * @return 1 on a normal tick run and 0 if the Scene should be terminated
  */
-void ts_tick_scene(TS_Scene *scene);
+int ts_tick_scene(TS_Scene *scene);
 
 /**
  * Destroy a scene and free all associated memory.
@@ -192,6 +187,15 @@ void ts_destroy_scene(TS_Scene *scene);
  * @param scene The scene to destroy
  */
 void ts_set_scene_reload(TS_Scene *scene);
+
+/**
+ * Tells the scene that at the end of the tick it should tell the main loop to
+ * terminate.
+ * It is the responsibility of the main loop to take this termination
+ * response seriously. It can also ignore it.
+ * @param scene The scene that should be terminated
+ */
+void ts_set_scene_terminate(TS_Scene *scene);
 
 TS_Entity *ts_find_entities_with_selector_and_groups(
     size_t *size, TS_Scene *scene, TS_System_Selector selector, int group);

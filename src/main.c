@@ -56,14 +56,13 @@ int main() {
   ts_add_system(scene, "ts_window_pre_renderer", 50);
   ts_add_system(scene, "ts_window_post_renderer", 150);
 
-  ts_add_system(scene, "ts_window_quiter", 100);
+  ts_add_system(scene, "ts_window_quiter", 200);
 
   ts_add_system(scene, "ts_window_reloader", 100);
 
   ts_add_system(scene, "ts_mesh_renderer", 100);
 
-  while (1) {
-    ts_tick_scene(scene);
+  while (ts_tick_scene(scene)) {
   }
 
   ts_destroy_scene(scene);
