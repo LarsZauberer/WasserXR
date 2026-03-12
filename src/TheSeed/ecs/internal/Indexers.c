@@ -1,5 +1,7 @@
 #include "Scene_internal.h"
+#include "TheSeed/ecs/Scene.h"
 #include <TheSeed/core/logging.h>
+#include <string.h>
 
 long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {
   for (long i = 0; i < scene->entities->len; i++) {
@@ -35,6 +37,24 @@ long ts_get_system_index(TS_Scene *scene, const char *system_id) {
     }
   }
   return -1L;
+}
+
+long ts_get_component_index(TS_Scene *scene, const TS_Entity entity,
+                            const char *component_id) {
+  ts_assert_abort_value(scene, -1,
+                        "Scene is NULL during ts_get_component_index");
+  ts_assert_abort_value(component_id, -1,
+                        "Component ID is NULL during ts_get_component_index");
+  ts_assert_abort_value(entity < scene->entity_counter && entity >= 0, -1,
+                        "Entity is invalid during ts_get_component_index");
+  for (long i = 0; i < scene->components->len; i++) {
+    const TS_Component_Handler *handler =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (strcmp(component_id, handler->id) == 0 && handler->entity == entity) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,

@@ -79,6 +79,9 @@ long ts_get_plugin_index(const TS_Scene *scene, const char *path);
 
 long ts_get_system_index(TS_Scene *scene, const char *system_id);
 
+long ts_get_component_index(TS_Scene *scene, TS_Entity entity,
+                            const char *component_id);
+
 TS_Component_Handler *ts_find_handler_for_component(TS_Scene *scene,
                                                     void *component);
 
