@@ -350,6 +350,56 @@ void *ts_get(TS_Scene *scene, void *component, char *field);
  */
 int ts_set(TS_Scene *scene, void *component, char *field, void *data);
 
+/**
+ * Serializes the loaded plugin from the Scene
+ * @param scene The scene that the plugin is loaded in
+ * @param plugin_id The name of the plugin that should be serialized
+ * @return The byte data of the plugin. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id);
+
+/**
+ * Serializes an active system in the Scene.
+ * @param scene The scene that the system is currently registered in
+ * @param system_id The name of the system that should be serialized
+ * @return The byte data of the system. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_system(const TS_Scene *scene, const char *system_id);
+
+/**
+ * Serializes an active component in the Scene.
+ * @param scene The scene that the component is currently registered in
+ * @param component The pointer to the component data.
+ * @return The byte data of the component. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_component(const TS_Scene *scene, const void *component);
+
+/**
+ * Serializes an entity in the Scene.
+ * @param scene The scene that the entity is currently registered in
+ * @param entity The entity id of the entity that should be serialized.
+ * @return The byte data of the entity. It contains the information about the
+entity and it's components. It is prefixed with a `size_t` which tells you how
+many bytes are in the serialization. The data is owned by the caller.
+ */
+char *ts_serialize_entity(const TS_Scene *scene, TS_Entity entity);
+
+/**
+ * Serializes the entire scene.
+ * @param scene The scene that should be serialized
+ * @return The byte data of the scene. It contains the information about the
+entities, components, systems and plugins. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_scene(const TS_Scene *scene);
+
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
  * @{
