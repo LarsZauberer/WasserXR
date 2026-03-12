@@ -49,7 +49,7 @@ struct TS_Component_Serialization {
 
 struct TS_Scene {
   GArray *plugins;
-  TS_Entity entity_counter;
+  TS_Entity entity_counter; // Entities < entity_counter
   GArray *entities;
   GArray *components;
   GArray *systems;
