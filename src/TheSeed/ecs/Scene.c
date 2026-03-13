@@ -776,7 +776,26 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
 char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id) {
-  return NULL;
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_serialize_plugin");
+  ts_assert_abort_value(plugin_id, NULL,
+                        "Plugin ID is NULL during ts_serialize_plugin");
+
+  long plugin_index = ts_get_plugin_index(scene, plugin_id);
+  if (plugin_index == -1L) {
+    return NULL;
+  }
+
+  size_t allocation = sizeof(size_t) + strlen(plugin_id) + 1;
+  char *data = (char *)malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, plugin_id, strlen(plugin_id) + 1);
+
+  return data;
 }
 
 char *ts_serialize_system(const TS_Scene *scene, const char *system_id) {
