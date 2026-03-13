@@ -777,6 +777,12 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
+static size_t ts_get_byte_length(char *data) {
+  size_t length;
+  memcpy(&length, data, sizeof(size_t));
+  return length;
+}
+
 char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id) {
   ts_assert_abort_value(scene, NULL,
                         "Scene is NULL during ts_serialize_plugin");
@@ -830,8 +836,84 @@ char *ts_serialize_system(const TS_Scene *scene, const char *system_id) {
   return data;
 }
 
+static char *
+ts_serialize_component_item(const TS_Scene *scene,
+                            const TS_Component_Serialization_Item *item) {
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_serialize_component_item");
+  ts_assert_abort_value(item, NULL,
+                        "Item is NULL during ts_serialize_component_item");
+
+  size_t allocation =
+      sizeof(size_t) + strlen(item->field_name) + 1 + item->size;
+  char *data = malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, item->field_name, strlen(item->field_name) + 1);
+  iter += strlen(item->field_name) + 1;
+
+  memcpy(iter, item->data, item->size);
+
+  return data;
+}
+
 char *ts_serialize_component(const TS_Scene *scene, const void *component) {
-  return NULL;
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_serialize_component");
+  ts_assert_abort_value(component, NULL,
+                        "Component is NULL during ts_serialize_component");
+
+  TS_Component_Handler *component_handler =
+      ts_find_handler_for_component(scene, component);
+  if (!component_handler) {
+    ts_error("Failed to find the component in the register during "
+             "ts_serialize_component");
+    return NULL;
+  }
+
+  TS_Component_Serialization *serialization =
+      ts_serialize_component_internal(component_handler);
+  ts_assert(serialization, "Failed to internally serialize the component");
+
+  size_t allocation =
+      sizeof(size_t) + strlen(serialization->component_name) + 1;
+
+  char **fields = malloc(serialization->fields->len * sizeof(char *));
+
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    TS_Component_Serialization_Item *item = g_array_index(
+        serialization->fields, TS_Component_Serialization_Item *, i);
+    char *serialization_item = ts_serialize_component_item(scene, item);
+    size_t length_of_item = ts_get_byte_length(serialization_item);
+    allocation += length_of_item;
+    fields[i] = serialization_item;
+  }
+
+  char *data = malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, serialization->component_name,
+         strlen(serialization->component_name) + 1);
+  iter += strlen(serialization->component_name) + 1;
+
+  for (size_t i = 0; i < serialization->fields->len; i++) {
+    size_t offset = ts_get_byte_length(fields[i]);
+
+    memcpy(iter, fields[i], offset);
+
+    iter += offset;
+    free(fields[i]);
+  }
+  free(fields);
+  ts_destroy_component_serialization(serialization);
+
+  return data;
 }
 
 char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {

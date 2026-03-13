@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
   // Constructing Tests
 
   for (size_t i = 0; i < 6; i++) {
-    char *path = g_strdup_printf("/theseed/test_ecs_add_component/%ld", i);
+    char *path = g_strdup_printf("/theseed/test_ecs_serialize_plugin/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

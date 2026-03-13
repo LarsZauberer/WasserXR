@@ -20,6 +20,7 @@ ts_create_component_serialization_item(char *field_name, void *data,
       (TS_Component_Serialization_Item *)malloc(
           sizeof(TS_Component_Serialization_Item));
   field->field_name = ts_copy_char_ptr(field_name);
+  field->size = size;
 
   if (type == TS_S || type == TS_BLOB_ARRAY) {
     // Handling of pointer field types that might have multiple elements.

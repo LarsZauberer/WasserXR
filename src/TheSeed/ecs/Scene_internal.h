@@ -38,6 +38,7 @@ struct TS_System_Handler {
 
 struct TS_Component_Serialization_Item {
   char *field_name;
+  size_t size;
   void *data;
 };
 

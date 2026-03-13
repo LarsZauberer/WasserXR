@@ -7,7 +7,7 @@ typedef struct TestCase TestCase;
 
 struct TestCase {
   TS_Scene *scene;
-  char *component;
+  void *component;
   size_t length;
   char *out;
 };
@@ -20,7 +20,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  char *data = ts_serialize_system(input->scene, input->component);
+  char *data = ts_serialize_component(input->scene, input->component);
   if (!input->out) {
     ts_assert(data == NULL, "Data should be NULL");
     return;
@@ -49,32 +49,39 @@ int main(int argc, char *argv[]) {
 
   // Constructing Cases
   TS_Scene *empty_scene = ts_create_scene();
-  TS_Scene *empty_scene2 = ts_create_scene();
 
-  TS_Scene *plugin_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_systems.so"),
+  TS_Scene *entity_scene = ts_create_scene();
+  ts_assert(0 ==
+                ts_load_plugin(entity_scene, "./libtheseed_test_components.so"),
             "Failed to load the plugin");
+  ts_add_entity(entity_scene);
 
-  TS_Scene *system_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_systems.so"),
-            "Failed to load the plugin");
-  ts_assert(0 == ts_add_system(system_scene, "ts_console_system", 100),
-            "Failed to add the system");
+  TS_Scene *component_scene = ts_create_scene();
+  ts_assert(
+      0 == ts_load_plugin(component_scene, "./libtheseed_test_components.so"),
+      "Failed to load the plugin");
+  TS_Entity entity_id_component = ts_add_entity(component_scene);
+  ts_assert(0 == ts_add_component(component_scene, entity_id_component, "TS_A"),
+            "Failed to add component");
+  void *component =
+      ts_entity_get_component(component_scene, entity_id_component, "TS_A");
 
   TestCase cases[] = {
       {NULL, NULL, 0, NULL},
-      {NULL, "", 0, NULL},
-      {empty_scene, "", 0, NULL},
-      {empty_scene2, "ts_console_system", 0, NULL},
-      {plugin_scene, "ts_console_system", 0, NULL},
-      {system_scene, "ts_console_system",
-       sizeof(size_t) + strlen("ts_console_system") + 1 + sizeof(int),
-       "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0"}};
+      {NULL, NULL, 0, NULL},
+      {empty_scene, NULL, 0, NULL},
+      {entity_scene, NULL, 0, NULL},
+      {component_scene, component,
+       sizeof(size_t) + strlen("TS_A") + 1 + sizeof(size_t) + strlen("x") + 1 +
+           sizeof(int) + sizeof(size_t) + strlen("extra") + 1 + sizeof(int),
+       "\55\0\0\0\0\0\0\0TS_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"}};
 
   // Constructing Tests
 
-  for (size_t i = 0; i < 6; i++) {
-    char *path = g_strdup_printf("/theseed/test_ecs_serialize_system/%ld", i);
+  for (size_t i = 0; i < 5; i++) {
+    char *path =
+        g_strdup_printf("/theseed/test_ecs_serialize_component/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

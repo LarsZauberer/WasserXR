@@ -89,6 +89,10 @@ install(DIRECTORY ${CMAKE_BINARY_DIR}/docs/man/man3
 # Tests
 enable_testing()
 
+# Extra Libraries for testing
+add_library(theseed_test_components SHARED tests/component_test.c)
+target_include_directories(theseed_test_components PUBLIC include)
+
 # Helper function to simplify adding tests
 # Usage: add_theseed_test(test_name)
 # Assumes test file is located at tests/{test_name}.c
@@ -104,3 +108,4 @@ add_theseed_test(test_utils)
 add_theseed_test(test_ecs_add_component)
 add_theseed_test(test_ecs_serialize_plugin)
 add_theseed_test(test_ecs_serialize_system)
+add_theseed_test(test_ecs_serialize_component)
