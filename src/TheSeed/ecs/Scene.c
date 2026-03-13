@@ -486,7 +486,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     if (component->plugin == plugin) {
       // Serialize the component and remove it from the scene.
       TS_Component_Serialization *serialization =
-          ts_serialize_component(component);
+          ts_serialize_component_internal(component);
       g_array_append_val(components_to_reconstruct, serialization);
       ts_remove_component(scene, component->entity, component->id);
       i--;
@@ -575,7 +575,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     ts_assert(handler, "NULL handler created during reload");
 
     // Perform the deserialization of the component
-    status = ts_deserialize_component(scene, handler, reconstruction);
+    status = ts_deserialize_component_internal(scene, handler, reconstruction);
     ts_debug("Component `%s` was reloaded for entity %ld",
              reconstruction->component_name, reconstruction->entity_id);
 

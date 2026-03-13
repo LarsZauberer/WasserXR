@@ -56,7 +56,7 @@ void ts_destroy_component_serialization(
 }
 
 TS_Component_Serialization *
-ts_serialize_component(TS_Component_Handler *handler) {
+ts_serialize_component_internal(TS_Component_Handler *handler) {
   TS_Component_Serialization *serialization =
       ts_create_component_serialization(handler->entity, handler->id);
 
@@ -87,8 +87,9 @@ ts_serialize_component(TS_Component_Handler *handler) {
   return serialization;
 }
 
-int ts_deserialize_component(TS_Scene *scene, TS_Component_Handler *handler,
-                             TS_Component_Serialization *serialization) {
+int ts_deserialize_component_internal(
+    TS_Scene *scene, TS_Component_Handler *handler,
+    TS_Component_Serialization *serialization) {
   // Performs all the setter with the data
   // Note that the setter in the user code is responsible for a potential copy
   // of the value
