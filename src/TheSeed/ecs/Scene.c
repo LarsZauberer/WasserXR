@@ -775,6 +775,24 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
+char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id) {
+  return NULL;
+}
+
+char *ts_serialize_system(const TS_Scene *scene, const char *system_id) {
+  return NULL;
+}
+
+char *ts_serialize_component(const TS_Scene *scene, const void *component) {
+  return NULL;
+}
+
+char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
+  return NULL;
+}
+
+char *ts_serialize_scene(const TS_Scene *scene) { return NULL; }
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene *scene) {
