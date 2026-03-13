@@ -801,7 +801,33 @@ char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id) {
 }
 
 char *ts_serialize_system(const TS_Scene *scene, const char *system_id) {
-  return NULL;
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_serialize_plugin");
+  ts_assert_abort_value(system_id, NULL,
+                        "System ID is NULL during ts_serialize_plugin");
+
+  long system_index = ts_get_system_index(scene, system_id);
+  if (system_index == -1L) {
+    return NULL;
+  }
+
+  TS_System_Handler *system_handler =
+      g_array_index(scene->systems, TS_System_Handler *, system_index);
+
+  size_t allocation =
+      sizeof(size_t) + strlen(system_handler->id) + 1 + sizeof(int);
+  char *data = (char *)malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, system_handler->id, strlen(system_handler->id) + 1);
+  iter += strlen(system_handler->id) + 1;
+
+  memcpy(iter, &system_handler->priority, sizeof(int));
+
+  return data;
 }
 
 char *ts_serialize_component(const TS_Scene *scene, const void *component) {
