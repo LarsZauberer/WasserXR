@@ -1,0 +1,102 @@
+#include "TheSeed/ecs/Scene.h"
+#include "glib.h"
+#include <TheSeed/core/logging.h>
+#include <string.h>
+
+typedef struct TestCase TestCase;
+
+struct TestCase {
+  TS_Scene *scene;
+  TS_Entity entity;
+  size_t length;
+  char *out;
+};
+
+static void free_case(void *ptr) {
+  TestCase *input = ptr;
+
+  ts_destroy_scene(input->scene);
+}
+
+static void unittest(const void *ptr) {
+  const TestCase *input = ptr;
+  char *data = ts_serialize_entity(input->scene, input->entity);
+  if (!input->out) {
+    ts_assert(data == NULL, "Data should be NULL");
+    return;
+  }
+  ts_assert(data != NULL, "Data is NULL");
+  size_t length = 0;
+  memcpy(&length, data, sizeof(size_t));
+  ts_assert_test(length == input->length, "%ld", input->length, "%ld", length,
+                 "The size of the data returned doesn't match!");
+  for (size_t i = 0; i < length; i++) {
+    char byte_should = input->out[i];
+    char byte_out = data[i];
+    ts_assert_test(byte_should == byte_out, "Should: %d", byte_should,
+                   "Output: %d", byte_out, "The Byte at index %d is not equal",
+                   i);
+  }
+
+  free(data);
+}
+
+int main(int argc, char *argv[]) {
+  g_test_init(&argc, &argv, NULL);
+
+  ts_logging_init(TS_LOG_DEBUG);
+  ts_add_logger(ts_stdout_logger);
+
+  // Constructing Cases
+  TS_Scene *empty_scene = ts_create_scene();
+
+  TS_Scene *entity_scene = ts_create_scene();
+  ts_assert(0 ==
+                ts_load_plugin(entity_scene, "./libtheseed_test_components.so"),
+            "Failed to load the plugin");
+  TS_Entity entity = ts_add_entity(entity_scene);
+
+  TS_Scene *component_scene = ts_create_scene();
+  ts_assert(
+      0 == ts_load_plugin(component_scene, "./libtheseed_test_components.so"),
+      "Failed to load the plugin");
+  TS_Entity entity_id_component = ts_add_entity(component_scene);
+  ts_assert(0 == ts_add_component(component_scene, entity_id_component, "TS_A"),
+            "Failed to add component");
+
+  TS_Scene *multi_entity_scene = ts_create_scene();
+  TS_Entity entity_a = ts_add_entity(multi_entity_scene);
+  ts_add_entity(multi_entity_scene);
+
+  TS_Scene *multi_entity_scene2 = ts_create_scene();
+  ts_add_entity(multi_entity_scene2);
+  TS_Entity entity2_b = ts_add_entity(multi_entity_scene2);
+
+  TestCase cases[] = {
+      {NULL, 0, 0, NULL},
+      {NULL, 0, 0, NULL},
+      {empty_scene, 0, 0, NULL},
+      {entity_scene, entity, sizeof(size_t) + sizeof(TS_Entity),
+       "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"},
+      {component_scene, entity_id_component,
+       sizeof(size_t) + sizeof(TS_Entity) + sizeof(size_t) + strlen("TS_A") +
+           1 + sizeof(size_t) + strlen("x") + 1 + sizeof(int) + sizeof(size_t) +
+           strlen("extra") + 1 + sizeof(int),
+       "\75\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
+      {multi_entity_scene, entity_a, sizeof(size_t) + sizeof(TS_Entity),
+       "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"},
+      {multi_entity_scene2, entity2_b, sizeof(size_t) + sizeof(TS_Entity),
+       "\20\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0"},
+  };
+
+  // Constructing Tests
+
+  for (size_t i = 0; i < 7; i++) {
+    char *path = g_strdup_printf("/theseed/test_ecs_serialize_entity/%ld", i);
+    g_test_add_data_func_full(path, &cases[i], unittest, free_case);
+    free(path);
+  }
+
+  return g_test_run();
+}

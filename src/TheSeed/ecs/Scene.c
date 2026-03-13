@@ -917,7 +917,63 @@ char *ts_serialize_component(const TS_Scene *scene, const void *component) {
 }
 
 char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
-  return NULL;
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_serialize_entity");
+  ts_assert_abort_value(entity_id < scene->entity_counter, NULL,
+                        "Entity ID is invalid");
+
+  // Compute the length of the component array
+  size_t component_counter = 0;
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component_handler =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (component_handler->entity == entity_id) {
+      component_counter++;
+    }
+  }
+
+  // Create the component array
+  char **component_serializations =
+      (char **)malloc(sizeof(char *) * component_counter);
+
+  size_t allocation = sizeof(size_t) + sizeof(TS_Entity);
+
+  // Compute the component array and also compute the allocation length
+  size_t component_index = 0;
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component_handler =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (component_handler->entity == entity_id) {
+      char *component_serialization =
+          ts_serialize_component(scene, component_handler->component);
+      component_serializations[component_index++] = component_serialization;
+
+      size_t offset = ts_get_byte_length(component_serialization);
+      allocation += offset;
+    }
+  }
+
+  char *data = (char *)malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, &entity_id, sizeof(TS_Entity));
+  iter += sizeof(TS_Entity);
+
+  for (size_t i = 0; i < component_counter; i++) {
+    char *component = component_serializations[i];
+    size_t offset = ts_get_byte_length(component);
+    memcpy(iter, component, offset);
+    iter += offset;
+
+    // Cleanup
+    free(component);
+  }
+  free(component_serializations);
+
+  return data;
 }
 
 char *ts_serialize_scene(const TS_Scene *scene) { return NULL; }
