@@ -443,6 +443,7 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
 
   TS_System_Handler *system =
       g_array_index(scene->systems, TS_System_Handler *, index);
+  char *system_id_copy = ts_copy_char_ptr(system->id);
 
   if (system->detacher) {
     ts_debug("Running detacher for system `%s`", system->id);
@@ -453,7 +454,8 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
   free(system);
   g_array_remove_index(scene->systems, index);
 
-  ts_debug("System `%s` was removed", system_id);
+  ts_debug("System `%s` was removed", system_id_copy);
+  free(system_id_copy);
 
   return 0;
 }
