@@ -97,5 +97,10 @@ add_executable(test_ecs_add_component tests/test_ecs_add_component.c)
 target_include_directories(test_ecs_add_component PRIVATE ${GLIB_INCLUDE_DIRS})
 target_link_libraries(test_ecs_add_component PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
 
+add_executable(test_ecs_serialize_plugin tests/test_ecs_serialize_plugin.c)
+target_include_directories(test_ecs_serialize_plugin PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(test_ecs_serialize_plugin PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
+
 add_test(NAME test_utils COMMAND test_utils)
 add_test(NAME test_ecs_add_component COMMAND test_ecs_add_component)
+add_test(NAME test_ecs_serialize_plugin COMMAND test_ecs_serialize_plugin)
