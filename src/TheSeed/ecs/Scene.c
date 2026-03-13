@@ -148,7 +148,7 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   free(plugin);
   g_array_remove_index(scene->plugins, index);
 
-  ts_debug("Unloaded Plugin: %s", plugin_name);
+  ts_debug("Unloaded Plugin: %s", plugin_name_copy);
   free(plugin_name_copy);
 
   return 0;
