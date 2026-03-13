@@ -89,18 +89,18 @@ install(DIRECTORY ${CMAKE_BINARY_DIR}/docs/man/man3
 # Tests
 enable_testing()
 
-add_executable(test_utils tests/test_utils.c)
-target_include_directories(test_utils PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(test_utils PRIVATE theseed_core ${GLIB_LIBRARIES})
+# Helper function to simplify adding tests
+# Usage: add_theseed_test(test_name)
+# Assumes test file is located at tests/{test_name}.c
+function(add_theseed_test test_name)
+    add_executable(${test_name} tests/${test_name}.c)
+    target_include_directories(${test_name} PRIVATE ${GLIB_INCLUDE_DIRS})
+    target_link_libraries(${test_name} PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+endfunction()
 
-add_executable(test_ecs_add_component tests/test_ecs_add_component.c)
-target_include_directories(test_ecs_add_component PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(test_ecs_add_component PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
-
-add_executable(test_ecs_serialize_plugin tests/test_ecs_serialize_plugin.c)
-target_include_directories(test_ecs_serialize_plugin PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(test_ecs_serialize_plugin PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
-
-add_test(NAME test_utils COMMAND test_utils)
-add_test(NAME test_ecs_add_component COMMAND test_ecs_add_component)
-add_test(NAME test_ecs_serialize_plugin COMMAND test_ecs_serialize_plugin)
+# Define tests (each test requires just one line now)
+add_theseed_test(test_utils)
+add_theseed_test(test_ecs_add_component)
+add_theseed_test(test_ecs_serialize_plugin)
+add_theseed_test(test_ecs_serialize_system)
