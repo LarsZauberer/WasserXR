@@ -45,7 +45,7 @@ long ts_get_component_index(TS_Scene *scene, const TS_Entity entity,
                         "Scene is NULL during ts_get_component_index");
   ts_assert_abort_value(component_id, -1,
                         "Component ID is NULL during ts_get_component_index");
-  ts_assert_abort_value(entity < scene->entity_counter && entity >= 0, -1,
+  ts_assert_abort_value(entity < scene->entity_counter, -1,
                         "Entity is invalid during ts_get_component_index");
   for (long i = 0; i < scene->components->len; i++) {
     const TS_Component_Handler *handler =
