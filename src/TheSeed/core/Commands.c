@@ -6,7 +6,7 @@
 #include <string.h>
 
 TS_Command *ts_create_command_list(size_t *size) {
-  *size = 15;
+  *size = 16;
   TS_Command *command_list = (TS_Command *)malloc(sizeof(TS_Command) * *size);
 
   command_list[0] = (TS_Command){"reload", ts_command_reload};
@@ -24,6 +24,7 @@ TS_Command *ts_create_command_list(size_t *size) {
   command_list[12] = (TS_Command){"showPlugins", ts_command_showPlugins};
   command_list[13] = (TS_Command){"showComponents", ts_command_showComponents};
   command_list[14] = (TS_Command){"showSystems", ts_command_showSystems};
+  command_list[15] = (TS_Command){"export", ts_command_export};
 
   return command_list;
 }
@@ -194,8 +195,11 @@ void ts_command_set(char **args, TS_Scene *scene) {
   }
   ts_info("Field `%s` set", args[2]);
 }
+<<<<<<< Conflict 3 of 3
+++ ++ ++ +Contents of side #1
 
-void ts_command_addSystem(char **args, TS_Scene *scene) {
+         void
+         ts_command_addSystem(char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Add System requires the system name");
     return;
@@ -261,4 +265,12 @@ void ts_command_showComponents(char **args, TS_Scene *scene) {
 
 void ts_command_showSystems(char **args, TS_Scene *scene) {
   ts_print_systems(scene);
+}
+void ts_command_export(char **args, TS_Scene *scene) {
+  if (!args[0]) {
+    ts_warn("Export requires a filename");
+    return;
+  }
+  ts_serialize_scene_to_file(scene, args[0]);
+  ts_info("Exported Scene");
 }

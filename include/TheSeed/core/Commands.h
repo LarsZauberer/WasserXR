@@ -22,6 +22,7 @@ void ts_command_showEntities(char **args, TS_Scene *scene);
 void ts_command_showPlugins(char **args, TS_Scene *scene);
 void ts_command_showComponents(char **args, TS_Scene *scene);
 void ts_command_showSystems(char **args, TS_Scene *scene);
+void ts_command_export(char **args, TS_Scene *scene);
 
 TS_Command *ts_create_command_list(size_t *size);
 void ts_destroy_command_list(TS_Command *ptr);
