@@ -976,7 +976,90 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
   return data;
 }
 
-char *ts_serialize_scene(const TS_Scene *scene) { return NULL; }
+char *ts_serialize_scene(const TS_Scene *scene) {
+  ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_serialize_scene");
+
+  size_t allocation =
+      sizeof(size_t) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t);
+
+  // Convert the lengths into proper size_t
+  size_t plugin_size = (size_t)scene->plugins->len;
+  size_t system_size = (size_t)scene->systems->len;
+  size_t entity_size = (size_t)scene->entities->len;
+
+  char **plugin_serializations = (char **)malloc(sizeof(char *) * plugin_size);
+  char **system_serializations = (char **)malloc(sizeof(char *) * system_size);
+  char **entity_serializations = (char **)malloc(sizeof(char *) * entity_size);
+
+  // Gather all the serializations and figure out how much to allocate in the
+  // end
+  for (size_t i = 0; i < plugin_size; i++) {
+    TS_Plugin_Handler *plugin_handler =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, i);
+    plugin_serializations[i] = ts_serialize_plugin(scene, plugin_handler->path);
+    size_t offset = ts_get_byte_length(plugin_serializations[i]);
+    allocation += offset;
+  }
+
+  for (size_t i = 0; i < system_size; i++) {
+    TS_System_Handler *system_handler =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    system_serializations[i] = ts_serialize_system(scene, system_handler->id);
+    size_t offset = ts_get_byte_length(system_serializations[i]);
+    allocation += offset;
+  }
+
+  for (size_t i = 0; i < entity_size; i++) {
+    TS_Entity entity_id = g_array_index(scene->entities, TS_Entity, i);
+    entity_serializations[i] = ts_serialize_entity(scene, entity_id);
+    size_t offset = ts_get_byte_length(entity_serializations[i]);
+    allocation += offset;
+  }
+
+  // Construct the final serialization
+  char *data = (char *)malloc(allocation);
+  char *iter = data;
+
+  memcpy(iter, &allocation, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, &plugin_size, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, &system_size, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  memcpy(iter, &entity_size, sizeof(size_t));
+  iter += sizeof(size_t);
+
+  for (size_t i = 0; i < plugin_size; i++) {
+    size_t offset = ts_get_byte_length(plugin_serializations[i]);
+    memcpy(iter, plugin_serializations[i], offset);
+    iter += offset;
+    free(plugin_serializations[i]);
+  }
+
+  for (size_t i = 0; i < system_size; i++) {
+    size_t offset = ts_get_byte_length(system_serializations[i]);
+    memcpy(iter, system_serializations[i], offset);
+    iter += offset;
+    free(system_serializations[i]);
+  }
+
+  for (size_t i = 0; i < entity_size; i++) {
+    size_t offset = ts_get_byte_length(entity_serializations[i]);
+    memcpy(iter, entity_serializations[i], offset);
+    iter += offset;
+    free(entity_serializations[i]);
+  }
+
+  // Cleanup
+  free(plugin_serializations);
+  free(system_serializations);
+  free(entity_serializations);
+
+  return data;
+}
 
 // Debug Functions
 
