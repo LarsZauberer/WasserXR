@@ -1061,6 +1061,59 @@ char *ts_serialize_scene(const TS_Scene *scene) {
   return data;
 }
 
+int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path) {
+  ts_assert_abort_value(scene, 1,
+                        "Scene is NULL during ts_serialize_scene_to_file");
+  ts_assert_abort_value(path, 1,
+                        "Path is NULL during ts_serialize_scene_to_file");
+
+  // Serialize the scene
+  char *data = ts_serialize_scene(scene);
+  ts_assert_abort_value(
+      data, 1, "Failed to serialize scene during ts_serialize_scene_to_file");
+
+  // Extract the size from the data
+  size_t size;
+  memcpy(&size, data, sizeof(size_t));
+
+  // Open the file for binary writing
+  FILE *file = fopen(path, "wb");
+  if (!file) {
+    ts_error("Failed to open file '%s' for writing", path);
+    free(data);
+    return 1;
+  }
+
+  // Write the serialized data to the file
+  size_t written = fwrite(data, 1, size, file);
+  if (written != size) {
+    ts_error("Failed to write complete data to file '%s' (%zu/%zu bytes "
+             "written)",
+             path, written, size);
+    int status = fclose(file);
+    if (status) {
+      ts_error("Also failed to close the file");
+      free(data);
+      return 1;
+    }
+    free(data);
+    return 1;
+  }
+
+  // Close the file
+  int status = fclose(file);
+  if (status) {
+    ts_warn("Failed to close the file (still the write succeeded). Proceeding");
+  }
+
+  // Cleanup
+  free(data);
+
+  ts_debug("Scene serialized to file '%s' (%zu bytes)", path, size);
+
+  return 0;
+}
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene *scene) {

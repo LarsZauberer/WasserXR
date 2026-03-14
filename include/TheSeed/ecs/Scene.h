@@ -400,6 +400,17 @@ caller.
  */
 char *ts_serialize_scene(const TS_Scene *scene);
 
+/**
+ * Serializes the scene into a file specified. By convention the file type
+should be `.ts` but could by anything.
+ * @param scene The scene that should be serialized
+ * @param path The path to the scene file. The user is responsible to make sure
+that the path exists. If the file doesn't exist, it will be created. If it
+already exists, it will be overwritten.
+ * @return It returns the status of the file operation
+  */
+int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
+
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
  * @{
