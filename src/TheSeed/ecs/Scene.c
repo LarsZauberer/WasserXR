@@ -83,6 +83,15 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
   return 1;
 }
 
+TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene) {
+  ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_entities");
+  ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_entities");
+  *size = scene->entities->len;
+  TS_Entity *data = (TS_Entity *)malloc(sizeof(TS_Entity) * *size);
+  memcpy(data, scene->entities->data, sizeof(TS_Entity) * *size);
+  return data;
+}
+
 int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_load_plugin");
   long does_exist = ts_get_plugin_index(scene, plugin_name);
@@ -152,6 +161,19 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
   free(plugin_name_copy);
 
   return 0;
+}
+
+char **ts_get_plugins(size_t *size, const TS_Scene *scene) {
+  ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_plugins");
+  ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_plugins");
+  *size = scene->plugins->len;
+  char **data = (char **)malloc(sizeof(char *) * *size);
+  for (size_t i = 0; i < *size; i++) {
+    TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, i);
+    data[i] = ts_copy_char_ptr(plugin->path);
+  }
+  return data;
 }
 
 int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
@@ -284,6 +306,34 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   return 0;
 }
 
+char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
+                                   const TS_Entity entity_id) {
+  ts_assert_abort_value(size, NULL,
+                        "Size is NULL during ts_get_components_of_entity");
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_get_components_of_entity");
+  ts_assert_abort_value(
+      entity_id >= scene->entity_counter, NULL,
+      "Entity ID is invalid during ts_get_components_of_entity");
+  *size = 0;
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (component->entity == entity_id) {
+      *size += 1;
+    }
+  }
+  char **data = (char **)malloc(*size * sizeof(char *));
+  for (size_t i = 0; i < scene->components->len; i++) {
+    TS_Component_Handler *component =
+        g_array_index(scene->components, TS_Component_Handler *, i);
+    if (component->entity == entity_id) {
+      data[i] = ts_copy_char_ptr(component->id);
+    }
+  }
+  return data;
+}
+
 static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
   return 0;
 }
@@ -353,6 +403,19 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
   ts_debug("System `%s` added with priority %d", system_id, priority);
 
   return 0;
+}
+
+char **ts_get_systems(size_t *size, const TS_Scene *scene) {
+  ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_plugins");
+  ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_plugins");
+  *size = scene->systems->len;
+  char **data = (char **)malloc(sizeof(char *) * *size);
+  for (size_t i = 0; i < *size; i++) {
+    TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, i);
+    data[i] = ts_copy_char_ptr(system->id);
+  }
+  return data;
 }
 
 TS_Entity *ts_find_entities_with_selector_and_groups(

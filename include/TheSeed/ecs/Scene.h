@@ -80,6 +80,14 @@ TS_Entity ts_add_entity(TS_Scene *scene);
 int ts_remove_entity(TS_Scene *scene, TS_Entity entity_id);
 
 /**
+ * Returns an array of entities currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the entities
+ * @return The array of entities
+ */
+TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene);
+
+/**
  * Load a plugin into the scene.
  * @param scene The scene to load the plugin into
  * @param plugin_path Path to the plugin shared library
@@ -96,6 +104,14 @@ int ts_load_plugin(TS_Scene *scene, const char *plugin_name);
  * @return 0 on success, non-zero on failure
  */
 int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
+
+/**
+ * Returns an array of plugin names currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the plugins
+ * @return The array of the plugin names
+ */
+char **ts_get_plugins(size_t *size, const TS_Scene *scene);
 
 /**
  * Reload a certain plugin in the scene. It automatically replaces all the
@@ -142,6 +158,16 @@ int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
                         const char *component_id);
 
 /**
+ * Returns an array of component names currently attached to the entity
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the plugins
+ * @param entity_id The entity from which the components should be queried
+ * @return The array of the component names
+ */
+char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
+                                   TS_Entity entity_id);
+
+/**
  * Get a component from an entity.
  * @param scene The scene containing the entity
  * @param entity_id The entity to get the component from
@@ -168,6 +194,14 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority);
  * @return 0 on success, non-zero on failure
  */
 int ts_remove_system(TS_Scene *scene, const char *system_id);
+
+/**
+ * Returns an array of system names currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the systems
+ * @return The array of the system names
+ */
+char **ts_get_systems(size_t *size, const TS_Scene *scene);
 
 /**
  * Execute one tick/frame of all systems in the scene.
