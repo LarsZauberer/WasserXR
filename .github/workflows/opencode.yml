@@ -27,5 +27,4 @@ jobs:
            ANTHROPIC_API_KEY: ${{ secrets.LLM_KEY }}
          with:
            model: anthropic/claude-sonnet-4-6
-          # share: true
-          # github_token: xxxx
+           github_token: ${{ secrets.GITHUB_TOKEN }}
