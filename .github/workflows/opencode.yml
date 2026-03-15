@@ -30,4 +30,3 @@ jobs:
            OPENAI_API_KEY: ${{ secrets.LLM_KEY }}
          with:
            model: SPH/anthropic/claude-sonnet-4-5
-           github_token: ${{ secrets.GITHUB_TOKEN }}
