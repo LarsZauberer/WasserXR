@@ -22,10 +22,10 @@ jobs:
            persist-credentials: false
 
        - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.LLM_KEY }}
-        with:
-          model: anthropic/claude-sonnet-4-6
+         uses: anomalyco/opencode/github@latest
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.LLM_KEY }}
+         with:
+           model: anthropic/claude-sonnet-4-6
           # share: true
           # github_token: xxxx
