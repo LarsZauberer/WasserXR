@@ -18,10 +18,10 @@ jobs:
           persist-credentials: false
       - uses: anomalyco/opencode/github@latest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.LLM_KEY }}
+          OPENAI_API_KEY: ${{ secrets.LLM_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: SPH/anthropic/claude-sonnet-4-5
           use_github_token: true
           prompt: |
             Review this pull request:
