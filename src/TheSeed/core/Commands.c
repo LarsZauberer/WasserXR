@@ -260,5 +260,5 @@ void ts_command_showComponents(char **args, TS_Scene *scene) {
 }
 
 void ts_command_showSystems(char **args, TS_Scene *scene) {
-  ts_print_system(scene);
+  ts_print_systems(scene);
 }
