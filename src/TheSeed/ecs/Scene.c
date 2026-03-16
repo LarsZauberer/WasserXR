@@ -766,9 +766,10 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
                                                 void *component) {
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);
-  ts_assert(handler, "Handler is null during ts_get_schema_of_component");
-  ts_assert(handler->schema,
-            "Schema is null during ts_get_schema_of_component");
+  ts_assert_abort_value(handler, NULL,
+                        "Handler is null during ts_get_schema_of_component");
+  ts_assert_abort_value(handler->schema, NULL,
+                        "Schema is null during ts_get_schema_of_component");
   return handler->schema;
 }
 
