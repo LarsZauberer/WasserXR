@@ -6,7 +6,7 @@
 #include <string.h>
 
 TS_Command *ts_create_command_list(size_t *size) {
-  *size = 7;
+  *size = 15;
   TS_Command *command_list = (TS_Command *)malloc(sizeof(TS_Command) * *size);
 
   command_list[0] = (TS_Command){"reload", ts_command_reload};
@@ -16,6 +16,14 @@ TS_Command *ts_create_command_list(size_t *size) {
   command_list[4] = (TS_Command){"addComponent", ts_command_addComponent};
   command_list[5] = (TS_Command){"get", ts_command_get};
   command_list[6] = (TS_Command){"set", ts_command_set};
+  command_list[7] = (TS_Command){"addSystem", ts_command_addSystem};
+  command_list[8] = (TS_Command){"removeSystem", ts_command_removeSystem};
+  command_list[9] = (TS_Command){"loadPlugin", ts_command_loadPlugin};
+  command_list[10] = (TS_Command){"unloadPlugin", ts_command_unloadPlugin};
+  command_list[11] = (TS_Command){"showEntities", ts_command_showEntities};
+  command_list[12] = (TS_Command){"showPlugins", ts_command_showPlugins};
+  command_list[13] = (TS_Command){"showComponents", ts_command_showComponents};
+  command_list[14] = (TS_Command){"showSystems", ts_command_showSystems};
 
   return command_list;
 }
@@ -185,4 +193,72 @@ void ts_command_set(char **args, TS_Scene *scene) {
     ts_warn("Cannot handle such a primitive type");
   }
   ts_info("Field `%s` set", args[2]);
+}
+
+void ts_command_addSystem(char **args, TS_Scene *scene) {
+  if (!args[0]) {
+    ts_warn("Add System requires the system name");
+    return;
+  }
+  int result = ts_add_system(scene, args[0], 100);
+  if (result != 0) {
+    ts_warn("Failed to add system `%s`", args[0]);
+  } else {
+    ts_info("System `%s` added successfully", args[0]);
+  }
+}
+
+void ts_command_removeSystem(char **args, TS_Scene *scene) {
+  if (!args[0]) {
+    ts_warn("Remove System requires the system name");
+    return;
+  }
+  int result = ts_remove_system(scene, args[0]);
+  if (result != 0) {
+    ts_warn("Failed to remove system `%s`", args[0]);
+  } else {
+    ts_info("System `%s` removed successfully", args[0]);
+  }
+}
+
+void ts_command_loadPlugin(char **args, TS_Scene *scene) {
+  if (!args[0]) {
+    ts_warn("Load Plugin requires the path to a shared object file");
+    return;
+  }
+  int result = ts_load_plugin(scene, args[0]);
+  if (result != 0) {
+    ts_warn("Failed to load plugin `%s`", args[0]);
+  } else {
+    ts_info("Plugin `%s` loaded successfully", args[0]);
+  }
+}
+
+void ts_command_unloadPlugin(char **args, TS_Scene *scene) {
+  if (!args[0]) {
+    ts_warn("Unload Plugin requires the path to a shared object file");
+    return;
+  }
+  int result = ts_unload_plugin(scene, args[0]);
+  if (result != 0) {
+    ts_warn("Failed to unload plugin `%s`", args[0]);
+  } else {
+    ts_info("Plugin `%s` unloaded successfully", args[0]);
+  }
+}
+
+void ts_command_showEntities(char **args, TS_Scene *scene) {
+  ts_print_entities(scene);
+}
+
+void ts_command_showPlugins(char **args, TS_Scene *scene) {
+  ts_print_plugins(scene);
+}
+
+void ts_command_showComponents(char **args, TS_Scene *scene) {
+  ts_print_components(scene);
+}
+
+void ts_command_showSystems(char **args, TS_Scene *scene) {
+  ts_print_system(scene);
 }
