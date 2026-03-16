@@ -197,38 +197,157 @@ void ts_set_scene_reload(TS_Scene *scene);
  */
 void ts_set_scene_terminate(TS_Scene *scene);
 
+/**
+ * Find all entities that match a given selector function and group criteria.
+ * This function evaluates each entity in the scene using the provided selector
+ * function and returns an array of entities that match the specified group.
+ * @param size Output parameter that will be set to the number of entities found
+ * @param scene The scene to search for entities
+ * @param selector The selector function to evaluate entities
+ * @param group The group mask to filter entities by
+ * @return Dynamically allocated array of entity IDs (caller must free)
+ */
 TS_Entity *ts_find_entities_with_selector_and_groups(
     size_t *size, TS_Scene *scene, TS_System_Selector selector, int group);
 
+/**
+ * Create a new component field definition.
+ * Fields are the basic building blocks of component schemas, defining individual
+ * properties that components can have with their type, size, and access methods.
+ * @param field_name Name of the field
+ * @param size Size of the field data in bytes
+ * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB, TS_S, TS_BLOB_ARRAY)
+ * @param permission Permission flags controlling serialization and other behaviors
+ * @param getter Function pointer to get the field value from a component instance
+ * @param setter Function pointer to set the field value on a component instance
+ * @return Pointer to the newly created component field, or NULL on failure
+ */
 TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
                                               TS_Primitive_Type type,
                                               TS_Field_Permission permission,
                                               TS_Component_Getter getter,
                                               TS_Component_Setter setter);
+
+/**
+ * Destroy a component field and free its memory.
+ * @param field The component field to destroy
+ */
 void ts_destroy_component_field(TS_Component_Field *field);
 
+/**
+ * Create a new component schema.
+ * A component schema defines the structure of a component type by holding
+ * a collection of fields. Schemas are used by the ECS to understand component
+ * layout for serialization, reflection, and field access.
+ * @return Pointer to the newly created component schema, or NULL on failure
+ */
 TS_Component_Schema *ts_create_component_schema();
+
+/**
+ * Destroy a component schema and free its memory.
+ * This will also destroy all fields that were added to the schema.
+ * @param schema The component schema to destroy
+ */
 void ts_destroy_component_schema(TS_Component_Schema *schema);
 
+/**
+ * Add a field to a component schema.
+ * This function registers a field definition with the schema, allowing the ECS
+ * to track and access this field on component instances.
+ * @param schema The schema to add the field to
+ * @param field The field to add (ownership is transferred to the schema)
+ * @return 0 on success, non-zero on failure
+ */
 int ts_add_field_to_component_schema(TS_Component_Schema *schema,
                                      TS_Component_Field *field);
 
+/**
+ * Get the schema for a given component instance.
+ * This function looks up the schema that defines the structure of the provided
+ * component, allowing you to introspect the component's fields.
+ * @param scene The scene containing the component
+ * @param component Pointer to the component instance
+ * @return Pointer to the component's schema, or NULL if not found
+ */
 TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
                                                 void *component);
 
+/**
+ * Get a field from a component schema by name.
+ * @param schema The component schema to search
+ * @param field Name of the field to retrieve
+ * @return Pointer to the field definition, or NULL if not found
+ */
 TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
 
+/**
+ * Get the getter function for a specific field in a component schema.
+ * The getter function can be used to retrieve the field's value from a component instance.
+ * @param schema The component schema to search
+ * @param field_name Name of the field
+ * @return Function pointer to the getter, or NULL if not found
+ */
 TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
                                         char *field_name);
+
+/**
+ * Get the setter function for a specific field in a component schema.
+ * The setter function can be used to update the field's value on a component instance.
+ * @param schema The component schema to search
+ * @param field_name Name of the field
+ * @return Function pointer to the setter, or NULL if not found
+ */
 TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
                                         char *field_name);
+
+/**
+ * Get the permission flags for a specific field in a component schema.
+ * Permission flags control behaviors like serialization access.
+ * @param schema The component schema to search
+ * @param field_name Name of the field
+ * @return Permission flags for the field
+ */
 TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
                                             char *field_name);
+
+/**
+ * Get the size in bytes of a specific field in a component schema.
+ * @param schema The component schema to search
+ * @param field_name Name of the field
+ * @return Size of the field data in bytes
+ */
 size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name);
+
+/**
+ * Get the primitive type of a specific field in a component schema.
+ * @param schema The component schema to search
+ * @param field_name Name of the field
+ * @return The primitive type (TS_L, TS_F, TS_C, TS_BLOB, TS_S, TS_BLOB_ARRAY)
+ */
 TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
                                     char *field_name);
 
+/**
+ * Get the value of a field from a component instance.
+ * This is a generic getter that uses the component's schema to look up
+ * the appropriate field getter function and retrieve the value.
+ * @param scene The scene containing the component
+ * @param component Pointer to the component instance
+ * @param field Name of the field to get
+ * @return Pointer to the field value, or NULL if not found
+ */
 void *ts_get(TS_Scene *scene, void *component, char *field);
+
+/**
+ * Set the value of a field on a component instance.
+ * This is a generic setter that uses the component's schema to look up
+ * the appropriate field setter function and update the value.
+ * @param scene The scene containing the component
+ * @param component Pointer to the component instance
+ * @param field Name of the field to set
+ * @param data Pointer to the new value to set
+ * @return 0 on success, non-zero on failure
+ */
 int ts_set(TS_Scene *scene, void *component, char *field, void *data);
 
 /** @name Debug Functions
