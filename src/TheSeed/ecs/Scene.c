@@ -1124,6 +1124,16 @@ char *ts_serialize_scene(const TS_Scene *scene) {
   return data;
 }
 
+int ts_deserialize_plugin(TS_Scene *scene, const char *data) { return 0; }
+
+int ts_deserialize_system(TS_Scene *scene, const char *data) { return 0; }
+
+int ts_deserialize_component(TS_Scene *scene, const char *data) { return 0; }
+
+int ts_deserialize_entity(TS_Scene *scene, const char *data) { return 0; }
+
+int ts_deserialize_scene(TS_Scene *scene, const char *data) { return 0; }
+
 int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path) {
   ts_assert_abort_value(scene, 1,
                         "Scene is NULL during ts_serialize_scene_to_file");
