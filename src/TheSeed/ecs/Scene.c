@@ -840,7 +840,7 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
-static size_t ts_get_byte_length(char *data) {
+static size_t ts_get_byte_length(const char *data) {
   size_t length;
   memcpy(&length, data, sizeof(size_t));
   return length;
@@ -1124,13 +1124,112 @@ char *ts_serialize_scene(const TS_Scene *scene) {
   return data;
 }
 
-int ts_deserialize_plugin(TS_Scene *scene, const char *data) { return 0; }
+int ts_deserialize_plugin(TS_Scene *scene, const char *data) {
+  ts_assert_abort_value(scene, 2, "Scene is NULL during ts_deserialize_plugin");
+  ts_assert_abort_value(data, 2, "Data is NULL during ts_deserialize_plugin");
 
-int ts_deserialize_system(TS_Scene *scene, const char *data) { return 0; }
+  const char *iter = data + sizeof(size_t);
 
-int ts_deserialize_component(TS_Scene *scene, const char *data) { return 0; }
+  ts_load_plugin(scene, iter);
 
-int ts_deserialize_entity(TS_Scene *scene, const char *data) { return 0; }
+  return 0;
+}
+
+int ts_deserialize_system(TS_Scene *scene, const char *data) {
+  ts_assert_abort_value(scene, 2, "Scene is NULL during ts_deserialize_plugin");
+  ts_assert_abort_value(data, 2, "Data is NULL during ts_deserialize_plugin");
+
+  size_t size = ts_get_byte_length(data);
+  const char *iter = data + sizeof(size_t);
+  size -= sizeof(size_t);
+
+  const char *system_name = iter;
+  const int *system_priority =
+      (int *)(iter + (sizeof(char) * size - sizeof(int)));
+
+  ts_add_system(scene, system_name, *system_priority);
+
+  return 0;
+}
+
+static TS_Component_Serialization_Item *
+ts_deserialize_component_item(TS_Scene *scene, const char *data) {
+  const size_t size = ts_get_byte_length(data);
+  const char *field_name = data + sizeof(size_t);
+  const size_t field_name_size = ts_len_till_null(field_name, sizeof(char));
+  const size_t data_size = size - sizeof(size_t) - field_name_size - 1;
+  const void *field_data = data + sizeof(size_t) + field_name_size + 1;
+
+  TS_Component_Serialization_Item *item =
+      ts_create_component_serialization_item(field_name, field_data, data_size,
+                                             TS_L);
+
+  return item;
+}
+
+static TS_Component_Serialization *
+ts_deserialize_component(TS_Entity entity, TS_Scene *scene, const char *data) {
+  const size_t size = ts_get_byte_length(data);
+
+  const char *component_name = data += sizeof(size_t);
+
+  TS_Component_Serialization *serialization =
+      ts_create_component_serialization(entity, component_name);
+
+  const char *end = data + size;
+  const char *iter = data + sizeof(size_t) + strlen(component_name) + 1;
+
+  while (iter < end) {
+    size_t length = ts_get_byte_length(iter);
+
+    TS_Component_Serialization_Item *item =
+        ts_deserialize_component_item(scene, iter);
+    g_array_append_val(serialization->fields, item);
+
+    iter += length;
+  }
+
+  if (iter != end) {
+    ts_error(
+        "Invalid component_item deserialization while deserializing entity %ld",
+        entity);
+    ts_destroy_component_serialization(serialization);
+    return NULL;
+  }
+
+  return serialization;
+}
+
+int ts_deserialize_entity(TS_Scene *scene, const char *data) {
+  const size_t size = ts_get_byte_length(data);
+
+  const TS_Entity entity =
+      ts_add_entity(scene); // We disregard the entity that was serialized
+
+  const char *end = data + size;
+  const char *iter = data + sizeof(size_t) + sizeof(TS_Entity);
+
+  while (iter < end) {
+    const size_t length = ts_get_byte_length(data);
+    TS_Component_Serialization *serialization =
+        ts_deserialize_component(entity, scene, iter);
+    ts_assert(serialization,
+              "Serialization was NULL during ts_deserialize_entity");
+    ts_add_component(scene, entity, serialization->component_name);
+    TS_Component_Handler *handler =
+        ts_find_handler_for_component(scene, serialization->component_name);
+    ts_deserialize_component_internal(scene, handler, serialization);
+    iter += length;
+  }
+
+  if (iter != end) {
+    ts_error("Invalid component deserialization while deserializing entity %ld",
+             entity);
+    return 1;
+  }
+
+  return 0;
+}
 
 int ts_deserialize_scene(TS_Scene *scene, const char *data) { return 0; }
 

@@ -453,15 +453,6 @@ int ts_deserialize_plugin(TS_Scene *scene, const char *data);
 int ts_deserialize_system(TS_Scene *scene, const char *data);
 
 /**
- * Deserializes a component bytestream
- * @param scene The scene in which it will be constructed in
- * @param data The bytestream that should be deserialized
- * @return Status of the deserialization. It returns 1 if the data couldn't be
- * deserialized. If it returns 0 it was successfully deserialized.
- */
-int ts_deserialize_component(TS_Scene *scene, const char *data);
-
-/**
  * Deserializes an entity bytestream
  * @param scene The scene in which it will be constructed in
  * @param data The bytestream that should be deserialized
