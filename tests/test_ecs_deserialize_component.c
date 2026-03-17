@@ -34,12 +34,12 @@ static void unittest(const void *ptr) {
   ts_assert(result == 0, "Should succeed for valid data");
 
   if (input->expected_component) {
-    size_t comp_count = 0;
-    char **components =
-        ts_get_components_of_entity(&comp_count, input->scene, input->entity);
+    size_t component_count = 0;
+    char **components = ts_get_components_of_entity(
+        &component_count, input->scene, input->entity);
 
-    ts_assert_test(comp_count == 1, "Expected: %d", 1, "Got: %ld", comp_count,
-                   "Component count doesn't match");
+    ts_assert_test(component_count == 1, "Expected: %d", 1, "Got: %ld",
+                   component_count, "Component count doesn't match");
     ts_assert(components != NULL, "Components array should not be NULL");
     ts_assert_test(strcmp(components[0], input->expected_component) == 0,
                    "Expected: %s", input->expected_component, "Got: %s",
@@ -58,8 +58,8 @@ static void unittest(const void *ptr) {
     // Get field values
     void *x_value = ts_get(input->scene, comp, "x");
     ts_assert(x_value != NULL, "x field value should not be NULL");
-    int x = *(int *)x_value;
-    ts_assert_test(x == 1, "Expected: %d", 1, "Got: %d", x,
+    int x_int = *(int *)x_value;
+    ts_assert_test(x_int == 1, "Expected: %d", 1, "Got: %d", x_int,
                    "x field value doesn't match");
 
     void *extra_value = ts_get(input->scene, comp, "extra");
@@ -67,6 +67,10 @@ static void unittest(const void *ptr) {
     int extra = *(int *)extra_value;
     ts_assert_test(extra == 5, "Expected: %d", 5, "Got: %d", extra,
                    "extra field value doesn't match");
+
+    for (size_t i = 0; i < component_count; i++) {
+      free(components[i]);
+    }
 
     free(components);
   }

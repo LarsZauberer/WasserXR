@@ -313,7 +313,7 @@ char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
   ts_assert_abort_value(scene, NULL,
                         "Scene is NULL during ts_get_components_of_entity");
   ts_assert_abort_value(
-      entity_id >= scene->entity_counter, NULL,
+      entity_id < scene->entity_counter, NULL,
       "Entity ID is invalid during ts_get_components_of_entity");
   *size = 0;
   for (size_t i = 0; i < scene->components->len; i++) {
@@ -1186,7 +1186,7 @@ int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
                         "Data is NULL during ts_deserialize_component");
   const size_t size = ts_get_byte_length(data);
 
-  const char *component_name = data += sizeof(size_t);
+  const char *component_name = data + sizeof(size_t);
 
   TS_Component_Serialization *serialization =
       ts_create_component_serialization(component_name);
@@ -1212,9 +1212,11 @@ int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
     return 1;
   }
 
-  ts_deserialize_component_internal(scene, entity, serialization);
+  int status = ts_deserialize_component_internal(scene, entity, serialization);
 
-  return 0;
+  ts_destroy_component_serialization(serialization);
+
+  return status;
 }
 
 int ts_deserialize_entity(TS_Scene *scene, const char *data) {
