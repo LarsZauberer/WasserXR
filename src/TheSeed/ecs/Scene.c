@@ -1357,6 +1357,83 @@ int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path) {
   return 0;
 }
 
+int ts_deserialize_scene_from_file(TS_Scene *scene, const char *path) {
+  ts_assert_abort_value(scene, 1,
+                        "Scene is NULL during ts_deserialize_scene_from_file");
+  ts_assert_abort_value(path, 1,
+                        "Path is NULL during ts_deserialize_scene_from_file");
+
+  // Open the file for binary reading
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    ts_error("Failed to open file '%s' for reading", path);
+    return 1;
+  }
+
+  // Determine file size
+  if (fseek(file, 0, SEEK_END) != 0) {
+    ts_error("Failed to seek to end of file '%s'", path);
+    fclose(file);
+    return 1;
+  }
+
+  long file_size = ftell(file);
+  if (file_size < 0) {
+    ts_error("Failed to determine size of file '%s'", path);
+    fclose(file);
+    return 1;
+  }
+
+  if (fseek(file, 0, SEEK_SET) != 0) {
+    ts_error("Failed to seek to beginning of file '%s'", path);
+    fclose(file);
+    return 1;
+  }
+
+  // Allocate buffer to hold file contents
+  char *data = (char *)malloc((size_t)file_size);
+  if (!data) {
+    ts_error("Failed to allocate memory for file '%s' (%ld bytes)", path,
+             file_size);
+    fclose(file);
+    return 1;
+  }
+
+  // Read the file data
+  size_t bytes_read = fread(data, 1, (size_t)file_size, file);
+  if (bytes_read != (size_t)file_size) {
+    ts_error("Failed to read complete data from file '%s' (%zu/%ld bytes read)",
+             path, bytes_read, file_size);
+    free(data);
+    fclose(file);
+    return 1;
+  }
+
+  // Close the file
+  int status = fclose(file);
+  if (status) {
+    ts_warn("Failed to close the file (still the read succeeded). Proceeding");
+  }
+
+  // Reset the scene
+  ts_reset_scene(scene);
+
+  // Deserialize the scene
+  status = ts_deserialize_scene(scene, data);
+  if (status) {
+    ts_error("Failed to deserialize scene from file '%s'", path);
+    free(data);
+    return 1;
+  }
+
+  // Cleanup
+  free(data);
+
+  ts_debug("Scene deserialized from file '%s' (%zu bytes)", path, bytes_read);
+
+  return 0;
+}
+
 // Debug Functions
 
 void ts_print_entities(TS_Scene *scene) {
