@@ -88,6 +88,9 @@ TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene) {
   ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_entities");
   *size = scene->entities->len;
   TS_Entity *data = (TS_Entity *)malloc(sizeof(TS_Entity) * *size);
+  if (!scene->entities->data) {
+    return data;
+  }
   memcpy(data, scene->entities->data, sizeof(TS_Entity) * *size);
   return data;
 }
@@ -1247,7 +1250,51 @@ int ts_deserialize_entity(TS_Scene *scene, const char *data) {
   return 0;
 }
 
-int ts_deserialize_scene(TS_Scene *scene, const char *data) { return 0; }
+int ts_deserialize_scene(TS_Scene *scene, const char *data) {
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_deserialize_scene");
+  ts_assert_abort_value(data, 1, "Data is NULL during ts_deserialize_scene");
+
+  const size_t size = ts_get_byte_length(data);
+
+  const size_t plugin_size = ts_get_byte_length(data + sizeof(size_t));
+  const size_t system_size = ts_get_byte_length(data + (2 * sizeof(size_t)));
+  const size_t entity_size = ts_get_byte_length(data + (3 * sizeof(size_t)));
+
+  const char *iter = data + (4 * sizeof(size_t));
+
+  for (size_t i = 0; i < plugin_size; i++) {
+    const size_t length = ts_get_byte_length(iter);
+    int status = ts_deserialize_plugin(scene, iter);
+    if (status) {
+      return status;
+    }
+    iter += length;
+  }
+
+  for (size_t i = 0; i < system_size; i++) {
+    const size_t length = ts_get_byte_length(iter);
+    int status = ts_deserialize_system(scene, iter);
+    if (status) {
+      return status;
+    }
+    iter += length;
+  }
+
+  for (size_t i = 0; i < entity_size; i++) {
+    const size_t length = ts_get_byte_length(iter);
+    int status = ts_deserialize_entity(scene, iter);
+    if (status) {
+      return status;
+    }
+    iter += length;
+  }
+
+  ts_assert_abort_value(
+      data + size == iter, 1,
+      "Length of serialized data was invalid. Potentially corrupted scene");
+
+  return 0;
+}
 
 int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path) {
   ts_assert_abort_value(scene, 1,
