@@ -1132,8 +1132,8 @@ char *ts_serialize_scene(const TS_Scene *scene) {
 }
 
 int ts_deserialize_plugin(TS_Scene *scene, const char *data) {
-  ts_assert_abort_value(scene, 2, "Scene is NULL during ts_deserialize_plugin");
-  ts_assert_abort_value(data, 2, "Data is NULL during ts_deserialize_plugin");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_deserialize_plugin");
+  ts_assert_abort_value(data, 1, "Data is NULL during ts_deserialize_plugin");
 
   const char *iter = data + sizeof(size_t);
 
@@ -1143,24 +1143,28 @@ int ts_deserialize_plugin(TS_Scene *scene, const char *data) {
 }
 
 int ts_deserialize_system(TS_Scene *scene, const char *data) {
-  ts_assert_abort_value(scene, 2, "Scene is NULL during ts_deserialize_plugin");
-  ts_assert_abort_value(data, 2, "Data is NULL during ts_deserialize_plugin");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_deserialize_system");
+  ts_assert_abort_value(data, 1, "Data is NULL during ts_deserialize_system");
 
   size_t size = ts_get_byte_length(data);
   const char *iter = data + sizeof(size_t);
   size -= sizeof(size_t);
 
   const char *system_name = iter;
-  const int *system_priority =
-      (int *)(iter + (sizeof(char) * size - sizeof(int)));
 
-  ts_add_system(scene, system_name, *system_priority);
+  int system_priority = 0;
+  memcpy(&system_priority, iter + (sizeof(char) * size - sizeof(int)),
+         sizeof(int));
 
-  return 0;
+  return ts_add_system(scene, system_name, system_priority);
 }
 
 static TS_Component_Serialization_Item *
 ts_deserialize_component_item(TS_Scene *scene, const char *data) {
+  ts_assert_abort_value(scene, NULL,
+                        "Scene is NULL during ts_deserialize_component_item");
+  ts_assert_abort_value(data, NULL,
+                        "Data is NULL during ts_deserialize_component_item");
   const size_t size = ts_get_byte_length(data);
   const char *field_name = data + sizeof(size_t);
   const size_t field_name_size = ts_len_till_null(field_name, sizeof(char));
@@ -1176,6 +1180,10 @@ ts_deserialize_component_item(TS_Scene *scene, const char *data) {
 
 int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
                              const char *data) {
+  ts_assert_abort_value(scene, 1,
+                        "Scene is NULL during ts_deserialize_component");
+  ts_assert_abort_value(data, 1,
+                        "Data is NULL during ts_deserialize_component");
   const size_t size = ts_get_byte_length(data);
 
   const char *component_name = data += sizeof(size_t);
