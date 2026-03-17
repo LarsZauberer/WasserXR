@@ -1,7 +1,6 @@
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>
-#include <string.h>
 typedef struct TS_A TS_A;
 
 struct TS_A {
@@ -42,34 +41,10 @@ void ts_set_TS_A_extra(void *ptr, void *value) {
   component->extra = val;
 }
 
-char *ts_serialize_TS_A_x(const void *ptr) {
-  const TS_A *component = ptr;
-  char *field_id = "x";
-  size_t allocation = sizeof(size_t) + strlen(field_id) + 1 + sizeof(int);
-  char *data = (char *)malloc(allocation);
-  char *iter = data;
-  memcpy(iter, &allocation, sizeof(size_t));
-  iter += sizeof(size_t);
-  memcpy(iter, field_id, strlen(field_id) + 1);
-  iter += strlen(field_id) + 1;
-  memcpy(iter, &component->x, sizeof(int));
-  iter += sizeof(int);
-  return data;
-}
-
-int ts_deserialize_TS_A_x(void *ptr, const char *data) {
-  TS_A *component = ptr;
-  memcpy(&component->x, data, sizeof(int));
-  return 0;
-}
-
-TS_BASIC_SERIALIZE(TS_A, extra, int, "extra")
-
-int ts_deserialize_TS_A_extra(void *ptr, const char *data) {
-  TS_A *component = ptr;
-  memcpy(&component->extra, data, sizeof(int));
-  return 0;
-}
+TS_BASIC_SERIALIZE(TS_A, x, &component->x, sizeof(int));
+TS_BASIC_DESERIALIZE(TS_A, x, &component->x, sizeof(int));
+TS_BASIC_SERIALIZE(TS_A, extra, &component->extra, sizeof(int));
+TS_BASIC_DESERIALIZE(TS_A, extra, &component->extra, sizeof(int));
 
 void ts_schema_TS_A(TS_Component_Schema *schema) {
   TS_Component_Field *field_x = ts_create_component_field(

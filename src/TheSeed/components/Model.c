@@ -4,6 +4,7 @@
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <glad/gl.h>
 #include <stdlib.h>
@@ -48,13 +49,24 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
+TS_BASIC_SERIALIZE(TS_Model, model_name, component->model_name,
+                   strlen(component->model_name) + 1);
+TS_BASIC_DESERIALIZE(TS_Model, model_name, component->model_name,
+                     strlen(data) + 1);
+TS_BASIC_SERIALIZE(TS_Model, shader_name, component->shader_name,
+                   strlen(component->shader_name) + 1);
+TS_BASIC_DESERIALIZE(TS_Model, shader_name, component->shader_name,
+                     strlen(data) + 1);
+
 void ts_schema_TS_Model(TS_Component_Schema *schema) {
   TS_Component_Field *model_name_field = ts_create_component_field(
       "model_name", sizeof(char), TS_S, ts_get_TS_Model_model_name,
-      ts_set_TS_Model_model_name, NULL, NULL);
+      ts_set_TS_Model_model_name, ts_serialize_TS_Model_model_name,
+      ts_deserialize_TS_Model_model_name);
   TS_Component_Field *shader_name_field = ts_create_component_field(
       "shader_name", sizeof(char), TS_S, ts_get_TS_Model_shader_name,
-      ts_set_TS_Model_shader_name, NULL, NULL);
+      ts_set_TS_Model_shader_name, ts_serialize_TS_Model_shader_name,
+      ts_deserialize_TS_Model_shader_name);
 
   TS_Component_Field *meshes_field =
       ts_create_component_field("meshes", sizeof(TS_Mesh *), TS_BLOB_ARRAY,
