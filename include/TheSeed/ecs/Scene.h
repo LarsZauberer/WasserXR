@@ -63,6 +63,18 @@ typedef void (*TS_System_Detacher)(TS_Scene *);
 TS_Scene *ts_create_scene();
 
 /**
+ * Destroy a scene and free all associated memory.
+ * @param scene The scene to destroy
+ */
+void ts_destroy_scene(TS_Scene *scene);
+
+/**
+ * Resets all the ECS structs in the scene and creates an empty scene
+ * @param scene The scene to reset
+ */
+void ts_reset_scene(TS_Scene *scene);
+
+/**
  * Creates an entity in the scene and returns the id of it.
  * @param scene The scene to create it in
  * @return The id of the entity
@@ -209,12 +221,6 @@ char **ts_get_systems(size_t *size, const TS_Scene *scene);
  * @return 1 on a normal tick run and 0 if the Scene should be terminated
  */
 int ts_tick_scene(TS_Scene *scene);
-
-/**
- * Destroy a scene and free all associated memory.
- * @param scene The scene to destroy
- */
-void ts_destroy_scene(TS_Scene *scene);
 
 /**
  * Tells the scene to reload at the end of a tick all the systems and components

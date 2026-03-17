@@ -26,6 +26,20 @@ void ts_destroy_scene(TS_Scene *scene) {
   if (!scene) {
     return;
   }
+
+  // This will unload everything from the scene
+  ts_reset_scene(scene);
+
+  g_array_free(scene->plugins, TRUE);
+  g_array_free(scene->entities, TRUE);
+  g_array_free(scene->components, TRUE);
+  g_array_free(scene->systems, TRUE);
+
+  free(scene);
+}
+
+void ts_reset_scene(TS_Scene *scene) {
+  ts_assert_abort(scene, "Scene is NULL during ts_reset_scene");
   // Unloading all plugins
   // This will result in destroying all the components and systems with it.
   size_t plugins_len = scene->plugins->len;
@@ -41,12 +55,6 @@ void ts_destroy_scene(TS_Scene *scene) {
     // This will also destroy all the components associated with the entity
     ts_remove_entity(scene, entity);
   }
-  g_array_free(scene->plugins, TRUE);
-  g_array_free(scene->entities, TRUE);
-  g_array_free(scene->components, TRUE);
-  g_array_free(scene->systems, TRUE);
-
-  free(scene);
 }
 
 TS_Entity ts_add_entity(TS_Scene *scene) {
