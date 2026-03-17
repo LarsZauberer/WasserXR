@@ -1,12 +1,12 @@
 #include "Scene_internal.h"
+#include "TheSeed/ecs/Scene.h"
 #include <TheSeed/core/logging.h>
 #include <TheSeed/core/utils.h>
 
 TS_Component_Serialization *
-ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
+ts_create_component_serialization(const char *component_name) {
   TS_Component_Serialization *serialization =
       (TS_Component_Serialization *)malloc(sizeof(TS_Component_Serialization));
-  serialization->entity_id = entity_id;
   serialization->component_name = ts_copy_char_ptr(component_name);
   serialization->fields =
       g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization_Item *));
@@ -14,8 +14,9 @@ ts_create_component_serialization(TS_Entity entity_id, char *component_name) {
 }
 
 TS_Component_Serialization_Item *
-ts_create_component_serialization_item(char *field_name, void *data,
-                                       size_t size, TS_Primitive_Type type) {
+ts_create_component_serialization_item(const char *field_name, const void *data,
+                                       const size_t size,
+                                       const TS_Primitive_Type type) {
   TS_Component_Serialization_Item *field =
       (TS_Component_Serialization_Item *)malloc(
           sizeof(TS_Component_Serialization_Item));
@@ -57,9 +58,9 @@ void ts_destroy_component_serialization(
 }
 
 TS_Component_Serialization *
-ts_serialize_component_internal(TS_Component_Handler *handler) {
+ts_serialize_component_internal(const TS_Component_Handler *handler) {
   TS_Component_Serialization *serialization =
-      ts_create_component_serialization(handler->entity, handler->id);
+      ts_create_component_serialization(handler->id);
 
   ts_assert(handler->schema,
             "Component `%s` has no schema during serialization", handler->id);
@@ -89,16 +90,28 @@ ts_serialize_component_internal(TS_Component_Handler *handler) {
 }
 
 int ts_deserialize_component_internal(
-    TS_Scene *scene, TS_Component_Handler *handler,
-    TS_Component_Serialization *serialization) {
+    TS_Scene *scene, const TS_Entity entity,
+    const TS_Component_Serialization *serialization) {
+  // Create component
+  int status = ts_add_component(scene, entity, serialization->component_name);
+  ts_assert_abort_value(!status, 1,
+                        "Failed to add component `%s` to entity %ld during "
+                        "internal component deserialization",
+                        serialization->component_name, entity);
+  void *handler =
+      ts_entity_get_component(scene, entity, serialization->component_name);
+  ts_assert_abort_value(handler, 1,
+                        "Failed to get the added component `%s` from entity "
+                        "%ld during internal component deserialization",
+                        serialization->component_name, entity);
   // Performs all the setter with the data
   // Note that the setter in the user code is responsible for a potential copy
   // of the value
-  int status = 0;
+  status = 0;
   for (size_t i = 0; i < serialization->fields->len; i++) {
     TS_Component_Serialization_Item *item = g_array_index(
         serialization->fields, TS_Component_Serialization_Item *, i);
-    status |= ts_set(scene, handler->component, item->field_name, item->data);
+    status |= ts_set(scene, handler, item->field_name, item->data);
   }
   return status;
 }

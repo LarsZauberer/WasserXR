@@ -43,7 +43,6 @@ struct TS_Component_Serialization_Item {
 };
 
 struct TS_Component_Serialization {
-  TS_Entity entity_id;
   char *component_name;
   GArray *fields;
 };
@@ -88,13 +87,13 @@ TS_Component_Handler *ts_find_handler_for_component(const TS_Scene *scene,
 
 // RAII of Component Serialization
 TS_Component_Serialization *
-ts_create_component_serialization(TS_Entity entity_id, char *component_name);
+ts_create_component_serialization(const char *component_name);
 
 void ts_destroy_component_serialization(
     TS_Component_Serialization *serialization);
 
 TS_Component_Serialization_Item *
-ts_create_component_serialization_item(char *field_name, void *data,
+ts_create_component_serialization_item(const char *field_name, const void *data,
                                        size_t size, TS_Primitive_Type type);
 
 void ts_destroy_component_serialization_item(
@@ -102,11 +101,11 @@ void ts_destroy_component_serialization_item(
 
 // Serialization
 TS_Component_Serialization *
-ts_serialize_component_internal(TS_Component_Handler *handler);
+ts_serialize_component_internal(const TS_Component_Handler *handler);
 
 int ts_deserialize_component_internal(
-    TS_Scene *scene, TS_Component_Handler *handler,
-    TS_Component_Serialization *serialization);
+    TS_Scene *scene, TS_Entity entity,
+    const TS_Component_Serialization *serialization);
 
 // ECS functions
 

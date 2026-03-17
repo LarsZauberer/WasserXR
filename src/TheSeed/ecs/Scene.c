@@ -543,6 +543,8 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
 
   GArray *components_to_reconstruct =
       g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization *));
+  GArray *components_to_reconstruct_entities =
+      g_array_new(FALSE, FALSE, sizeof(TS_Entity));
 
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
@@ -553,6 +555,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
       TS_Component_Serialization *serialization =
           ts_serialize_component_internal(component);
       g_array_append_val(components_to_reconstruct, serialization);
+      g_array_append_val(components_to_reconstruct_entities, component->entity);
       ts_remove_component(scene, component->entity, component->id);
       i--;
     }
@@ -622,17 +625,19 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
   for (size_t i = 0; i < components_to_reconstruct->len; i++) {
     TS_Component_Serialization *reconstruction = g_array_index(
         components_to_reconstruct, TS_Component_Serialization *, i);
+    const TS_Entity reconstruction_entity =
+        g_array_index(components_to_reconstruct_entities, TS_Entity, i);
 
     // Create and get the component handler
-    status = ts_add_component(scene, reconstruction->entity_id,
+    status = ts_add_component(scene, reconstruction_entity,
                               reconstruction->component_name);
     if (status) {
       ts_warn("Failed to create component `%s` for entity %ld",
-              reconstruction->component_name, reconstruction->entity_id);
+              reconstruction->component_name, reconstruction_entity);
       ts_destroy_component_serialization(reconstruction);
       continue;
     }
-    void *component = ts_entity_get_component(scene, reconstruction->entity_id,
+    void *component = ts_entity_get_component(scene, reconstruction_entity,
                                               reconstruction->component_name);
     ts_assert(component, "NULL component created during reload");
     TS_Component_Handler *handler =
@@ -640,14 +645,16 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
     ts_assert(handler, "NULL handler created during reload");
 
     // Perform the deserialization of the component
-    status = ts_deserialize_component_internal(scene, handler, reconstruction);
+    status = ts_deserialize_component_internal(scene, reconstruction_entity,
+                                               reconstruction);
     ts_debug("Component `%s` was reloaded for entity %ld",
-             reconstruction->component_name, reconstruction->entity_id);
+             reconstruction->component_name, reconstruction_entity);
 
     // Clean up the helper array and the serialization
     ts_destroy_component_serialization(reconstruction);
   }
   g_array_free(components_to_reconstruct, TRUE);
+  g_array_free(components_to_reconstruct_entities, TRUE);
 
   ts_debug("Reloaded Plugin `%s` with `%s`", plugin_path, new_plugin_path);
 
@@ -1167,14 +1174,14 @@ ts_deserialize_component_item(TS_Scene *scene, const char *data) {
   return item;
 }
 
-static TS_Component_Serialization *
-ts_deserialize_component(TS_Entity entity, TS_Scene *scene, const char *data) {
+int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
+                             const char *data) {
   const size_t size = ts_get_byte_length(data);
 
   const char *component_name = data += sizeof(size_t);
 
   TS_Component_Serialization *serialization =
-      ts_create_component_serialization(entity, component_name);
+      ts_create_component_serialization(component_name);
 
   const char *end = data + size;
   const char *iter = data + sizeof(size_t) + strlen(component_name) + 1;
@@ -1194,10 +1201,12 @@ ts_deserialize_component(TS_Entity entity, TS_Scene *scene, const char *data) {
         "Invalid component_item deserialization while deserializing entity %ld",
         entity);
     ts_destroy_component_serialization(serialization);
-    return NULL;
+    return 1;
   }
 
-  return serialization;
+  ts_deserialize_component_internal(scene, entity, serialization);
+
+  return 0;
 }
 
 int ts_deserialize_entity(TS_Scene *scene, const char *data) {
@@ -1210,15 +1219,8 @@ int ts_deserialize_entity(TS_Scene *scene, const char *data) {
   const char *iter = data + sizeof(size_t) + sizeof(TS_Entity);
 
   while (iter < end) {
-    const size_t length = ts_get_byte_length(data);
-    TS_Component_Serialization *serialization =
-        ts_deserialize_component(entity, scene, iter);
-    ts_assert(serialization,
-              "Serialization was NULL during ts_deserialize_entity");
-    ts_add_component(scene, entity, serialization->component_name);
-    TS_Component_Handler *handler =
-        ts_find_handler_for_component(scene, serialization->component_name);
-    ts_deserialize_component_internal(scene, handler, serialization);
+    const size_t length = ts_get_byte_length(iter);
+    ts_deserialize_component(scene, entity, iter);
     iter += length;
   }
 
