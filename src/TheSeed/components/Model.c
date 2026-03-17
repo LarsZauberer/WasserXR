@@ -49,14 +49,8 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
-TS_BASIC_SERIALIZE(TS_Model, model_name, component->model_name,
-                   strlen(component->model_name) + 1);
-TS_BASIC_DESERIALIZE(TS_Model, model_name, component->model_name,
-                     strlen(data) + 1);
-TS_BASIC_SERIALIZE(TS_Model, shader_name, component->shader_name,
-                   strlen(component->shader_name) + 1);
-TS_BASIC_DESERIALIZE(TS_Model, shader_name, component->shader_name,
-                     strlen(data) + 1);
+TS_STRING_SERIALIZERS(TS_Model, model_name, model_name);
+TS_STRING_SERIALIZERS(TS_Model, shader_name, shader_name);
 
 void ts_schema_TS_Model(TS_Component_Schema *schema) {
   TS_Component_Field *model_name_field = ts_create_component_field(

@@ -21,9 +21,9 @@ void *ts_create_TS_Camera() {
   return cam;
 }
 
-TS_BASIC_SERIALIZERS(TS_Camera, fov, &component->fov, sizeof(float));
-TS_BASIC_SERIALIZERS(TS_Camera, near, &component->near, sizeof(float));
-TS_BASIC_SERIALIZERS(TS_Camera, far, &component->far, sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Camera, fov, fov, sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Camera, near, near, sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Camera, far, far, sizeof(float));
 
 void ts_destroy_TS_Camera(void *cam) { free(cam); }
 

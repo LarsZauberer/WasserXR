@@ -36,7 +36,15 @@
 
 #define TS_BASIC_SERIALIZERS(component_type, field_name, field_exp,            \
                              field_size)                                       \
-  TS_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size);       \
-  TS_BASIC_DESERIALIZE(component_type, field_name, field_exp, field_size)
+  TS_BASIC_SERIALIZE(component_type, field_name, &component->field_exp,        \
+                     field_size);                                              \
+  TS_BASIC_DESERIALIZE(component_type, field_name, &component->field_exp,      \
+                       field_size)
+
+#define TS_STRING_SERIALIZERS(component_type, field_name, field_exp)           \
+  TS_BASIC_SERIALIZE(component_type, field_name, component->field_exp,         \
+                     strlen(component->field_exp));                            \
+  TS_BASIC_DESERIALIZE(component_type, field_name, component->field_exp,       \
+                       strlen(data) + 1)
 
 #endif
