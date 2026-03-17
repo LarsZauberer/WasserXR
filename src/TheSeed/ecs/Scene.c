@@ -848,6 +848,7 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
 static size_t ts_get_byte_length(const char *data) {
+  ts_assert(data, "Data is NULL during ts_get_byte_lenght");
   size_t length;
   memcpy(&length, data, sizeof(size_t));
   return length;
@@ -1220,6 +1221,9 @@ int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
 }
 
 int ts_deserialize_entity(TS_Scene *scene, const char *data) {
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_deserialize_entity");
+  ts_assert_abort_value(data, 1, "Data is NULL during ts_deserialize_entity");
+
   const size_t size = ts_get_byte_length(data);
 
   const TS_Entity entity =
