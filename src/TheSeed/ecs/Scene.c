@@ -365,7 +365,7 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
 
   if (!system) {
     ts_warn("Failed to find system function in the system `%s`", system_id);
-    return 2;
+    return 1;
   }
   // Set default functions
   if (!selector) {
