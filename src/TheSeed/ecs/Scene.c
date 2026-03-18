@@ -707,21 +707,23 @@ TS_Component_Schema *ts_create_component_schema() {
   return schema;
 }
 
-// // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
-                                              TS_Primitive_Type type,
-                                              TS_Field_Permission permission,
-                                              TS_Component_Getter getter,
-                                              TS_Component_Setter setter) {
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+TS_Component_Field *
+ts_create_component_field(char *field_name, size_t size, TS_Primitive_Type type,
+                          TS_Component_Getter getter,
+                          TS_Component_Setter setter,
+                          TS_Component_Serializer serializer,
+                          TS_Component_Deserializer deserializer) {
   TS_Component_Field *field =
       (TS_Component_Field *)malloc(sizeof(TS_Component_Field));
 
   field->field_name = ts_copy_char_ptr(field_name);
   field->size = size;
   field->type = type;
-  field->permission = permission;
   field->getter = getter;
   field->setter = setter;
+  field->serializer = serializer;
+  field->deserializer = deserializer;
 
   return field;
 }
@@ -791,15 +793,6 @@ TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
     return NULL;
   }
   return field->setter;
-}
-
-TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
-                                            char *field_name) {
-  ts_assert(schema, "Schema is null during ts_get_getter");
-  TS_Component_Field *field = ts_get_field(schema, field_name);
-  ts_assert(field, "Field `%s` not found during the ts_get_field_permission",
-            field_name);
-  return field->permission;
 }
 
 size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
@@ -919,25 +912,43 @@ char *ts_serialize_system(const TS_Scene *scene, const char *system_id) {
 }
 
 static char *
-ts_serialize_component_item(const TS_Scene *scene,
-                            const TS_Component_Serialization_Item *item) {
+ts_serialize_component_fields(size_t *total_size, const TS_Scene *scene,
+                              const TS_Component_Handler *handler) {
   ts_assert_abort_value(scene, NULL,
-                        "Scene is NULL during ts_serialize_component_item");
-  ts_assert_abort_value(item, NULL,
-                        "Item is NULL during ts_serialize_component_item");
+                        "Scene is NULL during ts_serialize_component_fields");
+  ts_assert_abort_value(
+      handler, NULL,
+      "Component Handler is NULL during ts_serialize_component_fields");
 
-  size_t allocation =
-      sizeof(size_t) + strlen(item->field_name) + 1 + item->size;
-  char *data = malloc(allocation);
+  const GArray *fields_array = handler->schema->fields; // Alias
+  GArray *serializations = g_array_new(FALSE, FALSE, sizeof(char *));
+
+  size_t allocation_size = 0;
+
+  for (size_t i = 0; i < fields_array->len; i++) {
+    TS_Component_Field *field =
+        g_array_index(fields_array, TS_Component_Field *, i);
+    if (field->serializer) {
+      char *serialization = field->serializer(handler->component);
+      g_array_append_val(serializations, serialization);
+      size_t offset = ts_get_byte_length(serialization);
+      allocation_size += offset;
+    }
+  }
+
+  *total_size = allocation_size;
+  char *data = malloc(allocation_size);
   char *iter = data;
 
-  memcpy(iter, &allocation, sizeof(size_t));
-  iter += sizeof(size_t);
+  for (size_t i = 0; i < serializations->len; i++) {
+    char *serialization = g_array_index(serializations, char *, i);
+    size_t offset = ts_get_byte_length(serialization);
+    memcpy(iter, serialization, offset);
+    iter += offset;
+    free(serialization);
+  }
 
-  memcpy(iter, item->field_name, strlen(item->field_name) + 1);
-  iter += strlen(item->field_name) + 1;
-
-  memcpy(iter, item->data, item->size);
+  g_array_free(serializations, TRUE);
 
   return data;
 }
@@ -956,44 +967,25 @@ char *ts_serialize_component(const TS_Scene *scene, const void *component) {
     return NULL;
   }
 
-  TS_Component_Serialization *serialization =
-      ts_serialize_component_internal(component_handler);
-  ts_assert(serialization, "Failed to internally serialize the component");
+  size_t field_serialization_size = 0;
+  char *field_serialization = ts_serialize_component_fields(
+      &field_serialization_size, scene, component_handler);
 
-  size_t allocation =
-      sizeof(size_t) + strlen(serialization->component_name) + 1;
-
-  char **fields = malloc(serialization->fields->len * sizeof(char *));
-
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    TS_Component_Serialization_Item *item = g_array_index(
-        serialization->fields, TS_Component_Serialization_Item *, i);
-    char *serialization_item = ts_serialize_component_item(scene, item);
-    size_t length_of_item = ts_get_byte_length(serialization_item);
-    allocation += length_of_item;
-    fields[i] = serialization_item;
-  }
-
-  char *data = malloc(allocation);
+  size_t allocation_size = sizeof(size_t) + strlen(component_handler->id) + 1 +
+                           field_serialization_size;
+  char *data = (char *)malloc(allocation_size);
   char *iter = data;
 
-  memcpy(iter, &allocation, sizeof(size_t));
+  memcpy(iter, &allocation_size, sizeof(size_t));
   iter += sizeof(size_t);
 
-  memcpy(iter, serialization->component_name,
-         strlen(serialization->component_name) + 1);
-  iter += strlen(serialization->component_name) + 1;
+  memcpy(iter, component_handler->id, strlen(component_handler->id) + 1);
+  iter += strlen(component_handler->id) + 1;
 
-  for (size_t i = 0; i < serialization->fields->len; i++) {
-    size_t offset = ts_get_byte_length(fields[i]);
+  memcpy(iter, field_serialization, field_serialization_size);
+  iter += field_serialization_size;
 
-    memcpy(iter, fields[i], offset);
-
-    iter += offset;
-    free(fields[i]);
-  }
-  free(fields);
-  ts_destroy_component_serialization(serialization);
+  free(field_serialization);
 
   return data;
 }
@@ -1171,23 +1163,48 @@ int ts_deserialize_system(TS_Scene *scene, const char *data) {
   return ts_add_system(scene, system_name, system_priority);
 }
 
-static TS_Component_Serialization_Item *
-ts_deserialize_component_item(TS_Scene *scene, const char *data) {
-  ts_assert_abort_value(scene, NULL,
-                        "Scene is NULL during ts_deserialize_component_item");
-  ts_assert_abort_value(data, NULL,
-                        "Data is NULL during ts_deserialize_component_item");
-  const size_t size = ts_get_byte_length(data);
-  const char *field_name = data + sizeof(size_t);
-  const size_t field_name_size = ts_len_till_null(field_name, sizeof(char));
-  const size_t data_size = size - sizeof(size_t) - field_name_size - 1;
-  const void *field_data = data + sizeof(size_t) + field_name_size + 1;
+static int ts_deserialize_component_fields(TS_Scene *scene, const char *data,
+                                           TS_Component_Handler *handler,
+                                           const char *end) {
+  ts_assert_abort_value(scene, 1,
+                        "Scene is NULL during ts_deserialize_component_fields");
+  ts_assert_abort_value(data, 1,
+                        "Data is NULL during ts_deserialize_component_fields");
+  ts_assert_abort_value(
+      handler, 1,
+      "Component Handler is NULL during ts_deserialize_component_fields");
+  ts_assert_abort_value(
+      end, 1, "End marker is NULL during ts_deserialize_component_fields");
 
-  TS_Component_Serialization_Item *item =
-      ts_create_component_serialization_item(field_name, field_data, data_size,
-                                             TS_L);
+  const char *iter = data;
 
-  return item;
+  const GArray *fields = handler->schema->fields;
+
+  while (iter < end) {
+    const size_t size = ts_get_byte_length(iter);
+    const char *field_name = iter + sizeof(size_t);
+    const size_t field_name_size = ts_len_till_null(field_name, sizeof(char));
+    const size_t data_size = size - sizeof(size_t) - field_name_size - 1;
+    const void *field_data = iter + sizeof(size_t) + field_name_size + 1;
+
+    for (size_t i = 0; i < fields->len; i++) {
+      TS_Component_Field *field =
+          g_array_index(fields, TS_Component_Field *, i);
+      if (strcmp(field->field_name, field_name) == 0) {
+        if (field->deserializer) {
+          field->deserializer(handler->component, field_data);
+          break;
+        }
+      }
+    }
+    iter += size;
+  }
+
+  ts_assert_abort_value(
+      iter == end, 1,
+      "Deserialization of the component didn't work properly. Data corrupted");
+
+  return 0;
 }
 
 int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
@@ -1200,35 +1217,18 @@ int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
 
   const char *component_name = data + sizeof(size_t);
 
-  TS_Component_Serialization *serialization =
-      ts_create_component_serialization(component_name);
-
   const char *end = data + size;
   const char *iter = data + sizeof(size_t) + strlen(component_name) + 1;
 
-  while (iter < end) {
-    size_t length = ts_get_byte_length(iter);
+  ts_add_component(scene, entity, component_name);
+  void *component_ptr = ts_entity_get_component(scene, entity, component_name);
+  TS_Component_Handler *handler =
+      ts_find_handler_for_component(scene, component_ptr);
+  ts_assert_abort_value(
+      handler, 1,
+      "Component couldn't be added during ts_deserialize_component");
 
-    TS_Component_Serialization_Item *item =
-        ts_deserialize_component_item(scene, iter);
-    g_array_append_val(serialization->fields, item);
-
-    iter += length;
-  }
-
-  if (iter != end) {
-    ts_error(
-        "Invalid component_item deserialization while deserializing entity %ld",
-        entity);
-    ts_destroy_component_serialization(serialization);
-    return 1;
-  }
-
-  int status = ts_deserialize_component_internal(scene, entity, serialization);
-
-  ts_destroy_component_serialization(serialization);
-
-  return status;
+  return ts_deserialize_component_fields(scene, iter, handler, end);
 }
 
 int ts_deserialize_entity(TS_Scene *scene, const char *data) {

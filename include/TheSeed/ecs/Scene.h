@@ -34,11 +34,14 @@ typedef int TS_Field_Permission;
 #define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
 // Component Functions
+// TODO: Add const modifiers to the functions
 typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Schema_Function)(TS_Component_Schema *);
 typedef void *(*TS_Component_Getter)(void *);
 typedef void (*TS_Component_Setter)(void *, void *);
+typedef char *(*TS_Component_Serializer)(const void *);
+typedef int (*TS_Component_Deserializer)(void *, const char *);
 
 // System Functions
 typedef int TS_System_Groups;
@@ -252,21 +255,30 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
 
 /**
  * Create a new component field definition.
- * Fields are the basic building blocks of component schemas, defining individual
- * properties that components can have with their type, size, and access methods.
+ * Fields are the basic building blocks of component schemas, defining
+ * individual properties that components can have with their type,
+ * size, and access methods.
  * @param field_name Name of the field
  * @param size Size of the field data in bytes
- * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB, TS_S, TS_BLOB_ARRAY)
- * @param permission Permission flags controlling serialization and other behaviors
- * @param getter Function pointer to get the field value from a component instance
- * @param setter Function pointer to set the field value on a component instance
- * @return Pointer to the newly created component field, or NULL on failure
+ * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB,
+ * TS_S, TS_BLOB_ARRAY)
+ * @param permission Permission flags controlling serialization and
+ * other behaviors
+ * @param getter Function pointer to get the field value from a
+ * component instance
+ * @param setter Function pointer to set the field value on a component
+ * instance
+ * @param serializer Function that serializes the field in the correctly
+ * specified format. If it is NULL, this field will not be serialized.
+ * @param deserializer Function that deserializes the field from the correctly
+ * specified format. If it is NULL, this field will not be deserialized.
+ * @return Pointer to the newly created component field, or NULL on
+ * failure
  */
-TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
-                                              TS_Primitive_Type type,
-                                              TS_Field_Permission permission,
-                                              TS_Component_Getter getter,
-                                              TS_Component_Setter setter);
+TS_Component_Field *ts_create_component_field(
+    char *field_name, size_t size, TS_Primitive_Type type,
+    TS_Component_Getter getter, TS_Component_Setter setter,
+    TS_Component_Serializer serializer, TS_Component_Deserializer deserializer);
 
 /**
  * Destroy a component field and free its memory.
@@ -322,7 +334,8 @@ TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
 
 /**
  * Get the getter function for a specific field in a component schema.
- * The getter function can be used to retrieve the field's value from a component instance.
+ * The getter function can be used to retrieve the field's value from a
+ * component instance.
  * @param schema The component schema to search
  * @param field_name Name of the field
  * @return Function pointer to the getter, or NULL if not found
@@ -332,23 +345,14 @@ TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
 
 /**
  * Get the setter function for a specific field in a component schema.
- * The setter function can be used to update the field's value on a component instance.
+ * The setter function can be used to update the field's value on a component
+ * instance.
  * @param schema The component schema to search
  * @param field_name Name of the field
  * @return Function pointer to the setter, or NULL if not found
  */
 TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
                                         char *field_name);
-
-/**
- * Get the permission flags for a specific field in a component schema.
- * Permission flags control behaviors like serialization access.
- * @param schema The component schema to search
- * @param field_name Name of the field
- * @return Permission flags for the field
- */
-TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
-                                            char *field_name);
 
 /**
  * Get the size in bytes of a specific field in a component schema.

@@ -22,11 +22,11 @@ void ts_destroy_TS_Console(void *ptr) {
 
 void ts_schema_TS_Console(TS_Component_Schema *schema) {
   TS_Component_Field *command_list_size_field = ts_create_component_field(
-      "command_list_size", sizeof(size_t), TS_L, TS_Permission_No_Serialize,
-      ts_get_TS_Console_command_list_size, NULL);
+      "command_list_size", sizeof(size_t), TS_L,
+      ts_get_TS_Console_command_list_size, NULL, NULL, NULL);
   TS_Component_Field *command_list_field = ts_create_component_field(
       "command_list", sizeof(TS_Command), TS_BLOB_ARRAY,
-      TS_Permission_No_Serialize, ts_get_TS_Console_command_list, NULL);
+      ts_get_TS_Console_command_list, NULL, NULL, NULL);
 
   ts_add_field_to_component_schema(schema, command_list_size_field);
   ts_add_field_to_component_schema(schema, command_list_field);

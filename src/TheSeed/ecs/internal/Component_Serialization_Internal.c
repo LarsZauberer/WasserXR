@@ -71,11 +71,6 @@ ts_serialize_component_internal(const TS_Component_Handler *handler) {
     TS_Component_Field *field =
         g_array_index(handler->schema->fields, TS_Component_Field *, i);
 
-    // Check the serialization bit (is this field exported to be serialized)
-    if (!(field->permission & TS_Permission_Mask_Serialize)) {
-      continue;
-    }
-
     if (!field->getter) {
       continue;
     }

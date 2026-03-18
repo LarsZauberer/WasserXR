@@ -23,15 +23,15 @@ void *ts_create_TS_Camera() {
 void ts_destroy_TS_Camera(void *cam) { free(cam); }
 
 void ts_schema_TS_Camera(TS_Component_Schema *schema) {
-  TS_Component_Field *fov_field =
-      ts_create_component_field("fov", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_fov, ts_set_TS_Camera_fov);
-  TS_Component_Field *near_field =
-      ts_create_component_field("near", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_near, ts_set_TS_Camera_near);
-  TS_Component_Field *far_field =
-      ts_create_component_field("far", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_far, ts_set_TS_Camera_far);
+  TS_Component_Field *fov_field = ts_create_component_field(
+      "fov", sizeof(float), TS_F, ts_get_TS_Camera_fov, ts_set_TS_Camera_fov,
+      NULL, NULL);
+  TS_Component_Field *near_field = ts_create_component_field(
+      "near", sizeof(float), TS_F, ts_get_TS_Camera_near, ts_set_TS_Camera_near,
+      NULL, NULL);
+  TS_Component_Field *far_field = ts_create_component_field(
+      "far", sizeof(float), TS_F, ts_get_TS_Camera_far, ts_set_TS_Camera_far,
+      NULL, NULL);
 
   ts_add_field_to_component_schema(schema, fov_field);
   ts_add_field_to_component_schema(schema, near_field);

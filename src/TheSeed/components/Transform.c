@@ -26,48 +26,48 @@ void ts_destroy_TS_Transform(void *ptr) { free(ptr); }
 
 void ts_schema_TS_Transform(TS_Component_Schema *schema) {
   TS_Component_Field *field_x =
-      ts_create_component_field("x", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_x, ts_set_TS_Transform_x);
+      ts_create_component_field("x", sizeof(float), TS_F, ts_get_TS_Transform_x,
+                                ts_set_TS_Transform_x, NULL, NULL);
   ts_add_field_to_component_schema(schema, field_x);
 
   TS_Component_Field *field_y =
-      ts_create_component_field("y", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_y, ts_set_TS_Transform_y);
+      ts_create_component_field("y", sizeof(float), TS_F, ts_get_TS_Transform_y,
+                                ts_set_TS_Transform_y, NULL, NULL);
   ts_add_field_to_component_schema(schema, field_y);
 
   TS_Component_Field *field_z =
-      ts_create_component_field("z", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_z, ts_set_TS_Transform_z);
+      ts_create_component_field("z", sizeof(float), TS_F, ts_get_TS_Transform_z,
+                                ts_set_TS_Transform_z, NULL, NULL);
   ts_add_field_to_component_schema(schema, field_z);
 
-  TS_Component_Field *field_rx =
-      ts_create_component_field("rx", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_rx, ts_set_TS_Transform_rx);
+  TS_Component_Field *field_rx = ts_create_component_field(
+      "rx", sizeof(float), TS_F, ts_get_TS_Transform_rx, ts_set_TS_Transform_rx,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_rx);
 
-  TS_Component_Field *field_ry =
-      ts_create_component_field("ry", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_ry, ts_set_TS_Transform_ry);
+  TS_Component_Field *field_ry = ts_create_component_field(
+      "ry", sizeof(float), TS_F, ts_get_TS_Transform_ry, ts_set_TS_Transform_ry,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_ry);
 
-  TS_Component_Field *field_rz =
-      ts_create_component_field("rz", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_rz, ts_set_TS_Transform_rz);
+  TS_Component_Field *field_rz = ts_create_component_field(
+      "rz", sizeof(float), TS_F, ts_get_TS_Transform_rz, ts_set_TS_Transform_rz,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_rz);
 
-  TS_Component_Field *field_sx =
-      ts_create_component_field("sx", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_sx, ts_set_TS_Transform_sx);
+  TS_Component_Field *field_sx = ts_create_component_field(
+      "sx", sizeof(float), TS_F, ts_get_TS_Transform_sx, ts_set_TS_Transform_sx,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_sx);
 
-  TS_Component_Field *field_sy =
-      ts_create_component_field("sy", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_sy, ts_set_TS_Transform_sy);
+  TS_Component_Field *field_sy = ts_create_component_field(
+      "sy", sizeof(float), TS_F, ts_get_TS_Transform_sy, ts_set_TS_Transform_sy,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_sy);
 
-  TS_Component_Field *field_sz =
-      ts_create_component_field("sz", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Transform_sz, ts_set_TS_Transform_sz);
+  TS_Component_Field *field_sz = ts_create_component_field(
+      "sz", sizeof(float), TS_F, ts_get_TS_Transform_sz, ts_set_TS_Transform_sz,
+      NULL, NULL);
   ts_add_field_to_component_schema(schema, field_sz);
 }
 

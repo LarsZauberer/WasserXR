@@ -65,9 +65,10 @@ struct TS_Component_Field {
   char *field_name;
   size_t size;
   TS_Primitive_Type type;
-  TS_Field_Permission permission;
   TS_Component_Getter getter;
   TS_Component_Setter setter;
+  TS_Component_Serializer serializer;
+  TS_Component_Deserializer deserializer;
 };
 
 // Functions
