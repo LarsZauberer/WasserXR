@@ -1,3 +1,4 @@
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>
 #include <string.h>
@@ -62,20 +63,7 @@ int ts_deserialize_TS_A_x(void *ptr, const char *data) {
   return 0;
 }
 
-char *ts_serialize_TS_A_extra(const void *ptr) {
-  const TS_A *component = ptr;
-  char *field_id = "extra";
-  size_t allocation = sizeof(size_t) + strlen(field_id) + 1 + sizeof(int);
-  char *data = (char *)malloc(allocation);
-  char *iter = data;
-  memcpy(iter, &allocation, sizeof(size_t));
-  iter += sizeof(size_t);
-  memcpy(iter, field_id, strlen(field_id) + 1);
-  iter += strlen(field_id) + 1;
-  memcpy(iter, &component->extra, sizeof(int));
-  iter += sizeof(int);
-  return data;
-}
+TS_BASIC_SERIALIZE(TS_A, extra, int, "extra")
 
 int ts_deserialize_TS_A_extra(void *ptr, const char *data) {
   TS_A *component = ptr;
