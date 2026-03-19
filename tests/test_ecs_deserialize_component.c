@@ -55,18 +55,26 @@ static void unittest(const void *ptr) {
         ts_get_schema_of_component(input->scene, comp);
     ts_assert(schema != NULL, "Schema should not be NULL");
 
-    // Get field values
-    void *x_value = ts_get(input->scene, comp, "x");
-    ts_assert(x_value != NULL, "x field value should not be NULL");
-    int x_int = *(int *)x_value;
-    ts_assert_test(x_int == 1, "Expected: %d", 1, "Got: %d", x_int,
-                   "x field value doesn't match");
+    if (strcmp(input->expected_component, "TS_A") == 0) {
+      // Get field values
+      void *x_value = ts_get(input->scene, comp, "x");
+      ts_assert(x_value != NULL, "x field value should not be NULL");
+      int x_int = *(int *)x_value;
+      ts_assert_test(x_int == 1, "Expected: %d", 1, "Got: %d", x_int,
+                     "x field value doesn't match");
 
-    void *extra_value = ts_get(input->scene, comp, "extra");
-    ts_assert(extra_value != NULL, "extra field value should not be NULL");
-    int extra = *(int *)extra_value;
-    ts_assert_test(extra == 5, "Expected: %d", 5, "Got: %d", extra,
-                   "extra field value doesn't match");
+      void *extra_value = ts_get(input->scene, comp, "extra");
+      ts_assert(extra_value != NULL, "extra field value should not be NULL");
+      int extra = *(int *)extra_value;
+      ts_assert_test(extra == 5, "Expected: %d", 5, "Got: %d", extra,
+                     "extra field value doesn't match");
+    } else if (strcmp(input->expected_component, "TS_B") == 0) {
+      void *name_value = ts_get(input->scene, comp, "name");
+      ts_assert(name_value, "name field value should not be NULL");
+      char *name_string = (char *)name_value;
+      ts_assert(strcmp(name_string, "Hello World!") == 0,
+                "Name is not `Hello World!`. It is: %s", name_string);
+    }
 
     for (size_t i = 0; i < component_count; i++) {
       free(components[i]);
@@ -98,24 +106,37 @@ int main(int argc, char *argv[]) {
             "Failed to load the plugin");
   TS_Entity valid_entity = ts_add_entity(valid_scene);
 
-  TestCase cases[] = {{NULL, 0, NULL, NULL, 1},
-                      {NULL, 0, "", NULL, 1},
-                      {empty_scene, dummy_entity, NULL, NULL, 1},
-                      {invalid_entity_scene, 999,
-                       "\55\0\0\0\0\0\0\0"
-                       "TS_A\0"
-                       "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
-                       "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
-                       NULL, 1},
-                      {valid_scene, valid_entity,
-                       "\55\0\0\0\0\0\0\0"
-                       "TS_A\0"
-                       "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
-                       "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
-                       "TS_A", 0}};
+  TS_Scene *valid_string_scene = ts_create_scene();
+  ts_assert(0 == ts_load_plugin(valid_string_scene,
+                                "./libtheseed_test_components.so"),
+            "Failed to load the plugin");
+  TS_Entity valid_string_entity = ts_add_entity(valid_string_scene);
+
+  TestCase cases[] = {
+      {NULL, 0, NULL, NULL, 1},
+      {NULL, 0, "", NULL, 1},
+      {empty_scene, dummy_entity, NULL, NULL, 1},
+      {invalid_entity_scene, 999,
+       "\55\0\0\0\0\0\0\0"
+       "TS_A\0"
+       "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
+       "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
+       NULL, 1},
+      {valid_scene, valid_entity,
+       "\55\0\0\0\0\0\0\0"
+       "TS_A\0"
+       "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
+       "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
+       "TS_A", 0},
+      {valid_string_scene, valid_string_entity,
+       "\47\0\0\0\0\0\0\0"
+       "TS_B\0"
+       "\32\0\0\0\0\0\0\0name\0Hello World!\0",
+       "TS_B", 0},
+  };
 
   // Constructing Tests
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 6; i++) {
     char *path =
         g_strdup_printf("/theseed/test_ecs_deserialize_component/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
