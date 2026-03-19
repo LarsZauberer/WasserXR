@@ -1184,7 +1184,6 @@ static int ts_deserialize_component_fields(TS_Scene *scene, const char *data,
     const size_t size = ts_get_byte_length(iter);
     const char *field_name = iter + sizeof(size_t);
     const size_t field_name_size = ts_len_till_null(field_name, sizeof(char));
-    const size_t data_size = size - sizeof(size_t) - field_name_size - 1;
     const void *field_data = iter + sizeof(size_t) + field_name_size + 1;
 
     for (size_t i = 0; i < fields->len; i++) {
