@@ -18,12 +18,15 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
 
   float *vertices = malloc(sizeof(float) * mesh->mNumVertices * 3);
   float *normals = malloc(sizeof(float) * mesh->mNumVertices * 3);
+  float *uvs = malloc(sizeof(float) * mesh->mNumVertices * 2);
   ts_assert(
       vertices,
       "Malloc returned null for the vertices creation during ts_process_mesh");
   ts_assert(
       normals,
       "Malloc returned null for the normals creation during ts_process_mesh");
+  ts_assert(uvs,
+            "Malloc returned null for the UVs creation during ts_process_mesh");
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
     vertices[(i * 3) + 0] = mesh->mVertices[i].x;
     vertices[(i * 3) + 1] = mesh->mVertices[i].y;
@@ -32,11 +35,20 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
     normals[(i * 3) + 0] = mesh->mNormals[i].x;
     normals[(i * 3) + 1] = mesh->mNormals[i].y;
     normals[(i * 3) + 2] = mesh->mNormals[i].z;
+
+    if (mesh->mTextureCoords[0]) {
+      uvs[(i * 2) + 0] = mesh->mTextureCoords[0][i].x;
+      uvs[(i * 2) + 1] = mesh->mTextureCoords[0][i].y;
+    } else {
+      uvs[(i * 2) + 0] = 0.0f;
+      uvs[(i * 2) + 1] = 0.0f;
+    }
   }
 
   mesh_data.vertices_size = mesh->mNumVertices;
   mesh_data.vertices = vertices;
   mesh_data.normals = normals;
+  mesh_data.uvs = uvs;
 
   unsigned int *indices = malloc(sizeof(unsigned int) * mesh->mNumFaces * 3);
   ts_assert(
@@ -95,5 +107,6 @@ TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
 void ts_destroy_mesh_data(TS_Mesh_Data *mesh) {
   free(mesh->indices);
   free(mesh->normals);
+  free(mesh->uvs);
   free(mesh->vertices);
 }
