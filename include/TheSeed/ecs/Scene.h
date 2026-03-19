@@ -509,7 +509,7 @@ int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
  * function fails and nothing happens
  * @return It returns the status of the file operation
  */
-int ts_deserialize_scene_from_file(TS_Scene *scene, const char *path);
+void ts_deserialize_scene_from_file(TS_Scene *scene, const char *path);
 
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state
