@@ -23,8 +23,8 @@ typedef size_t TS_Entity;
 typedef int TS_Field_Permission;
 
 // Function Prefix Macros
-#define CREATOR_FUNCION_PREFIX "ts_create_"
-#define DESTROYER_FUNCION_PREFIX "ts_destroy_"
+#define CREATOR_FUNCTION_PREFIX "ts_create_"
+#define DESTROYER_FUNCTION_PREFIX "ts_destroy_"
 #define SCHEMA_FUNCTION_PREFIX "ts_schema_"
 
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"

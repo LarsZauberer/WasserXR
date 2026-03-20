@@ -22,7 +22,6 @@ void ts_command_showEntities(char **args, TS_Scene *scene);
 void ts_command_showPlugins(char **args, TS_Scene *scene);
 void ts_command_showComponents(char **args, TS_Scene *scene);
 void ts_command_showSystems(char **args, TS_Scene *scene);
-void ts_command_export(char **args, TS_Scene *scene);
 void ts_command_save(char **args, TS_Scene *scene);
 void ts_command_load(char **args, TS_Scene *scene);
 

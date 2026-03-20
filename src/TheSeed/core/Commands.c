@@ -266,16 +266,16 @@ void ts_command_showSystems(char **args, TS_Scene *scene) {
 }
 void ts_command_save(char **args, TS_Scene *scene) {
   if (!args[0]) {
-    ts_warn("Export requires a filename");
+    ts_warn("Save requires a filename");
     return;
   }
   ts_serialize_scene_to_file(scene, args[0]);
-  ts_info("Exported Scene");
+  ts_info("Saved Scene");
 }
 
 void ts_command_load(char **args, TS_Scene *scene) {
   if (!args[0]) {
-    ts_warn("Export requires a filename");
+    ts_warn("Load requires a filename");
     return;
   }
 

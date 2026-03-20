@@ -91,7 +91,7 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
     }
   }
 
-  return 1;
+  return 0;
 }
 
 TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene) {
@@ -195,8 +195,8 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_component");
   ts_assert_abort_value(component_id, -1, "Id is NULL during ts_add_component");
   // Check if the entity exists
-  long does_exist = ts_get_entity_index(scene, entity_id);
-  if (does_exist == -1) {
+  long entity_index = ts_get_entity_index(scene, entity_id);
+  if (entity_index == -1) {
     ts_warn("Component `%s` already exists on entity %ld", component_id,
             entity_id);
     return 1;
@@ -204,9 +204,9 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
 
   TS_Plugin_Handler *plugin;
   TS_Component_Creator creator =
-      ts_get_abi_symbol(&plugin, scene, CREATOR_FUNCION_PREFIX, component_id);
+      ts_get_abi_symbol(&plugin, scene, CREATOR_FUNCTION_PREFIX, component_id);
   TS_Component_Destroyer destroyer = ts_get_abi_symbol_from_plugin(
-      scene, plugin, DESTROYER_FUNCION_PREFIX, component_id);
+      scene, plugin, DESTROYER_FUNCTION_PREFIX, component_id);
   TS_Component_Schema_Function schema_function = ts_get_abi_symbol_from_plugin(
       scene, plugin, SCHEMA_FUNCTION_PREFIX, component_id);
 
@@ -297,7 +297,7 @@ int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
   long index =
       ts_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
-    ts_warn("Component `%s` doesn't exist on entity %ld", scene, entity);
+    ts_warn("Component `%s` doesn't exist on entity %ld", component_id, entity);
     return 1;
   }
 
@@ -338,11 +338,12 @@ char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
     }
   }
   char **data = (char **)malloc(*size * sizeof(char *));
+  size_t data_index = 0;
   for (size_t i = 0; i < scene->components->len; i++) {
     TS_Component_Handler *component =
         g_array_index(scene->components, TS_Component_Handler *, i);
     if (component->entity == entity_id) {
-      data[i] = ts_copy_char_ptr(component->id);
+      data[data_index++] = ts_copy_char_ptr(component->id);
     }
   }
   return data;
@@ -436,9 +437,10 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
     size_t *size, TS_Scene *scene, TS_System_Selector selector, int group) {
   ts_assert(scene,
             "Scene is NULL during ts_find_entities_with_selector_and_groups");
-  ts_assert(selector,
-            "Selector is NULL during ts_find_entities_with_selector_and_groups")
-      GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
+  ts_assert(
+      selector,
+      "Selector is NULL during ts_find_entities_with_selector_and_groups");
+  GArray *res = g_array_new(FALSE, FALSE, sizeof(TS_Entity));
   for (size_t i = 0; i < scene->entities->len; i++) {
     TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
     if (selector(scene, entity) == group) {
@@ -710,7 +712,7 @@ int ts_add_field_to_component_schema(TS_Component_Schema *schema,
     ts_assert_abort_value(field != other, 1,
                           "Schema field has been added twice");
     ts_assert_abort_value(strcmp(field->field_name, other->field_name) != 0, 1,
-                          "Schema field has been added twice")
+                          "Schema field has been added twice");
   }
   g_array_append_val(schema->fields, field);
   return 0;
@@ -806,7 +808,7 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
 static size_t ts_get_byte_length(const char *data) {
-  ts_assert(data, "Data is NULL during ts_get_byte_lenght");
+  ts_assert(data, "Data is NULL during ts_get_byte_length");
   size_t length;
   memcpy(&length, data, sizeof(size_t));
   return length;
