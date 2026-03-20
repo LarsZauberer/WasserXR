@@ -32,9 +32,15 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
     vertices[(i * 3) + 1] = mesh->mVertices[i].y;
     vertices[(i * 3) + 2] = mesh->mVertices[i].z;
 
-    normals[(i * 3) + 0] = mesh->mNormals[i].x;
-    normals[(i * 3) + 1] = mesh->mNormals[i].y;
-    normals[(i * 3) + 2] = mesh->mNormals[i].z;
+    if (mesh->mNormals) {
+      normals[(i * 3) + 0] = mesh->mNormals[i].x;
+      normals[(i * 3) + 1] = mesh->mNormals[i].y;
+      normals[(i * 3) + 2] = mesh->mNormals[i].z;
+    } else {
+      normals[(i * 3) + 0] = 0.0F;
+      normals[(i * 3) + 1] = 0.0F;
+      normals[(i * 3) + 2] = 1.0F;
+    }
 
     if (mesh->mTextureCoords[0]) {
       uvs[(i * 2) + 0] = mesh->mTextureCoords[0][i].x;
@@ -86,7 +92,8 @@ static void ts_process_node(GArray *mesh_data, const aiScene *scene,
 
 TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
   const aiScene *scene =
-      aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
+      aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs |
+                                 aiProcess_GenSmoothNormals);
 
   if (!scene) {
     ts_error("Failed to load the model file %s: %s", filename,

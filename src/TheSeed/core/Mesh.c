@@ -17,8 +17,8 @@ TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
   // Generate the buffers
   glGenVertexArrays(1, &mesh->vao);
   ts_assert(mesh->vao, "Vertex Array couldn't be allocated");
-  glGenBuffers(1, &mesh->vbo);
-  ts_assert(mesh->vbo, "Vertex Buffer couldn't be allocated");
+  glGenBuffers(1, &mesh->vertexVbo);
+  ts_assert(mesh->vertexVbo, "Vertex Buffer couldn't be allocated");
   glGenBuffers(1, &mesh->normalVbo);
   ts_assert(mesh->normalVbo, "Normal Buffer couldn't be allocated");
   glGenBuffers(1, &mesh->uvVbo);
@@ -30,7 +30,7 @@ TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
   glBindVertexArray(mesh->vao);
 
   // Move vertices over
-  glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, mesh->vertexVbo);
   glBufferData(GL_ARRAY_BUFFER,
                (long)sizeof(float) * 3 * (long)mesh_data->vertices_size,
                mesh_data->vertices, GL_STATIC_DRAW);
@@ -68,7 +68,7 @@ TS_Mesh *ts_create_mesh_from_data(TS_Mesh_Data *mesh_data) {
 
 void ts_destroy_mesh(TS_Mesh *mesh) {
   glDeleteVertexArrays(1, &mesh->vao);
-  glDeleteBuffers(1, &mesh->vbo);
+  glDeleteBuffers(1, &mesh->vertexVbo);
   glDeleteBuffers(1, &mesh->normalVbo);
   glDeleteBuffers(1, &mesh->uvVbo);
   glDeleteBuffers(1, &mesh->ebo);

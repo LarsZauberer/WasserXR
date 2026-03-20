@@ -7,7 +7,7 @@
 typedef struct {
   int numIndices;
   unsigned int vao;
-  unsigned int vbo;
+  unsigned int vertexVbo;
   unsigned int normalVbo;
   unsigned int uvVbo;
   unsigned int ebo;
