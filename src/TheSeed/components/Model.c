@@ -49,47 +49,12 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
-char *ts_serialize_TS_Model_model_name(const void *ptr) {
-  const TS_Model *component = ptr;
-  char *field_id = "model_name";
-  size_t allocation =
-      sizeof(size_t) + strlen(field_id) + 1 + strlen(component->model_name) + 1;
-  char *data = (char *)malloc(allocation);
-  char *iter = data;
-  memcpy(iter, &allocation, sizeof(size_t));
-  iter += sizeof(size_t);
-  memcpy(iter, field_id, strlen(field_id) + 1);
-  iter += strlen(field_id) + 1;
-  memcpy(iter, component->model_name, strlen(component->model_name) + 1);
-  iter += strlen(component->model_name);
-  return data;
-};
-
-int ts_deserialize_TS_Model_model_name(void *ptr, const char *data) {
-  ts_set_TS_Model_model_name(ptr, (char *)data);
-  return 0;
-};
-
-char *ts_serialize_TS_Model_shader_name(const void *ptr) {
-  const TS_Model *component = ptr;
-  char *field_id = "shader_name";
-  size_t allocation = sizeof(size_t) + strlen(field_id) + 1 +
-                      strlen(component->shader_name) + 1;
-  char *data = (char *)malloc(allocation);
-  char *iter = data;
-  memcpy(iter, &allocation, sizeof(size_t));
-  iter += sizeof(size_t);
-  memcpy(iter, field_id, strlen(field_id) + 1);
-  iter += strlen(field_id) + 1;
-  memcpy(iter, component->shader_name, strlen(component->shader_name) + 1);
-  iter += strlen(component->shader_name) + 1;
-  return data;
-};
-
-int ts_deserialize_TS_Model_shader_name(void *ptr, const char *data) {
-  ts_set_TS_Model_shader_name(ptr, (char *)data);
-  return 0;
-};
+TS_STRING_SERIALIZE(TS_Model, model_name, component->model_name);
+TS_SET_DESERIALIZE(TS_Model, model_name, component->model_name,
+                   ts_set_TS_Model_model_name);
+TS_STRING_SERIALIZE(TS_Model, shader_name, component->shader_name);
+TS_SET_DESERIALIZE(TS_Model, shader_name, component->shader_name,
+                   ts_set_TS_Model_shader_name);
 
 void ts_schema_TS_Model(TS_Component_Schema *schema) {
   TS_Component_Field *model_name_field = ts_create_component_field(
