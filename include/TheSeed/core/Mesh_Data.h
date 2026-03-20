@@ -9,6 +9,7 @@ typedef struct {
 
   float *vertices;
   float *normals;
+  float *uvs;
   unsigned int *indices;
 } TS_Mesh_Data;
 
