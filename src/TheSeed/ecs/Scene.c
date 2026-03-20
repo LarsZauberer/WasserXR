@@ -181,6 +181,9 @@ char **ts_get_plugins(size_t *size, const TS_Scene *scene) {
   ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_plugins");
   ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_plugins");
   *size = scene->plugins->len;
+  if (*size == 0) {
+    return NULL;
+  }
   char **data = (char **)malloc(sizeof(char *) * *size);
   for (size_t i = 0; i < *size; i++) {
     TS_Plugin_Handler *plugin =
@@ -337,6 +340,9 @@ char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
       *size += 1;
     }
   }
+  if (*size == 0) {
+    return NULL;
+  }
   char **data = (char **)malloc(*size * sizeof(char *));
   size_t data_index = 0;
   for (size_t i = 0; i < scene->components->len; i++) {
@@ -424,6 +430,9 @@ char **ts_get_systems(size_t *size, const TS_Scene *scene) {
   ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_plugins");
   ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_plugins");
   *size = scene->systems->len;
+  if (*size == 0) {
+    return NULL;
+  }
   char **data = (char **)malloc(sizeof(char *) * *size);
   for (size_t i = 0; i < *size; i++) {
     TS_System_Handler *system =

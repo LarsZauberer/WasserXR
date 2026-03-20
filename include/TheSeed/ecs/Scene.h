@@ -124,7 +124,8 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
  * Returns an array of plugin names currently in the Scene
  * @param size The pointer which will hold the length of the array
  * @param scene The scene that carries the plugins
- * @return The array of the plugin names
+ * @return The array of the plugin names, or NULL if no plugins are loaded.
+ *         Caller must free each string in the array and the array itself.
  */
 char **ts_get_plugins(size_t *size, const TS_Scene *scene);
 
@@ -165,7 +166,8 @@ int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
  * @param size The pointer which will hold the length of the array
  * @param scene The scene that carries the plugins
  * @param entity_id The entity from which the components should be queried
- * @return The array of the component names
+ * @return The array of the component names, or NULL if the entity has no components.
+ *         Caller must free each string in the array and the array itself.
  */
 char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
                                    TS_Entity entity_id);
@@ -202,7 +204,8 @@ int ts_remove_system(TS_Scene *scene, const char *system_id);
  * Returns an array of system names currently in the Scene
  * @param size The pointer which will hold the length of the array
  * @param scene The scene that carries the systems
- * @return The array of the system names
+ * @return The array of the system names, or NULL if no systems are registered.
+ *         Caller must free each string in the array and the array itself.
  */
 char **ts_get_systems(size_t *size, const TS_Scene *scene);
 
