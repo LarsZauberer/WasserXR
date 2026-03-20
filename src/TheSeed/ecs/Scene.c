@@ -955,7 +955,9 @@ char *ts_serialize_component(const TS_Scene *scene, const void *component) {
   memcpy(iter, component_handler->id, strlen(component_handler->id) + 1);
   iter += strlen(component_handler->id) + 1;
 
-  memcpy(iter, field_serialization, field_serialization_size);
+  if (field_serialization_size != 0 && field_serialization != NULL) {
+    memcpy(iter, field_serialization, field_serialization_size);
+  }
 
   free(field_serialization);
 
