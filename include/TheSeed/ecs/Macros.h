@@ -4,12 +4,13 @@
 #include <TheSeed/ecs/Scene.h>
 #include <string.h>
 
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define TS_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size)  \
   char *ts_serialize_##component_type##_##field_name(const void *ptr) {        \
     const component_type *component = ptr;                                     \
     char *field_id = #field_name;                                              \
                                                                                \
-    size_t allocation = sizeof(size_t) + strlen(field_id) + 1 + field_size;    \
+    size_t allocation = sizeof(size_t) + strlen(field_id) + 1 + (field_size);  \
     char *data = (char *)malloc(allocation);                                   \
     char *iter = data;                                                         \
                                                                                \
@@ -20,7 +21,7 @@
     iter += strlen(field_id) + 1;                                              \
                                                                                \
     memcpy(iter, field_exp, field_size);                                       \
-    iter += field_size;                                                        \
+    iter += (field_size);                                                      \
                                                                                \
     return data;                                                               \
   }
@@ -62,5 +63,6 @@
     setter(ptr, (void *)data);                                                 \
     return 0;                                                                  \
   }
+// NOLINTEND(bugprone-macro-parentheses)
 
 #endif
