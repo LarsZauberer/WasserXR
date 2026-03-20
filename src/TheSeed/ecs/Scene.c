@@ -204,7 +204,7 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
     return 1;
   }
   void *component = ts_entity_get_component(scene, entity_id, component_id);
-  if (!component) {
+  if (component) {
     ts_warn("Component `%s` already exists on entity %ld", component_id,
             entity_id);
     return 1;
