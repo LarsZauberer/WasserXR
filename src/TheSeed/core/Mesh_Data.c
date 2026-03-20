@@ -40,8 +40,8 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
       uvs[(i * 2) + 0] = mesh->mTextureCoords[0][i].x;
       uvs[(i * 2) + 1] = mesh->mTextureCoords[0][i].y;
     } else {
-      uvs[(i * 2) + 0] = 0.0f;
-      uvs[(i * 2) + 1] = 0.0f;
+      uvs[(i * 2) + 0] = 0.0F;
+      uvs[(i * 2) + 1] = 0.0F;
     }
   }
 
