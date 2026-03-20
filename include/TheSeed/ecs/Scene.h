@@ -129,18 +129,6 @@ int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
 char **ts_get_plugins(size_t *size, const TS_Scene *scene);
 
 /**
- * Reload a certain plugin in the scene. It automatically replaces all the
- * systems with the new functions and recreates all the components
- * @param scene The scene whose plugins should be reloaded
- * @param plugin_name The name of the plugin that should be replaced
- * @param new_plugin_name The name of the new plugin that should be loaded
- * instead
- * @return 0 on success, non-zero on failure
- */
-int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
-                     const char *new_plugin_path);
-
-/**
  * Reload all plugins in the scene. It automatically replaces all the systems
  * with the new functions and recreates all the components.
  * This function should not be called within a system or component. This would
@@ -150,7 +138,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
  * instead
  * @return 0 on success, non-zero on failure
  */
-int ts_reload_all_plugins(TS_Scene *scene);
+int ts_reload(TS_Scene *scene);
 
 /**
  * Add a component to an entity.

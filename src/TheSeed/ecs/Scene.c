@@ -56,6 +56,8 @@ void ts_reset_scene(TS_Scene *scene) {
     // This will also destroy all the components associated with the entity
     ts_remove_entity(scene, entity);
   }
+  // Reset the entity counter
+  scene->entity_counter = 0;
 }
 
 TS_Entity ts_add_entity(TS_Scene *scene) {
@@ -464,20 +466,29 @@ static int ts_deserialize_scene_from_file_internal(TS_Scene *scene,
   // Determine file size
   if (fseek(file, 0, SEEK_END) != 0) {
     ts_error("Failed to seek to end of file '%s'", path);
-    fclose(file);
+    int status = fclose(file);
+    ts_assert_abort_value(
+        !status, 1,
+        "Failed to close the file during deserialization. Continuing");
     return 1;
   }
 
   long file_size = ftell(file);
   if (file_size < 0) {
     ts_error("Failed to determine size of file '%s'", path);
-    fclose(file);
+    int status = fclose(file);
+    ts_assert_abort_value(
+        !status, 1,
+        "Failed to close the file during deserialization. Continuing");
     return 1;
   }
 
   if (fseek(file, 0, SEEK_SET) != 0) {
     ts_error("Failed to seek to beginning of file '%s'", path);
-    fclose(file);
+    int status = fclose(file);
+    ts_assert_abort_value(
+        !status, 1,
+        "Failed to close the file during deserialization. Continuing");
     return 1;
   }
 
@@ -486,7 +497,10 @@ static int ts_deserialize_scene_from_file_internal(TS_Scene *scene,
   if (!data) {
     ts_error("Failed to allocate memory for file '%s' (%ld bytes)", path,
              file_size);
-    fclose(file);
+    int status = fclose(file);
+    ts_assert_abort_value(
+        !status, 1,
+        "Failed to close the file during deserialization. Continuing");
     return 1;
   }
 
@@ -496,7 +510,10 @@ static int ts_deserialize_scene_from_file_internal(TS_Scene *scene,
     ts_error("Failed to read complete data from file '%s' (%zu/%ld bytes read)",
              path, bytes_read, file_size);
     free(data);
-    fclose(file);
+    int status = fclose(file);
+    ts_assert_abort_value(
+        !status, 1,
+        "Failed to close the file during deserialization. Continuing");
     return 1;
   }
 
@@ -583,7 +600,7 @@ int ts_tick_scene(TS_Scene *scene) {
   if (scene->should_reload) {
     ts_debug("ECS system should be reloaded");
     scene->should_reload = 0; // Reset
-    ts_reload_all_plugins(scene);
+    ts_reload(scene);
   }
 
   return 1;
@@ -618,161 +635,14 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
   return 0;
 }
 
-int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
-                     const char *new_plugin_path) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_reload_plugin");
-  ts_assert_abort_value(plugin_path, -1,
-                        "Path is NULL during ts_reload_plugin");
-  ts_assert_abort_value(new_plugin_path, -1,
-                        "New_Path is NULL during ts_reload_plugin");
-  long index = ts_get_plugin_index(scene, plugin_path);
-  if (index == -1L) {
-    ts_warn("Plugin `%s` isn't loaded", plugin_path);
-    return 1;
-  }
-
-  TS_Plugin_Handler *plugin =
-      g_array_index(scene->plugins, TS_Plugin_Handler *, index);
-
-  // Pre Unload operations
-
-  GArray *components_to_reconstruct =
-      g_array_new(FALSE, FALSE, sizeof(TS_Component_Serialization *));
-  GArray *components_to_reconstruct_entities =
-      g_array_new(FALSE, FALSE, sizeof(TS_Entity));
-
-  for (size_t i = 0; i < scene->components->len; i++) {
-    TS_Component_Handler *component =
-        g_array_index(scene->components, TS_Component_Handler *, i);
-
-    if (component->plugin == plugin) {
-      // Serialize the component and remove it from the scene.
-      TS_Component_Serialization *serialization =
-          ts_serialize_component_internal(component);
-      g_array_append_val(components_to_reconstruct, serialization);
-      g_array_append_val(components_to_reconstruct_entities, component->entity);
-      ts_remove_component(scene, component->entity, component->id);
-      i--;
-    }
-  }
-
-  GArray *systems_to_reconstruct = g_array_new(FALSE, FALSE, sizeof(char *));
-  GArray *systems_to_reconstruct_priority =
-      g_array_new(FALSE, FALSE, sizeof(int));
-  for (size_t i = 0; i < scene->systems->len; i++) {
-    TS_System_Handler *system =
-        g_array_index(scene->systems, TS_System_Handler *, i);
-
-    if (system->plugin == plugin) {
-      char *copy_id = ts_copy_char_ptr(system->id);
-      g_array_append_val(systems_to_reconstruct, copy_id);
-      g_array_append_val(systems_to_reconstruct_priority, system->priority);
-
-      // Unregistering the system (also calls the detacher)
-      ts_remove_system(scene, copy_id);
-      i--;
-    }
-  }
-
-  // Loading the new plugin
-
-  // Copy the path and the new_path over since it might be in a
-  // systems memory location
-  char *new_plugin_path_copy = ts_copy_char_ptr(new_plugin_path);
-  free(plugin->path);
-  plugin->path = new_plugin_path_copy;
-
-  // Close and Check if you can open the new one
-  dlclose(plugin->fd);
-  void *new_fd = dlopen(plugin->path, RTLD_NOW);
-  if (!new_fd) {
-    // Failed to open the new plugin -> Abort
-    printf("%s\n", dlerror());
-    exit(1);
-    return 1;
-  }
-  plugin->fd = new_fd;
-
-  // Post Unload operations -> Recreation of stuff
-  int status = 0;
-
-  // Replace all the bindings of the systems
-  for (size_t i = 0; i < systems_to_reconstruct->len; i++) {
-    ts_assert(systems_to_reconstruct->len ==
-                  systems_to_reconstruct_priority->len,
-              "Reconstruction arrays are not the same length");
-    char *system_id = g_array_index(systems_to_reconstruct, char *, i);
-    int system_priority =
-        g_array_index(systems_to_reconstruct_priority, int, i);
-
-    ts_add_system(scene, system_id, system_priority);
-    ts_debug("System `%s` was reloaded", system_id);
-
-    free(system_id);
-    system_id = NULL;
-  }
-  g_array_free(systems_to_reconstruct, TRUE);
-  systems_to_reconstruct = NULL;
-  g_array_free(systems_to_reconstruct_priority, TRUE);
-  systems_to_reconstruct_priority = NULL;
-
-  // Reconstruct all the components
-  for (size_t i = 0; i < components_to_reconstruct->len; i++) {
-    TS_Component_Serialization *reconstruction = g_array_index(
-        components_to_reconstruct, TS_Component_Serialization *, i);
-    const TS_Entity reconstruction_entity =
-        g_array_index(components_to_reconstruct_entities, TS_Entity, i);
-
-    // Create and get the component handler
-    status = ts_add_component(scene, reconstruction_entity,
-                              reconstruction->component_name);
-    if (status) {
-      ts_warn("Failed to create component `%s` for entity %ld",
-              reconstruction->component_name, reconstruction_entity);
-      ts_destroy_component_serialization(reconstruction);
-      continue;
-    }
-    void *component = ts_entity_get_component(scene, reconstruction_entity,
-                                              reconstruction->component_name);
-    ts_assert(component, "NULL component created during reload");
-    TS_Component_Handler *handler =
-        ts_find_handler_for_component(scene, component);
-    ts_assert(handler, "NULL handler created during reload");
-
-    // Perform the deserialization of the component
-    status = ts_deserialize_component_internal(scene, reconstruction_entity,
-                                               reconstruction);
-    ts_debug("Component `%s` was reloaded for entity %ld",
-             reconstruction->component_name, reconstruction_entity);
-
-    // Clean up the helper array and the serialization
-    ts_destroy_component_serialization(reconstruction);
-  }
-  g_array_free(components_to_reconstruct, TRUE);
-  g_array_free(components_to_reconstruct_entities, TRUE);
-
-  ts_debug("Reloaded Plugin `%s` with `%s`", plugin_path, new_plugin_path);
-
-  return status;
-}
-
-int ts_reload_all_plugins(TS_Scene *scene) {
+int ts_reload(TS_Scene *scene) {
   ts_assert_abort_value(scene, -1,
                         "Scene is NULL during ts_reload_all_plugins");
-  GArray *plugins = g_array_copy(scene->plugins);
 
-  for (size_t i = 0; i < plugins->len; i++) {
-    TS_Plugin_Handler *plugin = g_array_index(plugins, TS_Plugin_Handler *, i);
-    char *path_before = ts_copy_char_ptr(plugin->path);
-    char *path_after = ts_copy_char_ptr(plugin->path);
-    ts_reload_plugin(scene, path_before, path_after);
-    free(path_before);
-    free(path_after);
-  }
-
-  g_array_free(plugins, TRUE);
-
-  ts_debug("Full reload of all plugins finished");
+  char *serialization = ts_serialize_scene(scene);
+  ts_reset_scene(scene);
+  ts_deserialize_scene(scene, serialization);
+  free(serialization);
 
   return 0;
 }

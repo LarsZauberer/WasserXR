@@ -36,17 +36,6 @@ struct TS_System_Handler {
   TS_System_Function system;
 };
 
-struct TS_Component_Serialization_Item {
-  char *field_name;
-  size_t size;
-  void *data;
-};
-
-struct TS_Component_Serialization {
-  char *component_name;
-  GArray *fields;
-};
-
 struct TS_Scene {
   GArray *plugins;
   TS_Entity entity_counter; // Entities < entity_counter
@@ -86,28 +75,6 @@ long ts_get_component_index(const TS_Scene *scene, TS_Entity entity,
 
 TS_Component_Handler *ts_find_handler_for_component(const TS_Scene *scene,
                                                     const void *component);
-
-// RAII of Component Serialization
-TS_Component_Serialization *
-ts_create_component_serialization(const char *component_name);
-
-void ts_destroy_component_serialization(
-    TS_Component_Serialization *serialization);
-
-TS_Component_Serialization_Item *
-ts_create_component_serialization_item(const char *field_name, const void *data,
-                                       size_t size, TS_Primitive_Type type);
-
-void ts_destroy_component_serialization_item(
-    TS_Component_Serialization_Item *item);
-
-// Serialization
-TS_Component_Serialization *
-ts_serialize_component_internal(const TS_Component_Handler *handler);
-
-int ts_deserialize_component_internal(
-    TS_Scene *scene, TS_Entity entity,
-    const TS_Component_Serialization *serialization);
 
 // ECS functions
 
