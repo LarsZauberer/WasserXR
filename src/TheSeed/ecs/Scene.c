@@ -200,6 +200,11 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   // Check if the entity exists
   long entity_index = ts_get_entity_index(scene, entity_id);
   if (entity_index == -1) {
+    ts_warn("Entity %ld doesn't exist", entity_id);
+    return 1;
+  }
+  void *component = ts_entity_get_component(scene, entity_id, component_id);
+  if (!component) {
     ts_warn("Component `%s` already exists on entity %ld", component_id,
             entity_id);
     return 1;
@@ -231,7 +236,7 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   // Create the actual data container
   ts_debug("Running creator for component `%s` on entity %ld", component_id,
            entity_id);
-  void *component = creator();
+  component = creator();
   ts_assert(component,
             "The component returned by the creator of the "
             "component `%s` was NULL",
@@ -554,8 +559,7 @@ static int ts_deserialize_scene_from_file_internal(TS_Scene *scene,
 }
 
 int ts_tick_scene(TS_Scene *scene) {
-  ts_assert(scene,
-            "Scene is NULL during ts_find_entities_with_selector_and_groups");
+  ts_assert(scene, "Scene is NULL during ts_tick_scene");
   for (size_t i = 0; i < scene->systems->len; i++) {
     TS_System_Handler *system =
         g_array_index(scene->systems, TS_System_Handler *, i);
