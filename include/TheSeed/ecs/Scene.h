@@ -23,8 +23,8 @@ typedef size_t TS_Entity;
 typedef int TS_Field_Permission;
 
 // Function Prefix Macros
-#define CREATOR_FUNCION_PREFIX "ts_create_"
-#define DESTROYER_FUNCION_PREFIX "ts_destroy_"
+#define CREATOR_FUNCTION_PREFIX "ts_create_"
+#define DESTROYER_FUNCTION_PREFIX "ts_destroy_"
 #define SCHEMA_FUNCTION_PREFIX "ts_schema_"
 
 #define SYSTEM_FUNCTION_PREFIX "ts_system_"
@@ -34,11 +34,14 @@ typedef int TS_Field_Permission;
 #define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
 // Component Functions
+// TODO: Add const modifiers to the functions
 typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Schema_Function)(TS_Component_Schema *);
 typedef void *(*TS_Component_Getter)(void *);
 typedef void (*TS_Component_Setter)(void *, void *);
+typedef char *(*TS_Component_Serializer)(const void *);
+typedef int (*TS_Component_Deserializer)(void *, const char *);
 
 // System Functions
 typedef int TS_System_Groups;
@@ -63,6 +66,18 @@ typedef void (*TS_System_Detacher)(TS_Scene *);
 TS_Scene *ts_create_scene();
 
 /**
+ * Destroy a scene and free all associated memory.
+ * @param scene The scene to destroy
+ */
+void ts_destroy_scene(TS_Scene *scene);
+
+/**
+ * Resets all the ECS structs in the scene and creates an empty scene
+ * @param scene The scene to reset
+ */
+void ts_reset_scene(TS_Scene *scene);
+
+/**
  * Creates an entity in the scene and returns the id of it.
  * @param scene The scene to create it in
  * @return The id of the entity
@@ -78,6 +93,14 @@ TS_Entity ts_add_entity(TS_Scene *scene);
  * entity (may happen if the entity doesn't exist)
  */
 int ts_remove_entity(TS_Scene *scene, TS_Entity entity_id);
+
+/**
+ * Returns an array of entities currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the entities
+ * @return The array of entities
+ */
+TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene);
 
 /**
  * Load a plugin into the scene.
@@ -98,16 +121,13 @@ int ts_load_plugin(TS_Scene *scene, const char *plugin_name);
 int ts_unload_plugin(TS_Scene *scene, const char *plugin_name);
 
 /**
- * Reload a certain plugin in the scene. It automatically replaces all the
- * systems with the new functions and recreates all the components
- * @param scene The scene whose plugins should be reloaded
- * @param plugin_name The name of the plugin that should be replaced
- * @param new_plugin_name The name of the new plugin that should be loaded
- * instead
- * @return 0 on success, non-zero on failure
+ * Returns an array of plugin names currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the plugins
+ * @return The array of the plugin names, or NULL if no plugins are loaded.
+ *         Caller must free each string in the array and the array itself.
  */
-int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
-                     const char *new_plugin_path);
+char **ts_get_plugins(size_t *size, const TS_Scene *scene);
 
 /**
  * Reload all plugins in the scene. It automatically replaces all the systems
@@ -119,7 +139,7 @@ int ts_reload_plugin(TS_Scene *scene, const char *plugin_path,
  * instead
  * @return 0 on success, non-zero on failure
  */
-int ts_reload_all_plugins(TS_Scene *scene);
+int ts_reload(TS_Scene *scene);
 
 /**
  * Add a component to an entity.
@@ -140,6 +160,17 @@ int ts_add_component(TS_Scene *scene, TS_Entity entity_id,
  */
 int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
                         const char *component_id);
+
+/**
+ * Returns an array of component names currently attached to the entity
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the plugins
+ * @param entity_id The entity from which the components should be queried
+ * @return The array of the component names, or NULL if the entity has no components.
+ *         Caller must free each string in the array and the array itself.
+ */
+char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
+                                   TS_Entity entity_id);
 
 /**
  * Get a component from an entity.
@@ -170,17 +201,20 @@ int ts_add_system(TS_Scene *scene, const char *system_id, int priority);
 int ts_remove_system(TS_Scene *scene, const char *system_id);
 
 /**
+ * Returns an array of system names currently in the Scene
+ * @param size The pointer which will hold the length of the array
+ * @param scene The scene that carries the systems
+ * @return The array of the system names, or NULL if no systems are registered.
+ *         Caller must free each string in the array and the array itself.
+ */
+char **ts_get_systems(size_t *size, const TS_Scene *scene);
+
+/**
  * Execute one tick/frame of all systems in the scene.
  * @param scene The scene to tick
  * @return 1 on a normal tick run and 0 if the Scene should be terminated
  */
 int ts_tick_scene(TS_Scene *scene);
-
-/**
- * Destroy a scene and free all associated memory.
- * @param scene The scene to destroy
- */
-void ts_destroy_scene(TS_Scene *scene);
 
 /**
  * Tells the scene to reload at the end of a tick all the systems and components
@@ -212,21 +246,30 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
 
 /**
  * Create a new component field definition.
- * Fields are the basic building blocks of component schemas, defining individual
- * properties that components can have with their type, size, and access methods.
+ * Fields are the basic building blocks of component schemas, defining
+ * individual properties that components can have with their type,
+ * size, and access methods.
  * @param field_name Name of the field
  * @param size Size of the field data in bytes
- * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB, TS_S, TS_BLOB_ARRAY)
- * @param permission Permission flags controlling serialization and other behaviors
- * @param getter Function pointer to get the field value from a component instance
- * @param setter Function pointer to set the field value on a component instance
- * @return Pointer to the newly created component field, or NULL on failure
+ * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB,
+ * TS_S, TS_BLOB_ARRAY)
+ * @param permission Permission flags controlling serialization and
+ * other behaviors
+ * @param getter Function pointer to get the field value from a
+ * component instance
+ * @param setter Function pointer to set the field value on a component
+ * instance
+ * @param serializer Function that serializes the field in the correctly
+ * specified format. If it is NULL, this field will not be serialized.
+ * @param deserializer Function that deserializes the field from the correctly
+ * specified format. If it is NULL, this field will not be deserialized.
+ * @return Pointer to the newly created component field, or NULL on
+ * failure
  */
-TS_Component_Field *ts_create_component_field(char *field_name, size_t size,
-                                              TS_Primitive_Type type,
-                                              TS_Field_Permission permission,
-                                              TS_Component_Getter getter,
-                                              TS_Component_Setter setter);
+TS_Component_Field *ts_create_component_field(
+    char *field_name, size_t size, TS_Primitive_Type type,
+    TS_Component_Getter getter, TS_Component_Setter setter,
+    TS_Component_Serializer serializer, TS_Component_Deserializer deserializer);
 
 /**
  * Destroy a component field and free its memory.
@@ -282,7 +325,8 @@ TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
 
 /**
  * Get the getter function for a specific field in a component schema.
- * The getter function can be used to retrieve the field's value from a component instance.
+ * The getter function can be used to retrieve the field's value from a
+ * component instance.
  * @param schema The component schema to search
  * @param field_name Name of the field
  * @return Function pointer to the getter, or NULL if not found
@@ -292,23 +336,14 @@ TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
 
 /**
  * Get the setter function for a specific field in a component schema.
- * The setter function can be used to update the field's value on a component instance.
+ * The setter function can be used to update the field's value on a component
+ * instance.
  * @param schema The component schema to search
  * @param field_name Name of the field
  * @return Function pointer to the setter, or NULL if not found
  */
 TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
                                         char *field_name);
-
-/**
- * Get the permission flags for a specific field in a component schema.
- * Permission flags control behaviors like serialization access.
- * @param schema The component schema to search
- * @param field_name Name of the field
- * @return Permission flags for the field
- */
-TS_Field_Permission ts_get_field_permission(TS_Component_Schema *schema,
-                                            char *field_name);
 
 /**
  * Get the size in bytes of a specific field in a component schema.
@@ -349,6 +384,123 @@ void *ts_get(TS_Scene *scene, void *component, char *field);
  * @return 0 on success, non-zero on failure
  */
 int ts_set(TS_Scene *scene, void *component, char *field, void *data);
+
+/**
+ * Serializes the loaded plugin from the Scene
+ * @param scene The scene that the plugin is loaded in
+ * @param plugin_id The name of the plugin that should be serialized
+ * @return The byte data of the plugin. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_plugin(const TS_Scene *scene, const char *plugin_id);
+
+/**
+ * Serializes an active system in the Scene.
+ * @param scene The scene that the system is currently registered in
+ * @param system_id The name of the system that should be serialized
+ * @return The byte data of the system. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_system(const TS_Scene *scene, const char *system_id);
+
+/**
+ * Serializes an active component in the Scene.
+ * @param scene The scene that the component is currently registered in
+ * @param component The pointer to the component data.
+ * @return The byte data of the component. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_component(const TS_Scene *scene, const void *component);
+
+/**
+ * Serializes an entity in the Scene.
+ * @param scene The scene that the entity is currently registered in
+ * @param entity The entity id of the entity that should be serialized.
+ * @return The byte data of the entity. It contains the information about the
+entity and it's components. It is prefixed with a `size_t` which tells you how
+many bytes are in the serialization. The data is owned by the caller.
+ */
+char *ts_serialize_entity(const TS_Scene *scene, TS_Entity entity);
+
+/**
+ * Serializes the entire scene.
+ * @param scene The scene that should be serialized
+ * @return The byte data of the scene. It contains the information about the
+entities, components, systems and plugins. It is prefixed with a `size_t` which
+tells you how many bytes are in the serialization. The data is owned by the
+caller.
+ */
+char *ts_serialize_scene(const TS_Scene *scene);
+
+/**
+ * Deserializes a plugin bytestream
+ * @param scene The scene in which it will be constructed in
+ * @param data The bytestream that should be deserialized
+ * @return Status of the deserialization. It returns 1 if the data couldn't be
+ * deserialized. If it returns 0 it was successfully deserialized.
+ */
+int ts_deserialize_plugin(TS_Scene *scene, const char *data);
+
+/**
+ * Deserializes a system bytestream
+ * @param scene The scene in which it will be constructed in
+ * @param data The bytestream that should be deserialized
+ * @return Status of the deserialization. It returns 1 if the data couldn't be
+ * deserialized. If it returns 0 it was successfully deserialized.
+ */
+int ts_deserialize_system(TS_Scene *scene, const char *data);
+
+/**
+ * Deserializes an component bytestream
+ * @param scene The scene in which it will be constructed in
+ * @param entity The entity in which the component should be deserialized in
+ * @param data The bytestream that should be deserialized
+ * @return Status of the deserialization. It returns 1 if the data couldn't be
+ * deserialized. If it returns 0 it was successfully deserialized.
+ */
+int ts_deserialize_component(TS_Scene *scene, TS_Entity entity,
+                             const char *data);
+
+/**
+ * Deserializes an entity bytestream
+ * @param scene The scene in which it will be constructed in
+ * @param data The bytestream that should be deserialized
+ * @return Status of the deserialization. It returns 1 if the data couldn't be
+ * deserialized. If it returns 0 it was successfully deserialized.
+ */
+int ts_deserialize_entity(TS_Scene *scene, const char *data);
+
+/**
+ * Deserializes an entire scene bytestream
+ * @param scene The scene that should be reconstructed
+ * @param data The bytestream that should be deserialized
+ * @return Status of the deserialization. It returns 1 if the data couldn't be
+ * deserialized. If it returns 0 it was successfully deserialized.
+ */
+int ts_deserialize_scene(TS_Scene *scene, const char *data);
+
+/**
+ * Serializes the scene into a file specified. By convention the file type
+should be `.ts` but could by anything.
+ * @param scene The scene that should be serialized
+ * @param path The path to the scene file. The user is responsible to make sure
+that the path exists. If the file doesn't exist, it will be created. If it
+already exists, it will be overwritten.
+ * @return It returns the status of the file operation
+  */
+int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
+
+/**
+ * Reads the provided file and deserializes the data from the file into a scene.
+ * @param scene The scene that should be constructed
+ * @param path The path to the scene file. If the file or path doesn't exist the
+ * function fails and nothing happens
+ * @return It returns the status of the file operation
+ */
+void ts_deserialize_scene_from_file(TS_Scene *scene, const char *path);
 
 /** @name Debug Functions
  * Functions for debugging and inspecting scene state

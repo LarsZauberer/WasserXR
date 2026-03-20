@@ -56,6 +56,14 @@ void ts_critical(char * /*fmt*/, ...);
 
 #endif
 
+#define ts_assert_test(exp, should, should_val, out, out_val, fmt, ...)        \
+  if (!(exp)) {                                                                \
+    ts_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
+    ts_error(should, should_val);                                              \
+    ts_error(out, out_val);                                                    \
+    exit(1);                                                                   \
+  }
+
 // Logger registry
 
 typedef void (*TS_Logger)(TS_Log_Entry);

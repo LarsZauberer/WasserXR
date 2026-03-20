@@ -1,5 +1,6 @@
 #include "TheSeed/components/Camera.h"
 #include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>
 
@@ -20,18 +21,22 @@ void *ts_create_TS_Camera() {
   return cam;
 }
 
+TS_BASIC_SERIALIZERS(TS_Camera, fov, &component->fov, sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Camera, near, &component->near, sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Camera, far, &component->far, sizeof(float));
+
 void ts_destroy_TS_Camera(void *cam) { free(cam); }
 
 void ts_schema_TS_Camera(TS_Component_Schema *schema) {
-  TS_Component_Field *fov_field =
-      ts_create_component_field("fov", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_fov, ts_set_TS_Camera_fov);
-  TS_Component_Field *near_field =
-      ts_create_component_field("near", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_near, ts_set_TS_Camera_near);
-  TS_Component_Field *far_field =
-      ts_create_component_field("far", sizeof(float), TS_F, TS_Permission_All,
-                                ts_get_TS_Camera_far, ts_set_TS_Camera_far);
+  TS_Component_Field *fov_field = ts_create_component_field(
+      "fov", sizeof(float), TS_F, ts_get_TS_Camera_fov, ts_set_TS_Camera_fov,
+      ts_serialize_TS_Camera_fov, ts_deserialize_TS_Camera_fov);
+  TS_Component_Field *near_field = ts_create_component_field(
+      "near", sizeof(float), TS_F, ts_get_TS_Camera_near, ts_set_TS_Camera_near,
+      ts_serialize_TS_Camera_near, ts_deserialize_TS_Camera_near);
+  TS_Component_Field *far_field = ts_create_component_field(
+      "far", sizeof(float), TS_F, ts_get_TS_Camera_far, ts_set_TS_Camera_far,
+      ts_serialize_TS_Camera_far, ts_deserialize_TS_Camera_far);
 
   ts_add_field_to_component_schema(schema, fov_field);
   ts_add_field_to_component_schema(schema, near_field);

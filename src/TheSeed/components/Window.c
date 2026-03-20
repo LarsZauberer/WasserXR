@@ -90,9 +90,9 @@ void ts_destroy_TS_Window(void *window) {
 }
 
 void ts_schema_TS_Window(TS_Component_Schema *schema) {
-  TS_Component_Field *window_field = ts_create_component_field(
-      "window", sizeof(GLFWwindow *), TS_BLOB, TS_Permission_No_Serialize,
-      ts_get_TS_Window_window, NULL);
+  TS_Component_Field *window_field =
+      ts_create_component_field("window", sizeof(GLFWwindow *), TS_BLOB,
+                                ts_get_TS_Window_window, NULL, NULL, NULL);
 
   ts_add_field_to_component_schema(schema, window_field);
 }

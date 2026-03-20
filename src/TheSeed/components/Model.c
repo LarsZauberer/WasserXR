@@ -4,6 +4,7 @@
 #include "TheSeed/core/Shader.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <glad/gl.h>
 #include <stdlib.h>
@@ -48,24 +49,33 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
+TS_STRING_SERIALIZE(TS_Model, model_name, component->model_name);
+TS_SET_DESERIALIZE(TS_Model, model_name, component->model_name,
+                   ts_set_TS_Model_model_name);
+TS_STRING_SERIALIZE(TS_Model, shader_name, component->shader_name);
+TS_SET_DESERIALIZE(TS_Model, shader_name, component->shader_name,
+                   ts_set_TS_Model_shader_name);
+
 void ts_schema_TS_Model(TS_Component_Schema *schema) {
   TS_Component_Field *model_name_field = ts_create_component_field(
-      "model_name", sizeof(char), TS_S, TS_Permission_All,
-      ts_get_TS_Model_model_name, ts_set_TS_Model_model_name);
+      "model_name", sizeof(char), TS_S, ts_get_TS_Model_model_name,
+      ts_set_TS_Model_model_name, ts_serialize_TS_Model_model_name,
+      ts_deserialize_TS_Model_model_name);
   TS_Component_Field *shader_name_field = ts_create_component_field(
-      "shader_name", sizeof(char), TS_S, TS_Permission_All,
-      ts_get_TS_Model_shader_name, ts_set_TS_Model_shader_name);
+      "shader_name", sizeof(char), TS_S, ts_get_TS_Model_shader_name,
+      ts_set_TS_Model_shader_name, ts_serialize_TS_Model_shader_name,
+      ts_deserialize_TS_Model_shader_name);
 
-  TS_Component_Field *meshes_field = ts_create_component_field(
-      "meshes", sizeof(TS_Mesh *), TS_BLOB_ARRAY, TS_Permission_No_Serialize,
-      ts_get_TS_Model_meshes, NULL);
-  TS_Component_Field *numMeshes_field = ts_create_component_field(
-      "num_meshes", sizeof(unsigned int), TS_L, TS_Permission_No_Serialize,
-      ts_get_TS_Model_numMeshes, NULL);
+  TS_Component_Field *meshes_field =
+      ts_create_component_field("meshes", sizeof(TS_Mesh *), TS_BLOB_ARRAY,
+                                ts_get_TS_Model_meshes, NULL, NULL, NULL);
+  TS_Component_Field *numMeshes_field =
+      ts_create_component_field("num_meshes", sizeof(unsigned int), TS_L,
+                                ts_get_TS_Model_numMeshes, NULL, NULL, NULL);
 
-  TS_Component_Field *shader_field = ts_create_component_field(
-      "shader", sizeof(TS_Shader *), TS_BLOB, TS_Permission_No_Serialize,
-      ts_get_TS_Model_shader, NULL);
+  TS_Component_Field *shader_field =
+      ts_create_component_field("shader", sizeof(TS_Shader *), TS_BLOB,
+                                ts_get_TS_Model_shader, NULL, NULL, NULL);
 
   ts_add_field_to_component_schema(schema, model_name_field);
   ts_add_field_to_component_schema(schema, shader_name_field);
