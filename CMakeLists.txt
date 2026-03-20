@@ -93,6 +93,9 @@ enable_testing()
 add_library(theseed_test_components SHARED tests/component_test.c)
 target_include_directories(theseed_test_components PUBLIC include)
 
+add_library(theseed_test_systems SHARED tests/system_test.c)
+target_include_directories(theseed_test_systems PUBLIC include)
+
 # Helper function to simplify adding tests
 # Usage: add_theseed_test(test_name)
 # Assumes test file is located at tests/{test_name}.c

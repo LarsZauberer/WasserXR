@@ -7,7 +7,7 @@ typedef struct TestCase TestCase;
 
 struct TestCase {
   TS_Scene *scene;
-  char *component;
+  char *system;
   size_t length;
   char *out;
 };
@@ -20,7 +20,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  char *data = ts_serialize_system(input->scene, input->component);
+  char *data = ts_serialize_system(input->scene, input->system);
   if (!input->out) {
     ts_assert(data == NULL, "Data should be NULL");
     return;
@@ -52,24 +52,23 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene2 = ts_create_scene();
 
   TS_Scene *plugin_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_systems.so"),
+  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin");
 
   TS_Scene *system_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_systems.so"),
+  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin");
-  ts_assert(0 == ts_add_system(system_scene, "ts_console_system", 100),
+  ts_assert(0 == ts_add_system(system_scene, "ts_system_a", 100),
             "Failed to add the system");
 
-  TestCase cases[] = {
-      {NULL, NULL, 0, NULL},
-      {NULL, "", 0, NULL},
-      {empty_scene, "", 0, NULL},
-      {empty_scene2, "ts_console_system", 0, NULL},
-      {plugin_scene, "ts_console_system", 0, NULL},
-      {system_scene, "ts_console_system",
-       sizeof(size_t) + strlen("ts_console_system") + 1 + sizeof(int),
-       "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0"}};
+  TestCase cases[] = {{NULL, NULL, 0, NULL},
+                      {NULL, "", 0, NULL},
+                      {empty_scene, "", 0, NULL},
+                      {empty_scene2, "ts_system_a", 0, NULL},
+                      {plugin_scene, "ts_system_a", 0, NULL},
+                      {system_scene, "ts_system_a",
+                       sizeof(size_t) + strlen("ts_system_a") + 1 + sizeof(int),
+                       "\30\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0"}};
 
   // Constructing Tests
 
