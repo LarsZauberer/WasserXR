@@ -47,6 +47,7 @@
   int ts_deserialize_##component_type##_##field_name(void *ptr,                \
                                                      const char *data) {       \
     component_type *component = ptr;                                           \
+    free(field_exp);                                                           \
     field_exp = ts_copy_char_ptr(data);                                        \
     return 0;                                                                  \
   }

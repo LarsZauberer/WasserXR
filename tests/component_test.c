@@ -78,7 +78,7 @@ void ts_destroy_TS_B(void *ptr) {
   free(component);
 }
 
-TS_STRING_SERIALIZERS(TS_B, name, name);
+TS_STRING_SERIALIZERS(TS_B, name, component->name);
 
 void *ts_get_TS_B_name(void *ptr) {
   TS_B *component = ptr;
