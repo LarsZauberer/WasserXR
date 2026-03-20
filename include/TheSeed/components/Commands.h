@@ -1,3 +1,4 @@
+// This is not a system
 #include "TheSeed/ecs/Scene.h"
 
 typedef void (*TS_Command_Function)(char **args, TS_Scene *scene);

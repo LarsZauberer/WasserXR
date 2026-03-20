@@ -1,5 +1,5 @@
-// This is not a System
-#include "TheSeed/core/Commands.h"
+// This is not a component
+#include "TheSeed/components/Commands.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>

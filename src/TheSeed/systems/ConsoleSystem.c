@@ -1,6 +1,6 @@
 #include "TheSeed/systems/ConsoleSystem.h"
+#include "TheSeed/components/Commands.h"
 #include "TheSeed/components/Console.h"
-#include "TheSeed/core/Commands.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
 #include "TheSeed/ecs/Scene.h"
