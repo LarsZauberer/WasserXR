@@ -817,7 +817,7 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
 void ts_set_scene_terminate(TS_Scene *scene) { scene->should_terminate = 1; }
 
 static size_t ts_get_byte_length(const char *data) {
-  ts_assert(data, "Data is NULL during ts_get_byte_length");
+  ts_assert_abort_value(data, 0, "Data is NULL during ts_get_byte_length");
   size_t length;
   memcpy(&length, data, sizeof(size_t));
   return length;
@@ -902,6 +902,10 @@ ts_serialize_component_fields(size_t *total_size, const TS_Scene *scene,
   }
 
   *total_size = allocation_size;
+  if (allocation_size == 0) {
+    return NULL;
+  }
+
   char *data = malloc(allocation_size);
   char *iter = data;
 
@@ -948,7 +952,6 @@ char *ts_serialize_component(const TS_Scene *scene, const void *component) {
   iter += strlen(component_handler->id) + 1;
 
   memcpy(iter, field_serialization, field_serialization_size);
-  iter += field_serialization_size;
 
   free(field_serialization);
 
@@ -971,9 +974,16 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
     }
   }
 
-  // Create the component array
-  char **component_serializations =
-      (char **)malloc(sizeof(char *) * component_counter);
+  char **component_serializations = NULL;
+  if (component_counter != 0) {
+    // Create the component array
+    component_serializations =
+        (char **)malloc(sizeof(char *) * component_counter);
+    // Initialize all the values
+    for (size_t i = 0; i < component_counter; i++) {
+      component_serializations[i] = NULL;
+    }
+  }
 
   size_t allocation = sizeof(size_t) + sizeof(TS_Entity);
 
@@ -985,10 +995,16 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
     if (component_handler->entity == entity_id) {
       char *component_serialization =
           ts_serialize_component(scene, component_handler->component);
-      component_serializations[component_index++] = component_serialization;
-
-      size_t offset = ts_get_byte_length(component_serialization);
-      allocation += offset;
+      // Check for clang-tidy to be sure about the array bounds
+      if (component_index < component_counter) {
+        component_serializations[component_index++] = component_serialization;
+        size_t offset = ts_get_byte_length(component_serialization);
+        allocation += offset;
+      } else {
+        size_t offset = ts_get_byte_length(component_serialization);
+        allocation += offset;
+        free(component_serialization);
+      }
     }
   }
 
@@ -1003,6 +1019,9 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
 
   for (size_t i = 0; i < component_counter; i++) {
     char *component = component_serializations[i];
+    if (!component) {
+      continue;
+    }
     size_t offset = ts_get_byte_length(component);
     memcpy(iter, component, offset);
     iter += offset;
