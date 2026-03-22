@@ -31,6 +31,14 @@ void ts_destroy_scene(TS_Scene *scene) {
   // This will unload everything from the scene
   ts_reset_scene(scene);
 
+  // This will result in destroying all the components and systems with it.
+  const size_t plugins_len = scene->plugins->len;
+  for (size_t i = 0; i < plugins_len; i++) {
+    const TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
+    ts_unload_plugin(scene, plugin->path);
+  }
+
   g_array_free(scene->plugins, TRUE);
   g_array_free(scene->entities, TRUE);
   g_array_free(scene->components, TRUE);
@@ -43,12 +51,12 @@ void ts_reset_scene(TS_Scene *scene) {
   ts_assert_abort(scene, "Scene is NULL during ts_reset_scene");
   // Unloading all plugins
   // This will result in destroying all the components and systems with it.
-  const size_t plugins_len = scene->plugins->len;
-  for (size_t i = 0; i < plugins_len; i++) {
-    const TS_Plugin_Handler *plugin =
-        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
-    ts_unload_plugin(scene, plugin->path);
-  }
+  // const size_t plugins_len = scene->plugins->len;
+  // for (size_t i = 0; i < plugins_len; i++) {
+  //   const TS_Plugin_Handler *plugin =
+  //       g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
+  //   ts_unload_plugin(scene, plugin->path);
+  // }
   // Clean up all the systems
   const size_t systems_len = scene->systems->len;
   for (size_t i = 0; i < systems_len; i++) {
@@ -1268,10 +1276,10 @@ int ts_deserialize_scene(TS_Scene *scene, const char *data) {
 
   for (size_t i = 0; i < plugin_size; i++) {
     const size_t length = ts_get_byte_length(iter);
-    int status = ts_deserialize_plugin(scene, iter);
-    if (status) {
-      return status;
-    }
+    // int status = ts_deserialize_plugin(scene, iter);
+    // if (status) {
+    //   return status;
+    // }
     iter += length;
   }
 

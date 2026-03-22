@@ -24,21 +24,21 @@ if (TS_NO_ASSERTS)
   add_compile_definitions(TS_NO_ASSERTS)
 endif()
 
+if (TS_STATIC)
+  add_compile_definitions(TS_STATIC)
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(CGLM REQUIRED cglm)
 pkg_check_modules(ASSIMP REQUIRED assimp)
-
-# OpenGL
-add_library(glad STATIC src/glad/gl.c)
-target_include_directories(glad PUBLIC include)
 
 # Core
 file(GLOB CORE_SRC src/TheSeed/core/*.c)
 add_library(theseed_core STATIC ${CORE_SRC})
 target_include_directories(theseed_core PUBLIC include)
 target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
-target_link_libraries(theseed_core PRIVATE theseed_ecs glad glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} ${ASSIMP_LIBRARIES})
+target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} ${ASSIMP_LIBRARIES} theseed_ecs)
 
 # ECS
 file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)
@@ -55,7 +55,7 @@ else()
   add_library(theseed_components SHARED ${COMPONENTS_SRC})
 endif()
 target_include_directories(theseed_components PUBLIC include)
-target_link_libraries(theseed_components PRIVATE glad glfw theseed_core)
+target_link_libraries(theseed_components PRIVATE glfw theseed_ecs theseed_core)
 
 # Systems
 file(GLOB SYSTEMS_SRC src/TheSeed/systems/*.c)
@@ -65,10 +65,10 @@ else()
   add_library(theseed_systems SHARED ${SYSTEMS_SRC})
 endif()
 target_include_directories(theseed_systems PUBLIC include ${GLIB_INCLUDE_DIRS})
-target_link_libraries(theseed_systems PRIVATE glad glfw pthread ${GLIB_LIBRARIES})
+target_link_libraries(theseed_systems PRIVATE glfw pthread ${GLIB_LIBRARIES} theseed_ecs theseed_core)
 
 # Generate main executable
-add_executable(theseed src/main.c)
+add_executable(theseed src/main.c src/glad/gl.c)
 target_link_libraries(theseed PRIVATE theseed_core theseed_ecs)
 if(TS_STATIC)
   target_link_libraries(theseed PRIVATE -Wl,--whole-archive 

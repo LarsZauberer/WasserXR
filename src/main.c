@@ -1,5 +1,3 @@
-#include "TheSeed/components/Model.h"
-#include "TheSeed/components/Transform.h"
 #include "TheSeed/core/logging.h"
 #include "TheSeed/core/utils.h"
 #include "TheSeed/ecs/Scene.h"
@@ -15,8 +13,10 @@ int main() {
   // Create the ecs scene
   TS_Scene *scene = ts_create_scene();
 
+#ifndef TS_STATIC
   ts_load_plugin(scene, "build/libtheseed_components.so");
   ts_load_plugin(scene, "build/libtheseed_systems.so");
+#endif
 
   size_t console = ts_add_entity(scene);
   ts_add_component(scene, console, "TS_Console");
