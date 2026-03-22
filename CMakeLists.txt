@@ -38,7 +38,7 @@ file(GLOB CORE_SRC src/TheSeed/core/*.c)
 add_library(theseed_core STATIC ${CORE_SRC})
 target_include_directories(theseed_core PUBLIC include)
 target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
-target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} ${ASSIMP_LIBRARIES} theseed_ecs)
+target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} m ${ASSIMP_LIBRARIES} theseed_ecs)
 
 # ECS
 file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)
@@ -64,8 +64,8 @@ if(TS_STATIC)
 else()
   add_library(theseed_systems SHARED ${SYSTEMS_SRC})
 endif()
-target_include_directories(theseed_systems PUBLIC include ${GLIB_INCLUDE_DIRS})
-target_link_libraries(theseed_systems PRIVATE glfw pthread ${GLIB_LIBRARIES} theseed_ecs theseed_core)
+target_include_directories(theseed_systems PUBLIC include ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS})
+target_link_libraries(theseed_systems PRIVATE glfw pthread ${CGLM_LIBRARIES} m ${GLIB_LIBRARIES} theseed_ecs theseed_core)
 
 # Generate main executable
 add_executable(theseed src/main.c src/glad/gl.c)
