@@ -43,14 +43,21 @@ void ts_reset_scene(TS_Scene *scene) {
   ts_assert_abort(scene, "Scene is NULL during ts_reset_scene");
   // Unloading all plugins
   // This will result in destroying all the components and systems with it.
-  size_t plugins_len = scene->plugins->len;
+  const size_t plugins_len = scene->plugins->len;
   for (size_t i = 0; i < plugins_len; i++) {
     const TS_Plugin_Handler *plugin =
         g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
     ts_unload_plugin(scene, plugin->path);
   }
+  // Clean up all the systems
+  const size_t systems_len = scene->systems->len;
+  for (size_t i = 0; i < systems_len; i++) {
+    const TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, 0);
+    ts_remove_system(scene, system->id);
+  }
   // Clean up all the rest of the entities
-  size_t entities_len = scene->entities->len;
+  const size_t entities_len = scene->entities->len;
   for (size_t i = 0; i < entities_len; i++) {
     const TS_Entity entity = g_array_index(scene->entities, TS_Entity, 0);
     // This will also destroy all the components associated with the entity

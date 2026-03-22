@@ -22,13 +22,18 @@ void *ts_get_abi_symbol_from_plugin(const TS_Scene *scene,
   ts_assert(prefix, "Prefix is NULL during ts_get_abi_symbol_from_plugin");
   ts_assert(symbol, "Symbol is NULL during ts_get_abi_symbol_from_plugin");
 
-  if (!scene || !handler) {
+  if (!scene) {
     return NULL;
   }
 
   GString *working_symbol = g_string_new(symbol);
   g_string_prepend(working_symbol, prefix);
-  void *func = dlsym(handler->fd, working_symbol->str);
+  void *func;
+  if (handler) {
+    func = dlsym(handler->fd, working_symbol->str);
+  } else {
+    func = dlsym(RTLD_DEFAULT, working_symbol->str);
+  }
   g_string_free(working_symbol, TRUE);
   if (func) {
     return func;
@@ -44,6 +49,14 @@ void *ts_get_abi_symbol(TS_Plugin_Handler **handler, const TS_Scene *scene,
     *handler = NULL;
     return NULL;
   }
+  // Check static linking
+  void *func = func =
+      ts_get_abi_symbol_from_plugin(scene, NULL, prefix, symbol);
+  if (func) {
+    *handler = NULL;
+    return func;
+  }
+  // Check dynamic linking
   for (size_t i = 0; i < scene->plugins->len; i++) {
     TS_Plugin_Handler *plugin =
         g_array_index(scene->plugins, TS_Plugin_Handler *, i);
