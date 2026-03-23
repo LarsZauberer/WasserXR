@@ -116,7 +116,7 @@ target_include_directories(theseed_test_systems PUBLIC include)
 # Usage: add_theseed_test(test_name)
 # Assumes test file is located at tests/{test_name}.c
 function(add_theseed_test test_name)
-    add_executable(${test_name} tests/${test_name}.c)
+    add_executable(${test_name} tests/${test_name}.c src/glad/gl.c)
     target_include_directories(${test_name} PRIVATE ${GLIB_INCLUDE_DIRS})
     target_link_libraries(${test_name} PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
