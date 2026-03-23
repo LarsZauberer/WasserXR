@@ -8,7 +8,6 @@ typedef struct TestCase TestCase;
 struct TestCase {
   TS_Scene *scene;
   char *data;
-  size_t expected_plugins;
   size_t expected_systems;
   size_t expected_entities;
   int should_fail;
@@ -41,28 +40,6 @@ static void unittest(const void *ptr) {
 
   ts_assert(result == 0, "Should succeed for valid data");
 
-  // Verify plugins
-  size_t plugin_count = 0;
-  char **plugins = ts_get_plugins(&plugin_count, input->scene);
-  ts_assert_test(plugin_count == input->expected_plugins,
-                 "Expected plugins: %d", input->expected_plugins, "Got: %ld",
-                 plugin_count, "Plugin count doesn't match");
-
-  if (plugin_count == 1) {
-    ts_assert_test(strcmp(plugins[0], "./libtheseed_test_components.so") == 0,
-                   "Expected: %s", "./libtheseed_test_components.so", "Got: %s",
-                   plugins[0], "Plugin name doesn't match");
-  } else if (plugin_count == 2) {
-    ts_assert_test(strcmp(plugins[0], "./libtheseed_test_components.so") == 0,
-                   "Expected: %s", "./libtheseed_test_components.so", "Got: %s",
-                   plugins[0], "First plugin name doesn't match");
-    ts_assert_test(strcmp(plugins[1], "./libtheseed_systems.so") == 0,
-                   "Expected: %s", "./libtheseed_systems.so", "Got: %s",
-                   plugins[1], "Second plugin name doesn't match");
-  }
-
-  destroy_char_array(plugins, plugin_count);
-
   // Verify systems
   size_t system_count = 0;
   char **systems = ts_get_systems(&system_count, input->scene);
@@ -86,7 +63,7 @@ static void unittest(const void *ptr) {
                  entity_count, "Entity count doesn't match");
 
   // Verify entity components if there are entities
-  if (entity_count > 0 && input->expected_plugins > 0) {
+  if (entity_count > 0) {
     size_t component_count = 0;
     char **components = ts_get_components_of_entity(&component_count,
                                                     input->scene, entities[0]);
@@ -123,15 +100,18 @@ int main(int argc, char *argv[]) {
   TS_Scene *entity_scene = ts_create_scene();
   TS_Scene *full_scene = ts_create_scene();
 
+  ts_load_plugin(full_scene, "./libtheseed_test_components.so");
+  ts_load_plugin(full_scene, "./libtheseed_systems.so");
+
   TestCase cases[] = {
-      {NULL, NULL, 0, 0, 0, 1},
-      {NULL, "", 0, 0, 0, 1},
+      {NULL, NULL, 0, 0, 1},
+      {NULL, "", 0, 0, 1},
       {empty_scene,
        "\40\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0",
-       0, 0, 0, 0},
+       0, 0, 0},
       {entity_scene,
        "\130\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
@@ -139,7 +119,7 @@ int main(int argc, char *argv[]) {
        "\1\0\0\0\0\0\0\0"
        "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
        "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
-       1, 0, 1, 0},
+       0, 1, 0},
       {full_scene,
        "\303\0\0\0\0\0\0\0"
        "\2\0\0\0\0\0\0\0"
@@ -150,7 +130,7 @@ int main(int argc, char *argv[]) {
        "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0"
        "\75\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
-       2, 1, 1, 0}};
+       1, 1, 0}};
 
   // Constructing Tests
   for (size_t i = 0; i < 5; i++) {

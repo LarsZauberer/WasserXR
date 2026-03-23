@@ -5,8 +5,8 @@
 
 // Globals
 
-TS_Log_Level ts_lowest_level = TS_LOG_INFO;
-GArray *ts_loggers = NULL;
+static TS_Log_Level ts_lowest_level = TS_LOG_INFO;
+static GArray *ts_loggers = NULL;
 
 static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, char *fmt,
                                     va_list args) {

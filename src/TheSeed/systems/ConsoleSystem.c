@@ -15,8 +15,8 @@
 
 #define TS_MAX_COMMAND_LENGTH 2048
 
-pthread_t ts_console_thread;
-char *ts_console_buffer = NULL;
+static pthread_t ts_console_thread;
+static char *ts_console_buffer = NULL;
 
 static char *ts_preprocess_cmd(char *raw) {
   GString *cmd_gstring = g_string_new(raw);

@@ -31,6 +31,14 @@ void ts_destroy_scene(TS_Scene *scene) {
   // This will unload everything from the scene
   ts_reset_scene(scene);
 
+  // This will result in destroying all the components and systems with it.
+  const size_t plugins_len = scene->plugins->len;
+  for (size_t i = 0; i < plugins_len; i++) {
+    const TS_Plugin_Handler *plugin =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
+    ts_unload_plugin(scene, plugin->path);
+  }
+
   g_array_free(scene->plugins, TRUE);
   g_array_free(scene->entities, TRUE);
   g_array_free(scene->components, TRUE);
@@ -41,16 +49,15 @@ void ts_destroy_scene(TS_Scene *scene) {
 
 void ts_reset_scene(TS_Scene *scene) {
   ts_assert_abort(scene, "Scene is NULL during ts_reset_scene");
-  // Unloading all plugins
-  // This will result in destroying all the components and systems with it.
-  size_t plugins_len = scene->plugins->len;
-  for (size_t i = 0; i < plugins_len; i++) {
-    const TS_Plugin_Handler *plugin =
-        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
-    ts_unload_plugin(scene, plugin->path);
+  // Clean up all the systems
+  const size_t systems_len = scene->systems->len;
+  for (size_t i = 0; i < systems_len; i++) {
+    const TS_System_Handler *system =
+        g_array_index(scene->systems, TS_System_Handler *, 0);
+    ts_remove_system(scene, system->id);
   }
   // Clean up all the rest of the entities
-  size_t entities_len = scene->entities->len;
+  const size_t entities_len = scene->entities->len;
   for (size_t i = 0; i < entities_len; i++) {
     const TS_Entity entity = g_array_index(scene->entities, TS_Entity, 0);
     // This will also destroy all the components associated with the entity
@@ -656,6 +663,7 @@ int ts_reload(TS_Scene *scene) {
 
   char *serialization = ts_serialize_scene(scene);
   ts_reset_scene(scene);
+  ts_reload_plugins(scene);
   ts_deserialize_scene(scene, serialization);
   free(serialization);
 
@@ -1261,10 +1269,10 @@ int ts_deserialize_scene(TS_Scene *scene, const char *data) {
 
   for (size_t i = 0; i < plugin_size; i++) {
     const size_t length = ts_get_byte_length(iter);
-    int status = ts_deserialize_plugin(scene, iter);
-    if (status) {
-      return status;
-    }
+    // int status = ts_deserialize_plugin(scene, iter);
+    // if (status) {
+    //   return status;
+    // }
     iter += length;
   }
 

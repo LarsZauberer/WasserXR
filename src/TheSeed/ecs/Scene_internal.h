@@ -90,4 +90,6 @@ void *ts_get_abi_symbol_from_plugin(const TS_Scene *scene,
 void *ts_get_abi_symbol(TS_Plugin_Handler **handler, const TS_Scene *scene,
                         const char *prefix, const char *symbol);
 
+void ts_reload_plugins(TS_Scene *scene);
+
 #endif
