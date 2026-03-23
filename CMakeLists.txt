@@ -7,7 +7,7 @@ set(CMAKE_CLANG_TIDY clang-tidy)
 
 option(BUILD_DEBUG "Debug build" OFF)
 option(TS_NO_ASSERTS "Asserts are removed" OFF)
-option(TS_STATIC, "Static Linking for Components and Systems" OFF)
+option(TS_STATIC "Static Linking for Components and Systems" OFF)
 
 add_compile_options(-std=c99 -Wall -Wextra -Wno-unused-parameter)
 add_link_options(-rdynamic)
@@ -38,7 +38,7 @@ file(GLOB CORE_SRC src/TheSeed/core/*.c)
 add_library(theseed_core STATIC ${CORE_SRC})
 target_include_directories(theseed_core PUBLIC include)
 target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
-target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} m ${ASSIMP_LIBRARIES} theseed_ecs)
+target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} m ${ASSIMP_LIBRARIES})
 
 # ECS
 file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)

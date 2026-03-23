@@ -86,7 +86,7 @@ void ts_reload_plugins(TS_Scene *scene) {
   }
   for (size_t i = 0; i < num_plugins; i++) {
     int status = ts_load_plugin(scene, plugins_to_load[i]);
-    if (!status) {
+    if (status) {
       ts_warn("Failed to reload the plugin `%s` after unloading it",
               plugins_to_load[i]);
     }
