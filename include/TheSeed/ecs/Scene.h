@@ -166,8 +166,8 @@ int ts_remove_component(TS_Scene *scene, TS_Entity entity_id,
  * @param size The pointer which will hold the length of the array
  * @param scene The scene that carries the plugins
  * @param entity_id The entity from which the components should be queried
- * @return The array of the component names, or NULL if the entity has no components.
- *         Caller must free each string in the array and the array itself.
+ * @return The array of the component names, or NULL if the entity has no
+ * components. Caller must free each string in the array and the array itself.
  */
 char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
                                    TS_Entity entity_id);

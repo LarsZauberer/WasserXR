@@ -2,6 +2,7 @@
 #include "TheSeed/ecs/Scene.h"
 #include "dlfcn.h"
 #include <TheSeed/core/logging.h>
+#include <TheSeed/core/utils.h>
 #include <glib.h>
 
 static int ts_compare_systems_priority(gconstpointer left,
@@ -68,4 +69,29 @@ void *ts_get_abi_symbol(TS_Plugin_Handler **handler, const TS_Scene *scene,
   }
   *handler = NULL;
   return NULL;
+}
+
+void ts_reload_plugins(TS_Scene *scene) {
+  size_t num_plugins = scene->plugins->len;
+  char **plugins_to_load = (char **)malloc(sizeof(char *) * num_plugins);
+  for (size_t i = 0; i < num_plugins; i++) {
+    TS_Plugin_Handler *plugin_handler =
+        g_array_index(scene->plugins, TS_Plugin_Handler *, 0);
+    plugins_to_load[i] = ts_copy_char_ptr(plugin_handler->path);
+    ts_unload_plugin(scene, plugins_to_load[i]);
+  }
+  // All Plugins should now be unloaded
+  if (scene->plugins->len != 0) {
+    ts_warn(
+        "Failed to unload all the plugins during the reload of the plugins");
+  }
+  for (size_t i = 0; i < num_plugins; i++) {
+    int status = ts_load_plugin(scene, plugins_to_load[i]);
+    if (!status) {
+      ts_warn("Failed to reload the plugin `%s` after unloading it",
+              plugins_to_load[i]);
+    }
+    free(plugins_to_load[i]);
+  }
+  free(plugins_to_load);
 }
