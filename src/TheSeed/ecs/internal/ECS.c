@@ -51,8 +51,7 @@ void *ts_get_abi_symbol(TS_Plugin_Handler **handler, const TS_Scene *scene,
     return NULL;
   }
   // Check static linking
-  void *func = func =
-      ts_get_abi_symbol_from_plugin(scene, NULL, prefix, symbol);
+  void *func = ts_get_abi_symbol_from_plugin(scene, NULL, prefix, symbol);
   if (func) {
     *handler = NULL;
     return func;
