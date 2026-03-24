@@ -95,13 +95,13 @@ int main(int argc, char *argv[]) {
   TestCase cases[] = {
       {NULL, NULL, 0, 0, NULL, 1},
       {NULL, "", 0, 0, NULL, 1},
-      {entity_scene, "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 1, 0, NULL, 0},
+      {entity_scene, "\10\0\0\0\0\0\0\0", 1, 0, NULL, 0},
       {component_scene,
-       "\75\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
+       "\67\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
        1, 1, "TS_A", 0},
-      {multi_entity_scene, "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 2, 0, NULL, 0},
-      {multi_entity_scene2, "\20\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0", 2, 0, NULL,
+      {multi_entity_scene, "\10\0\0\0\0\0\0\0", 2, 0, NULL, 0},
+      {multi_entity_scene2, "\10\0\0\0\0\0\0\0", 2, 0, NULL,
        0}};
 
   // Constructing Tests
