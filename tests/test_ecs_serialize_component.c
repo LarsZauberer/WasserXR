@@ -61,10 +61,9 @@ int main(int argc, char *argv[]) {
       0 == ts_load_plugin(component_scene, "./libtheseed_test_components.so"),
       "Failed to load the plugin");
   TS_Entity entity_id_component = ts_add_entity(component_scene);
-  ts_assert(0 == ts_add_component(component_scene, entity_id_component, "TS_A"),
-            "Failed to add component");
   void *component =
-      ts_entity_get_component(component_scene, entity_id_component, "TS_A");
+      ts_add_component(component_scene, entity_id_component, "TS_A");
+  ts_assert(component != NULL, "Failed to add component");
 
   TestCase cases[] = {
       {NULL, NULL, 0, NULL},

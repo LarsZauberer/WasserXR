@@ -61,7 +61,8 @@ int main(int argc, char *argv[]) {
       0 == ts_load_plugin(component_scene, "./libtheseed_test_components.so"),
       "Failed to load the plugin");
   TS_Entity entity_id_component = ts_add_entity(component_scene);
-  ts_assert(0 == ts_add_component(component_scene, entity_id_component, "TS_A"),
+  ts_assert(ts_add_component(component_scene, entity_id_component, "TS_A") !=
+                NULL,
             "Failed to add component");
 
   TS_Scene *multi_entity_scene = ts_create_scene();

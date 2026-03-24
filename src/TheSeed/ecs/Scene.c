@@ -200,21 +200,22 @@ char **ts_get_plugins(size_t *size, const TS_Scene *scene) {
   return data;
 }
 
-int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
-                     const char *component_id) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_component");
-  ts_assert_abort_value(component_id, -1, "Id is NULL during ts_add_component");
+void *ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
+                       const char *component_id) {
+  ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_add_component");
+  ts_assert_abort_value(component_id, NULL,
+                        "Id is NULL during ts_add_component");
   // Check if the entity exists
   long entity_index = ts_get_entity_index(scene, entity_id);
   if (entity_index == -1) {
     ts_warn("Entity %ld doesn't exist", entity_id);
-    return 1;
+    return NULL;
   }
   void *component = ts_entity_get_component(scene, entity_id, component_id);
   if (component) {
     ts_warn("Component `%s` already exists on entity %ld", component_id,
             entity_id);
-    return 1;
+    return NULL;
   }
 
   TS_Plugin_Handler *plugin;
@@ -227,15 +228,15 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
 
   if (!creator) {
     ts_error("Failed to find creator for `%s`", component_id);
-    return 1;
+    return NULL;
   }
   if (!destroyer) {
     ts_error("Failed to find destroyer for `%s`", component_id);
-    return 1;
+    return NULL;
   }
   if (!schema_function) {
     ts_error("Failed to find schema function for `%s`", component_id);
-    return 1;
+    return NULL;
   }
   // Note that only the creator and the destroyer are required for a
   // component to exist
@@ -268,7 +269,7 @@ int ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
 
   ts_debug("Component `%s` added to entity %ld", component_id, entity_id);
 
-  return 0;
+  return component;
 }
 
 long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
@@ -1217,8 +1218,7 @@ int ts_deserialize_component(TS_Scene *scene, const TS_Entity entity,
   const char *end = data + size;
   const char *iter = data + sizeof(size_t) + strlen(component_name) + 1;
 
-  ts_add_component(scene, entity, component_name);
-  void *component_ptr = ts_entity_get_component(scene, entity, component_name);
+  void *component_ptr = ts_add_component(scene, entity, component_name);
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component_ptr);
   ts_assert_abort_value(
