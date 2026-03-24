@@ -98,7 +98,7 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
   ts_console_buffer = NULL;
 }
 
-TS_System_Groups ts_select_ts_console_system(TS_Scene *scene,
+TS_System_Groups ts_select_ts_console_system(const TS_Scene *scene,
                                              const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Console")) {
     return 1;

@@ -20,7 +20,7 @@
 
 TS_System_Groups ts_groups_ts_mesh_renderer = 3;
 
-TS_System_Groups ts_select_ts_mesh_renderer(TS_Scene *scene,
+TS_System_Groups ts_select_ts_mesh_renderer(const TS_Scene *scene,
                                             const TS_Entity entity) {
   size_t normal_object =
       ts_entity_get_component(scene, entity, "TS_Transform") &&

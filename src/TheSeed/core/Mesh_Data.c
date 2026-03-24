@@ -90,7 +90,7 @@ static void ts_process_node(GArray *mesh_data, const aiScene *scene,
   }
 }
 
-TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename) {
+TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, const char *filename) {
   const aiScene *scene =
       aiImportFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs |
                                  aiProcess_GenSmoothNormals);

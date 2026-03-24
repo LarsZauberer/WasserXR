@@ -84,9 +84,9 @@ void ts_schema_TS_Model(TS_Component_Schema *schema) {
   ts_add_field_to_component_schema(schema, shader_field);
 }
 
-void ts_set_TS_Model_model_name(void *component, void *data) {
+void ts_set_TS_Model_model_name(void *component, const void *data) {
   TS_Model *model = (TS_Model *)component;
-  char *path = (char *)data;
+  const char *path = (const char *)data;
   if (path) {
     // Replace the field
     free(model->model_name);
@@ -118,9 +118,9 @@ void ts_set_TS_Model_model_name(void *component, void *data) {
   }
 }
 
-void ts_set_TS_Model_shader_name(void *component, void *data) {
+void ts_set_TS_Model_shader_name(void *component, const void *data) {
   TS_Model *model = (TS_Model *)component;
-  char *path = (char *)data;
+  const char *path = (const char *)data;
   if (path) {
     // Replace the field
     free(model->shader_name);
@@ -141,27 +141,27 @@ void ts_set_TS_Model_shader_name(void *component, void *data) {
   }
 }
 
-void *ts_get_TS_Model_shader_name(void *component) {
-  TS_Model *model = (TS_Model *)component;
-  return model->shader_name;
+void *ts_get_TS_Model_shader_name(const void *component) {
+  const TS_Model *model = (const TS_Model *)component;
+  return (void *)model->shader_name;
 }
 
-void *ts_get_TS_Model_model_name(void *component) {
-  TS_Model *model = (TS_Model *)component;
-  return model->model_name;
+void *ts_get_TS_Model_model_name(const void *component) {
+  const TS_Model *model = (const TS_Model *)component;
+  return (void *)model->model_name;
 }
 
-void *ts_get_TS_Model_shader(void *component) {
-  TS_Model *model = (TS_Model *)component;
-  return model->shader;
+void *ts_get_TS_Model_shader(const void *component) {
+  const TS_Model *model = (const TS_Model *)component;
+  return (void *)model->shader;
 }
 
-void *ts_get_TS_Model_meshes(void *component) {
-  TS_Model *model = (TS_Model *)component;
-  return model->meshes;
+void *ts_get_TS_Model_meshes(const void *component) {
+  const TS_Model *model = (const TS_Model *)component;
+  return (void *)model->meshes;
 }
 
-void *ts_get_TS_Model_numMeshes(void *component) {
-  TS_Model *model = (TS_Model *)component;
-  return &model->numMeshes;
+void *ts_get_TS_Model_numMeshes(const void *component) {
+  const TS_Model *model = (const TS_Model *)component;
+  return (void *)&model->numMeshes;
 }

@@ -3,7 +3,7 @@
 
 #include "TheSeed/ecs/Scene.h"
 
-int ts_select_ts_mesh_renderer(TS_Scene_t *scene, const size_t entity);
-void ts_system_ts_mesh_renderer(TS_Scene_t *scene, size_t *entities, size_t n);
+int ts_select_ts_mesh_renderer(const TS_Scene *scene, const TS_Entity entity);
+void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities, const size_t *groups);
 
 #endif

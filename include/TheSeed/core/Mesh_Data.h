@@ -13,7 +13,7 @@ typedef struct {
   unsigned int *indices;
 } TS_Mesh_Data;
 
-TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, char *filename);
+TS_Mesh_Data *ts_read_mesh_data(unsigned int *n, const char *filename);
 void ts_destroy_mesh_data(TS_Mesh_Data *mesh);
 
 #endif

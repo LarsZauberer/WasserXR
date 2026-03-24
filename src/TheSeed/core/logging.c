@@ -8,7 +8,7 @@
 static TS_Log_Level ts_lowest_level = TS_LOG_INFO;
 static GArray *ts_loggers = NULL;
 
-static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, char *fmt,
+static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, const char *fmt,
                                     va_list args) {
   char *formatted_string = g_strdup_vprintf(fmt, args);
   TS_Log_Entry entry = {log_level, formatted_string};
@@ -64,7 +64,7 @@ void ts_stdout_logger(TS_Log_Entry entry) {
   printf("[\033[%sm%s\033[0m]: %s\n", color, level, entry.msg);
 }
 
-void ts_debug(char *fmt, ...) {
+void ts_debug(const char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
@@ -79,7 +79,7 @@ void ts_debug(char *fmt, ...) {
   ts_destroy_entry(entry);
 }
 
-void ts_info(char *fmt, ...) {
+void ts_info(const char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
@@ -94,7 +94,7 @@ void ts_info(char *fmt, ...) {
   ts_destroy_entry(entry);
 }
 
-void ts_warn(char *fmt, ...) {
+void ts_warn(const char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
@@ -109,7 +109,7 @@ void ts_warn(char *fmt, ...) {
   ts_destroy_entry(entry);
 }
 
-void ts_error(char *fmt, ...) {
+void ts_error(const char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }
@@ -124,7 +124,7 @@ void ts_error(char *fmt, ...) {
   ts_destroy_entry(entry);
 }
 
-void ts_critical(char *fmt, ...) {
+void ts_critical(const char *fmt, ...) {
   if (!ts_loggers) {
     return;
   }

@@ -32,12 +32,12 @@ void ts_schema_TS_Console(TS_Component_Schema *schema) {
   ts_add_field_to_component_schema(schema, command_list_field);
 }
 
-void *ts_get_TS_Console_command_list_size(void *component) {
-  TS_Console *console = (TS_Console *)component;
-  return &console->command_list_size;
+void *ts_get_TS_Console_command_list_size(const void *component) {
+  const TS_Console *console = (const TS_Console *)component;
+  return (void *)&console->command_list_size;
 }
 
-void *ts_get_TS_Console_command_list(void *component) {
-  TS_Console *console = (TS_Console *)component;
-  return console->command_list;
+void *ts_get_TS_Console_command_list(const void *component) {
+  const TS_Console *console = (const TS_Console *)component;
+  return (void *)console->command_list;
 }

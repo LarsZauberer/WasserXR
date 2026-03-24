@@ -32,7 +32,7 @@ TS_Command *ts_create_command_list(size_t *size) {
 
 void ts_destroy_command_list(TS_Command *ptr) { free(ptr); }
 
-void ts_command_reload(char **args, TS_Scene *scene) {
+void ts_command_reload(const char **args, TS_Scene *scene) {
   ts_set_scene_reload(scene);
 }
 
@@ -43,7 +43,7 @@ static int ts_get_window(TS_Scene *scene, TS_Entity entity) {
   return 0;
 }
 
-void ts_command_exit(char **args, TS_Scene *scene) {
+void ts_command_exit(const char **args, TS_Scene *scene) {
   size_t num_entities = 0;
   TS_Entity *entities = ts_find_entities_with_selector_and_groups(
       &num_entities, scene, ts_get_window, 1);
@@ -53,11 +53,11 @@ void ts_command_exit(char **args, TS_Scene *scene) {
   free(entities);
 }
 
-void ts_command_addEntity(char **args, TS_Scene *scene) {
+void ts_command_addEntity(const char **args, TS_Scene *scene) {
   ts_add_entity(scene);
 }
 
-void ts_command_removeEntity(char **args, TS_Scene *scene) {
+void ts_command_removeEntity(const char **args, TS_Scene *scene) {
   if (!*args) {
     ts_warn("Remove Entity requires the entity id to remove");
     return;
@@ -66,7 +66,7 @@ void ts_command_removeEntity(char **args, TS_Scene *scene) {
   ts_remove_entity(scene, entity_id);
 }
 
-void ts_command_addComponent(char **args, TS_Scene *scene) {
+void ts_command_addComponent(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Add Component requires the entity id to add to the entity");
     return;
@@ -79,7 +79,7 @@ void ts_command_addComponent(char **args, TS_Scene *scene) {
   ts_add_component(scene, entity_id, args[1]);
 }
 
-void ts_command_get(char **args, TS_Scene *scene) {
+void ts_command_get(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Get requires the entity id to add to the entity");
     return;
@@ -139,7 +139,7 @@ void ts_command_get(char **args, TS_Scene *scene) {
   }
 }
 
-void ts_command_set(char **args, TS_Scene *scene) {
+void ts_command_set(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Set requires the entity id to add to the entity");
     return;
@@ -197,7 +197,7 @@ void ts_command_set(char **args, TS_Scene *scene) {
   ts_info("Field `%s` set", args[2]);
 }
 
-void ts_command_addSystem(char **args, TS_Scene *scene) {
+void ts_command_addSystem(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Add System requires the system name");
     return;
@@ -210,7 +210,7 @@ void ts_command_addSystem(char **args, TS_Scene *scene) {
   }
 }
 
-void ts_command_removeSystem(char **args, TS_Scene *scene) {
+void ts_command_removeSystem(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Remove System requires the system name");
     return;
@@ -223,7 +223,7 @@ void ts_command_removeSystem(char **args, TS_Scene *scene) {
   }
 }
 
-void ts_command_loadPlugin(char **args, TS_Scene *scene) {
+void ts_command_loadPlugin(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Load Plugin requires the path to a shared object file");
     return;
@@ -236,7 +236,7 @@ void ts_command_loadPlugin(char **args, TS_Scene *scene) {
   }
 }
 
-void ts_command_unloadPlugin(char **args, TS_Scene *scene) {
+void ts_command_unloadPlugin(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Unload Plugin requires the path to a shared object file");
     return;
@@ -249,22 +249,22 @@ void ts_command_unloadPlugin(char **args, TS_Scene *scene) {
   }
 }
 
-void ts_command_showEntities(char **args, TS_Scene *scene) {
+void ts_command_showEntities(const char **args, TS_Scene *scene) {
   ts_print_entities(scene);
 }
 
-void ts_command_showPlugins(char **args, TS_Scene *scene) {
+void ts_command_showPlugins(const char **args, TS_Scene *scene) {
   ts_print_plugins(scene);
 }
 
-void ts_command_showComponents(char **args, TS_Scene *scene) {
+void ts_command_showComponents(const char **args, TS_Scene *scene) {
   ts_print_components(scene);
 }
 
-void ts_command_showSystems(char **args, TS_Scene *scene) {
+void ts_command_showSystems(const char **args, TS_Scene *scene) {
   ts_print_systems(scene);
 }
-void ts_command_save(char **args, TS_Scene *scene) {
+void ts_command_save(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Save requires a filename");
     return;
@@ -273,7 +273,7 @@ void ts_command_save(char **args, TS_Scene *scene) {
   ts_info("Saved Scene");
 }
 
-void ts_command_load(char **args, TS_Scene *scene) {
+void ts_command_load(const char **args, TS_Scene *scene) {
   if (!args[0]) {
     ts_warn("Load requires a filename");
     return;

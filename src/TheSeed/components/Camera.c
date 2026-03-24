@@ -43,47 +43,47 @@ void ts_schema_TS_Camera(TS_Component_Schema *schema) {
   ts_add_field_to_component_schema(schema, far_field);
 }
 
-void *ts_get_TS_Camera_fov(void *component) {
-  TS_Camera *cam = (TS_Camera *)component;
-  return &cam->fov;
+void *ts_get_TS_Camera_fov(const void *component) {
+  const TS_Camera *cam = (const TS_Camera *)component;
+  return (void *)&cam->fov;
 }
 
-void *ts_get_TS_Camera_near(void *component) {
-  TS_Camera *cam = (TS_Camera *)component;
-  return &cam->near;
+void *ts_get_TS_Camera_near(const void *component) {
+  const TS_Camera *cam = (const TS_Camera *)component;
+  return (void *)&cam->near;
 }
 
-void *ts_get_TS_Camera_far(void *component) {
-  TS_Camera *cam = (TS_Camera *)component;
-  return &cam->far;
+void *ts_get_TS_Camera_far(const void *component) {
+  const TS_Camera *cam = (const TS_Camera *)component;
+  return (void *)&cam->far;
 }
 
-void ts_set_TS_Camera_fov(void *component, void *data) {
+void ts_set_TS_Camera_fov(void *component, const void *data) {
   if (!data) {
     ts_warn("Trying to set NULL data to TS_Camera");
     return;
   }
   TS_Camera *cam = (TS_Camera *)component;
-  float fov = *(float *)data;
+  float fov = *(const float *)data;
   cam->fov = fov;
 }
 
-void ts_set_TS_Camera_near(void *component, void *data) {
+void ts_set_TS_Camera_near(void *component, const void *data) {
   if (!data) {
     ts_warn("Trying to set NULL data to TS_Camera");
     return;
   }
   TS_Camera *cam = (TS_Camera *)component;
-  float near = *(float *)data;
+  float near = *(const float *)data;
   cam->near = near;
 }
 
-void ts_set_TS_Camera_far(void *component, void *data) {
+void ts_set_TS_Camera_far(void *component, const void *data) {
   if (!data) {
     ts_warn("Trying to set NULL data to TS_Camera");
     return;
   }
   TS_Camera *cam = (TS_Camera *)component;
-  float far = *(float *)data;
+  float far = *(const float *)data;
   cam->far = far;
 }

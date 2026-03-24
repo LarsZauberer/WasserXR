@@ -14,11 +14,11 @@ typedef struct {
 
 // Logging functions
 
-void ts_debug(char * /*fmt*/, ...);
-void ts_info(char * /*fmt*/, ...);
-void ts_warn(char * /*fmt*/, ...);
-void ts_error(char * /*fmt*/, ...);
-void ts_critical(char * /*fmt*/, ...);
+void ts_debug(const char * /*fmt*/, ...);
+void ts_info(const char * /*fmt*/, ...);
+void ts_warn(const char * /*fmt*/, ...);
+void ts_error(const char * /*fmt*/, ...);
+void ts_critical(const char * /*fmt*/, ...);
 
 #ifndef TS_NO_ASSERTS
 
