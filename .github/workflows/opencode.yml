@@ -27,6 +27,7 @@ jobs:
        - name: Run OpenCode
          uses: anomalyco/opencode/github@latest
          env:
-           OPENAI_API_KEY: ${{ secrets.LLM_KEY }}
+           OPENAI_API_KEY: ${{ secrets.LLM_KEY_1 }}
+           ANTHROPIC_API_KEY: ${{ secrets.LLM_KEY_2 }}
          with:
-           model: SPH/anthropic/claude-sonnet-4-5
+           model: anthropic/claude-sonnet-4-5-20250929
