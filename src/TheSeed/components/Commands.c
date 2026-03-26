@@ -36,7 +36,7 @@ void ts_command_reload(char **args, TS_Scene *scene) {
   ts_set_scene_reload(scene);
 }
 
-static int ts_get_window(TS_Scene *scene, TS_Entity entity) {
+static int ts_get_window(const TS_Scene *scene, const TS_Entity entity) {
   if (ts_entity_get_component(scene, entity, "TS_Window")) {
     return 1;
   }
