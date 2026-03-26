@@ -76,18 +76,15 @@ int main(int argc, char *argv[]) {
       {NULL, 0, 0, NULL},
       {NULL, 0, 0, NULL},
       {empty_scene, 0, 0, NULL},
-      {entity_scene, entity, sizeof(size_t),
-       "\10\0\0\0\0\0\0\0"},
+      {entity_scene, entity, sizeof(size_t), "\10\0\0\0\0\0\0\0"},
       {component_scene, entity_id_component,
-       sizeof(size_t) + sizeof(size_t) + strlen("TS_A") +
-           1 + sizeof(size_t) + strlen("x") + 1 + sizeof(int) + sizeof(size_t) +
-           strlen("extra") + 1 + sizeof(int),
-       "\67\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
+       sizeof(size_t) + sizeof(size_t) + strlen("TS_A") + 1 + sizeof(size_t) +
+           strlen("x") + 1 + sizeof(int) + sizeof(size_t) + strlen("extra") +
+           1 + sizeof(int),
+       "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
-      {multi_entity_scene, entity_a, sizeof(size_t),
-       "\10\0\0\0\0\0\0\0"},
-      {multi_entity_scene2, entity2_b, sizeof(size_t),
-       "\10\0\0\0\0\0\0\0"},
+      {multi_entity_scene, entity_a, sizeof(size_t), "\10\0\0\0\0\0\0\0"},
+      {multi_entity_scene2, entity2_b, sizeof(size_t), "\10\0\0\0\0\0\0\0"},
   };
 
   // Constructing Tests

@@ -48,8 +48,8 @@ static void unittest(const void *ptr) {
                  system_count, "System count doesn't match");
 
   if (system_count > 0) {
-    ts_assert_test(strcmp(systems[0], "ts_console_system") == 0, "Expected: %s",
-                   "ts_console_system", "Got: %s", systems[0],
+    ts_assert_test(strcmp(systems[0], "ts_system_a") == 0, "Expected: %s",
+                   "ts_system_a", "Got: %s", systems[0],
                    "System name doesn't match");
   }
 
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
   TS_Scene *full_scene = ts_create_scene();
 
   ts_load_plugin(full_scene, "./libtheseed_test_components.so");
-  ts_load_plugin(full_scene, "./libtheseed_systems.so");
+  ts_load_plugin(full_scene, "./libtheseed_test_systems.so");
 
   TestCase cases[] = {
       {NULL, NULL, 0, 0, 1},
@@ -121,14 +121,14 @@ int main(int argc, char *argv[]) {
        "\10\0\0\0\0\0\0\0",
        0, 1, 0},
       {full_scene,
-       "\273\0\0\0\0\0\0\0"
+       "\272\0\0\0\0\0\0\0"
        "\2\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
-       "\40\0\0\0\0\0\0\0./libtheseed_systems.so\0"
-       "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0"
-       "\67\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
+       "\45\0\0\0\0\0\0\0./libtheseed_test_systems.so\0"
+       "\30\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0"
+       "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
        1, 1, 0}};
 

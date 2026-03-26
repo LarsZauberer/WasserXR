@@ -88,36 +88,36 @@ int main(int argc, char *argv[]) {
       {entity_scene,
        sizeof(size_t) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t) +
            sizeof(size_t) + strlen("./libtheseed_test_components.so") + 1 +
-           sizeof(size_t) + sizeof(TS_Entity),
-       "\130\0\0\0\0\0\0\0"
+           sizeof(size_t),
+       "\120\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
-       "\20\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"},
+       "\10\0\0\0\0\0\0\0"},
       {full_scene,
        sizeof(size_t) + (sizeof(size_t) + sizeof(size_t) + sizeof(size_t)) +
            (sizeof(size_t) + strlen("./libtheseed_test_components.so") + 1) +
            (sizeof(size_t) + strlen("./libtheseed_test_systems.so") + 1) +
            (sizeof(size_t) + strlen("ts_system_a") + 1 + sizeof(int)) +
-           (sizeof(size_t) + sizeof(TS_Entity) + sizeof(size_t) +
-            strlen("TS_A") + 1 + sizeof(size_t) + strlen("x") + 1 +
-            sizeof(int) + sizeof(size_t) + strlen("extra") + 1 + sizeof(int)),
-       "\302\0\0\0\0\0\0\0"
+           (sizeof(size_t) + sizeof(size_t) + strlen("TS_A") + 1 +
+            sizeof(size_t) + strlen("x") + 1 + sizeof(int) + sizeof(size_t) +
+            strlen("extra") + 1 + sizeof(int)),
+       "\272\0\0\0\0\0\0\0"
        "\2\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
        "\45\0\0\0\0\0\0\0./libtheseed_test_systems.so\0"
        "\30\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0"
-       "\75\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
+       "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
   };
 
   // Constructing Tests
 
   for (size_t i = 0; i < 5; i++) {
-    char *path = g_strdup_printf("/theseed/test_ecs_serialize_entity/%ld", i);
+    char *path = g_strdup_printf("/theseed/test_ecs_serialize_scene/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }
