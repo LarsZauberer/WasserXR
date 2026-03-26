@@ -432,7 +432,7 @@ char *ts_serialize_entity(const TS_Scene *scene, TS_Entity entity);
  * Serializes the entire scene.
  * @param scene The scene that should be serialized
  * @return The byte data of the scene. It contains the information about the
-entities, components, systems and plugins. It is prefixed with a `size_t` which
+entities, components, and systems. It is prefixed with a `size_t` which
 tells you how many bytes are in the serialization. The data is owned by the
 caller.
  */
@@ -477,7 +477,8 @@ int ts_deserialize_component(TS_Scene *scene, TS_Entity entity,
 int ts_deserialize_entity(TS_Scene *scene, const char *data);
 
 /**
- * Deserializes an entire scene bytestream
+ * Deserializes an entire scene bytestream. This deserializes entities, 
+ * components, and systems, but does not deserialize plugins.
  * @param scene The scene that should be reconstructed
  * @param data The bytestream that should be deserialized
  * @return Status of the deserialization. It returns 1 if the data couldn't be
@@ -487,7 +488,8 @@ int ts_deserialize_scene(TS_Scene *scene, const char *data);
 
 /**
  * Serializes the scene into a file specified. By convention the file type
-should be `.ts` but could by anything.
+should be `.ts` but could by anything. This serializes entities, components,
+and systems, but does not serialize plugins.
  * @param scene The scene that should be serialized
  * @param path The path to the scene file. The user is responsible to make sure
 that the path exists. If the file doesn't exist, it will be created. If it
@@ -498,6 +500,8 @@ int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
 
 /**
  * Reads the provided file and deserializes the data from the file into a scene.
+ * This deserializes entities, components, and systems, but does not deserialize 
+ * plugins.
  * @param scene The scene that should be constructed
  * @param path The path to the scene file. If the file or path doesn't exist the
  * function fails and nothing happens
