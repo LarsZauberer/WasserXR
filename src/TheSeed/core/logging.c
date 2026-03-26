@@ -11,28 +11,30 @@ static GArray *ts_loggers = NULL;
 static TS_Log_Entry ts_create_entry(TS_Log_Level log_level, const char *fmt,
                                     va_list args) {
   char *formatted_string = g_strdup_vprintf(fmt, args);
-  TS_Log_Entry entry = {log_level, formatted_string};
+  const TS_Log_Entry entry = {log_level, formatted_string};
   return entry;
 }
 
 static void ts_destroy_entry(TS_Log_Entry entry) { free(entry.msg); }
 
-static void ts_send_entry_to_loggers(TS_Log_Entry entry) {
+static void ts_send_entry_to_loggers(const TS_Log_Entry entry) {
   g_assert(ts_loggers);
   for (unsigned int i = 0; i < ts_loggers->len; i++) {
-    TS_Logger logger = g_array_index(ts_loggers, TS_Logger, i);
+    const TS_Logger logger = g_array_index(ts_loggers, TS_Logger, i);
     logger(entry);
   }
 }
 
-void ts_logging_init(TS_Log_Level level) {
+void ts_logging_init(const TS_Log_Level level) {
   ts_lowest_level = level;
   ts_loggers = g_array_new(FALSE, FALSE, sizeof(TS_Logger));
 }
 
-void ts_add_logger(TS_Logger logger) { g_array_append_val(ts_loggers, logger); }
+void ts_add_logger(const TS_Logger logger) {
+  g_array_append_val(ts_loggers, logger);
+}
 
-void ts_stdout_logger(TS_Log_Entry entry) {
+void ts_stdout_logger(const TS_Log_Entry entry) {
   char *level = NULL;
   char *color = NULL;
   switch (entry.level) {

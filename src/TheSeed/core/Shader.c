@@ -216,7 +216,8 @@ int ts_set_shader_uniform_1i(TS_Shader *shader, const char *name, int value) {
   return 0;
 }
 
-int ts_set_shader_uniform_2f(TS_Shader *shader, const char *name, const vec2 value) {
+int ts_set_shader_uniform_2f(TS_Shader *shader, const char *name,
+                             const vec2 value) {
   ts_assert_abort_value(shader, -1,
                         "Shader is NULL during ts_set_shader_uniform_2f");
 
@@ -235,7 +236,8 @@ int ts_set_shader_uniform_2f(TS_Shader *shader, const char *name, const vec2 val
   return 0;
 }
 
-int ts_set_shader_uniform_3f(TS_Shader *shader, const char *name, const vec3 value) {
+int ts_set_shader_uniform_3f(TS_Shader *shader, const char *name,
+                             const vec3 value) {
   ts_assert_abort_value(shader, -1,
                         "Shader is NULL during ts_set_shader_uniform_3f");
 
@@ -254,7 +256,8 @@ int ts_set_shader_uniform_3f(TS_Shader *shader, const char *name, const vec3 val
   return 0;
 }
 
-int ts_set_shader_uniform_4f(TS_Shader *shader, const char *name, const vec4 value) {
+int ts_set_shader_uniform_4f(TS_Shader *shader, const char *name,
+                             const vec4 value) {
   ts_assert_abort_value(shader, -1,
                         "Shader is NULL during ts_set_shader_uniform_4f");
 

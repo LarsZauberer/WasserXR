@@ -13,7 +13,7 @@ typedef struct aiMesh aiMesh;
 typedef struct aiFace aiFace;
 
 // Recursive function to handle all the model nodes
-static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
+static TS_Mesh_Data ts_process_mesh(const aiMesh *mesh) {
   TS_Mesh_Data mesh_data;
 
   float *vertices = malloc(sizeof(float) * mesh->mNumVertices * 3);
@@ -62,7 +62,7 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
       "Malloc returned null for indicies creation during ts_process_mesh");
 
   for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
-    aiFace face = mesh->mFaces[i];
+    const aiFace face = mesh->mFaces[i];
     ts_assert(face.mNumIndices == 3,
               "The mesh being processed is not a triangle mesh. Meshes other "
               "than triangle meshes are not supported");
@@ -77,11 +77,11 @@ static TS_Mesh_Data ts_process_mesh(aiMesh *mesh) {
 }
 
 static void ts_process_node(GArray *mesh_data, const aiScene *scene,
-                            aiNode *node) {
+                            const aiNode *node) {
   // process all the node's meshes (if any)
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
-    aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-    TS_Mesh_Data new_mesh = ts_process_mesh(mesh);
+    const aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+    const TS_Mesh_Data new_mesh = ts_process_mesh(mesh);
     g_array_append_val(mesh_data, new_mesh);
   }
   // then do the same for each of its children

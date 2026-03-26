@@ -66,7 +66,7 @@ void ts_critical(const char * /*fmt*/, ...);
 
 // Logger registry
 
-typedef void (*TS_Logger)(TS_Log_Entry);
+typedef void (*TS_Logger)(const TS_Log_Entry);
 
 void ts_add_logger(TS_Logger /*logger*/);
 
