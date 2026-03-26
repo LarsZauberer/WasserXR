@@ -8,7 +8,6 @@ struct TestCase {
   TS_Scene *scene;
   TS_Entity entity;
   char *component;
-  int status;
   void *out;
 };
 
@@ -19,12 +18,8 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  int status = ts_add_component(input->scene, input->entity, input->component);
-  ts_assert(status == input->status,
-            "Add Component has not the right status: %d != %d", status,
-            input->status);
   void *component =
-      ts_entity_get_component(input->scene, input->entity, input->component);
+      ts_add_component(input->scene, input->entity, input->component);
   if (input->out) {
     ts_assert(component != NULL, "Component is NULL (should not be NULL)");
   } else {
@@ -57,12 +52,12 @@ int main(int argc, char *argv[]) {
   TS_Entity entity3 = ts_add_entity(entity_plugin_scene);
 
   TestCase cases[] = {
-      {NULL, 0, NULL, -1, NULL},
-      {NULL, 0, "", -1, NULL},
-      {empty_scene, 0, "", 1, NULL},
-      {entity_scene, entity, "", 1, NULL},
-      {entity_plugin_scene_invalid, entity2, "Ahh", 1, NULL},
-      {entity_plugin_scene, entity3, "TS_Transform", 0, (void *)1},
+      {NULL, 0, NULL, NULL},
+      {NULL, 0, "", NULL},
+      {empty_scene, 0, "", NULL},
+      {entity_scene, entity, "", NULL},
+      {entity_plugin_scene_invalid, entity2, "Ahh", NULL},
+      {entity_plugin_scene, entity3, "TS_Transform", (void *)1},
   };
 
   // Constructing Tests

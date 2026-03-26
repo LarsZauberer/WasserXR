@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   ts_assert(0 == ts_load_plugin(full_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin (systems)");
   TS_Entity entity_id_component = ts_add_entity(full_scene);
-  ts_assert(0 == ts_add_component(full_scene, entity_id_component, "TS_A"),
+  ts_assert(ts_add_component(full_scene, entity_id_component, "TS_A") != NULL,
             "Failed to add component");
   ts_assert(0 == ts_add_system(full_scene, "ts_system_a", 100),
             "Failed to add system");

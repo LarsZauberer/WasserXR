@@ -145,11 +145,11 @@ int ts_reload(TS_Scene *scene);
  * Add a component to an entity.
  * @param scene The scene containing the entity
  * @param entity_id The entity to add the component to
- * @param component_name Name of the component type to add
- * @return 0 on success, non-zero on failure
+ * @param component_id Name of the component type to add
+ * @return Pointer to the created component data, or NULL on failure
  */
-int ts_add_component(TS_Scene *scene, TS_Entity entity_id,
-                     const char *component_id);
+void *ts_add_component(TS_Scene *scene, TS_Entity entity_id,
+                       const char *component_id);
 
 /**
  * Remove a component from an entity.
