@@ -66,49 +66,29 @@ int main(int argc, char *argv[]) {
   ts_assert(0 == ts_add_system(full_scene, "ts_system_a", 100),
             "Failed to add system");
 
-  ts_debug(
-      "Length of last test case: %ld",
-      sizeof(size_t) + (sizeof(size_t) + sizeof(size_t) + sizeof(size_t)) +
-          (sizeof(size_t) + strlen("./libtheseed_test_components.so") + 1) +
-          (sizeof(size_t) + strlen("./libtheseed_systems.so") + 1) +
-          (sizeof(size_t) + strlen("ts_console_system") + 1 + sizeof(int)) +
-          (sizeof(size_t) + sizeof(TS_Entity) + sizeof(size_t) +
-           strlen("TS_A") + 1 + sizeof(size_t) + strlen("x") + 1 + sizeof(int) +
-           sizeof(size_t) + strlen("extra") + 1 + sizeof(int)));
-
   TestCase cases[] = {
       {NULL, 0, NULL},
       {NULL, 0, NULL},
       {empty_scene,
-       sizeof(size_t) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t),
-       "\40\0\0\0\0\0\0\0"
-       "\0\0\0\0\0\0\0\0"
+       sizeof(size_t) + sizeof(size_t) + sizeof(size_t),
+       "\30\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"},
       {entity_scene,
-       sizeof(size_t) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t) +
-           sizeof(size_t) + strlen("./libtheseed_test_components.so") + 1 +
-           sizeof(size_t),
-       "\120\0\0\0\0\0\0\0"
-       "\1\0\0\0\0\0\0\0"
+       sizeof(size_t) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t),
+       "\40\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
-       "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
        "\10\0\0\0\0\0\0\0"},
       {full_scene,
-       sizeof(size_t) + (sizeof(size_t) + sizeof(size_t) + sizeof(size_t)) +
-           (sizeof(size_t) + strlen("./libtheseed_test_components.so") + 1) +
-           (sizeof(size_t) + strlen("./libtheseed_test_systems.so") + 1) +
+       sizeof(size_t) + (sizeof(size_t) + sizeof(size_t)) +
            (sizeof(size_t) + strlen("ts_system_a") + 1 + sizeof(int)) +
            (sizeof(size_t) + sizeof(size_t) + strlen("TS_A") + 1 +
             sizeof(size_t) + strlen("x") + 1 + sizeof(int) + sizeof(size_t) +
             strlen("extra") + 1 + sizeof(int)),
-       "\272\0\0\0\0\0\0\0"
-       "\2\0\0\0\0\0\0\0"
+       "\145\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
-       "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"
-       "\45\0\0\0\0\0\0\0./libtheseed_test_systems.so\0"
        "\30\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0"
        "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0TS_"
        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
