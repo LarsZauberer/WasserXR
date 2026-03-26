@@ -1000,7 +1000,7 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
     }
   }
 
-  size_t allocation = sizeof(size_t) + sizeof(TS_Entity);
+  size_t allocation = sizeof(size_t);
 
   // Compute the component array and also compute the allocation length
   size_t component_index = 0;
@@ -1028,9 +1028,6 @@ char *ts_serialize_entity(const TS_Scene *scene, const TS_Entity entity_id) {
 
   memcpy(iter, &allocation, sizeof(size_t));
   iter += sizeof(size_t);
-
-  memcpy(iter, &entity_id, sizeof(TS_Entity));
-  iter += sizeof(TS_Entity);
 
   for (size_t i = 0; i < component_counter; i++) {
     char *component = component_serializations[i];
@@ -1234,11 +1231,10 @@ int ts_deserialize_entity(TS_Scene *scene, const char *data) {
 
   const size_t size = ts_get_byte_length(data);
 
-  const TS_Entity entity =
-      ts_add_entity(scene); // We disregard the entity that was serialized
+  const TS_Entity entity = ts_add_entity(scene);
 
   const char *end = data + size;
-  const char *iter = data + sizeof(size_t) + sizeof(TS_Entity);
+  const char *iter = data + sizeof(size_t);
 
   while (iter < end) {
     const size_t length = ts_get_byte_length(iter);
