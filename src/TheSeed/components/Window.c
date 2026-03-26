@@ -97,7 +97,7 @@ void ts_schema_TS_Window(TS_Component_Schema *schema) {
   ts_add_field_to_component_schema(schema, window_field);
 }
 
-void *ts_get_TS_Window_window(void *component) {
-  TS_Window *window = (TS_Window *)component;
-  return window->window;
+void *ts_get_TS_Window_window(const void *component) {
+  const TS_Window *window = (const TS_Window *)component;
+  return (void *)window->window;
 }

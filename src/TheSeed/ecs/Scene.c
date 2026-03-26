@@ -272,7 +272,7 @@ void *ts_add_component(TS_Scene *scene, const TS_Entity entity_id,
   return component;
 }
 
-long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
+long ts_get_component_index_from_entity_and_id(const TS_Scene *scene,
                                                const TS_Entity entity,
                                                const char *component_id) {
   ts_assert(scene,
@@ -289,7 +289,7 @@ long ts_get_component_index_from_entity_and_id(TS_Scene *scene,
   return -1L;
 }
 
-void *ts_entity_get_component(TS_Scene *scene, const TS_Entity entity,
+void *ts_entity_get_component(const TS_Scene *scene, const TS_Entity entity,
                               const char *component_id) {
   ts_assert_abort_value(scene, NULL,
                         "Scene is NULL during ts_entity_get_component");
@@ -368,7 +368,8 @@ char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
   return data;
 }
 
-static int ts_default_selector(TS_Scene *scene, const TS_Entity entity_id) {
+static int ts_default_selector(const TS_Scene *scene,
+                               const TS_Entity entity_id) {
   return 0;
 }
 
@@ -687,8 +688,8 @@ TS_Component_Schema *ts_create_component_schema() {
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 TS_Component_Field *
-ts_create_component_field(char *field_name, size_t size, TS_Primitive_Type type,
-                          TS_Component_Getter getter,
+ts_create_component_field(const char *field_name, size_t size,
+                          TS_Primitive_Type type, TS_Component_Getter getter,
                           TS_Component_Setter setter,
                           TS_Component_Serializer serializer,
                           TS_Component_Deserializer deserializer) {
@@ -727,7 +728,7 @@ void ts_destroy_component_field(TS_Component_Field *field) {
 }
 
 int ts_add_field_to_component_schema(TS_Component_Schema *schema,
-                                     TS_Component_Field *field) {
+                                     const TS_Component_Field *field) {
   for (size_t i = 0; i < schema->fields->len; i++) {
     TS_Component_Field *other =
         g_array_index(schema->fields, TS_Component_Field *, i);
@@ -740,8 +741,8 @@ int ts_add_field_to_component_schema(TS_Component_Schema *schema,
   return 0;
 }
 
-TS_Component_Field *ts_get_field(TS_Component_Schema *schema,
-                                 char *field_name) {
+TS_Component_Field *ts_get_field(const TS_Component_Schema *schema,
+                                 const char *field_name) {
   ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_field");
   for (size_t i = 0; i < schema->fields->len; i++) {
     TS_Component_Field *field =
@@ -753,8 +754,8 @@ TS_Component_Field *ts_get_field(TS_Component_Schema *schema,
   return NULL;
 }
 
-TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
-                                        char *field_name) {
+TS_Component_Getter ts_get_field_getter(const TS_Component_Schema *schema,
+                                        const char *field_name) {
   ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
   TS_Component_Field *field = ts_get_field(schema, field_name);
   if (!field) {
@@ -763,8 +764,8 @@ TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
   return field->getter;
 }
 
-TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
-                                        char *field_name) {
+TS_Component_Setter ts_get_field_setter(const TS_Component_Schema *schema,
+                                        const char *field_name) {
   ts_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
   TS_Component_Field *field = ts_get_field(schema, field_name);
   if (!field) {
@@ -773,7 +774,8 @@ TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
   return field->setter;
 }
 
-size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
+size_t ts_get_field_size(const TS_Component_Schema *schema,
+                         const char *field_name) {
   ts_assert(schema, "Schema is null during ts_get_getter");
   TS_Component_Field *field = ts_get_field(schema, field_name);
   ts_assert(field, "Field `%s` not found during the ts_get_field_size",
@@ -781,8 +783,8 @@ size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name) {
   return field->size;
 }
 
-TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
-                                    char *field_name) {
+TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
+                                    const char *field_name) {
   ts_assert(schema, "Schema is null during ts_get_getter");
   TS_Component_Field *field = ts_get_field(schema, field_name);
   ts_assert(field, "Field `%s` not found during the ts_get_field_type",
@@ -790,7 +792,7 @@ TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
   return field->type;
 }
 
-void *ts_get(TS_Scene *scene, void *component, char *field) {
+void *ts_get(const TS_Scene *scene, const void *component, const char *field) {
   ts_assert_abort_value(scene, NULL, "Scene is null during ts_get");
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);
@@ -803,7 +805,8 @@ void *ts_get(TS_Scene *scene, void *component, char *field) {
   return getter(component);
 }
 
-int ts_set(TS_Scene *scene, void *component, char *field, void *data) {
+int ts_set(const TS_Scene *scene, void *component, const char *field,
+           const void *data) {
   ts_assert_abort_value(scene, 1, "Scene is null during ts_get");
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);
@@ -816,8 +819,8 @@ int ts_set(TS_Scene *scene, void *component, char *field, void *data) {
   return 0;
 }
 
-TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
-                                                void *component) {
+TS_Component_Schema *ts_get_schema_of_component(const TS_Scene *scene,
+                                                const void *component) {
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);
   ts_assert_abort_value(handler, NULL,
@@ -1359,7 +1362,7 @@ void ts_deserialize_scene_from_file(TS_Scene *scene, const char *path) {
 
 // Debug Functions
 
-void ts_print_entities(TS_Scene *scene) {
+void ts_print_entities(const TS_Scene *scene) {
   printf("Active Entities %d:\n", scene->entities->len);
   for (size_t i = 0; i < scene->entities->len; i++) {
     const TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
@@ -1367,7 +1370,7 @@ void ts_print_entities(TS_Scene *scene) {
   }
 }
 
-void ts_print_plugins(TS_Scene *scene) {
+void ts_print_plugins(const TS_Scene *scene) {
   printf("Loaded Plugins %d:\n", scene->plugins->len);
   for (size_t i = 0; i < scene->plugins->len; i++) {
     const TS_Plugin_Handler *plugin =
@@ -1376,7 +1379,7 @@ void ts_print_plugins(TS_Scene *scene) {
   }
 }
 
-void ts_print_components(TS_Scene *scene) {
+void ts_print_components(const TS_Scene *scene) {
   printf("Active Components %d:\n", scene->components->len);
   for (size_t i = 0; i < scene->entities->len; i++) {
     const TS_Entity entity = g_array_index(scene->entities, TS_Entity, i);
@@ -1391,7 +1394,7 @@ void ts_print_components(TS_Scene *scene) {
   }
 }
 
-void ts_print_systems(TS_Scene *scene) {
+void ts_print_systems(const TS_Scene *scene) {
   printf("Active Systems %d:\n", scene->systems->len);
   for (size_t i = 0; i < scene->systems->len; i++) {
     const TS_System_Handler *system =

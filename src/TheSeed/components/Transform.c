@@ -91,119 +91,119 @@ void ts_schema_TS_Transform(TS_Component_Schema *schema) {
   ts_add_field_to_component_schema(schema, field_sz);
 }
 
-void *ts_get_TS_Transform_x(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_x(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->position[0];
+  return (void *)&transform->position[0];
 }
 
-void ts_set_TS_Transform_x(void *component, void *data) {
+void ts_set_TS_Transform_x(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->position[0] = *(float *)data;
+    transform->position[0] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_y(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_y(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->position[1];
+  return (void *)&transform->position[1];
 }
 
-void ts_set_TS_Transform_y(void *component, void *data) {
+void ts_set_TS_Transform_y(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->position[1] = *(float *)data;
+    transform->position[1] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_z(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_z(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->position[2];
+  return (void *)&transform->position[2];
 }
 
-void ts_set_TS_Transform_z(void *component, void *data) {
+void ts_set_TS_Transform_z(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->position[2] = *(float *)data;
+    transform->position[2] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_rx(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_rx(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->rotation[0];
+  return (void *)&transform->rotation[0];
 }
 
-void ts_set_TS_Transform_rx(void *component, void *data) {
+void ts_set_TS_Transform_rx(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->rotation[0] = *(float *)data;
+    transform->rotation[0] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_ry(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_ry(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->rotation[1];
+  return (void *)&transform->rotation[1];
 }
 
-void ts_set_TS_Transform_ry(void *component, void *data) {
+void ts_set_TS_Transform_ry(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->rotation[1] = *(float *)data;
+    transform->rotation[1] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_rz(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_rz(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->rotation[2];
+  return (void *)&transform->rotation[2];
 }
 
-void ts_set_TS_Transform_rz(void *component, void *data) {
+void ts_set_TS_Transform_rz(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->rotation[2] = *(float *)data;
+    transform->rotation[2] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_sx(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_sx(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->scale[0];
+  return (void *)&transform->scale[0];
 }
 
-void ts_set_TS_Transform_sx(void *component, void *data) {
+void ts_set_TS_Transform_sx(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->scale[0] = *(float *)data;
+    transform->scale[0] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_sy(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_sy(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->scale[1];
+  return (void *)&transform->scale[1];
 }
 
-void ts_set_TS_Transform_sy(void *component, void *data) {
+void ts_set_TS_Transform_sy(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->scale[1] = *(float *)data;
+    transform->scale[1] = *(const float *)data;
   }
 }
 
-void *ts_get_TS_Transform_sz(void *component) {
-  TS_Transform *transform = (TS_Transform *)component;
+void *ts_get_TS_Transform_sz(const void *component) {
+  const TS_Transform *transform = (const TS_Transform *)component;
 
-  return &transform->scale[2];
+  return (void *)&transform->scale[2];
 }
 
-void ts_set_TS_Transform_sz(void *component, void *data) {
+void ts_set_TS_Transform_sz(void *component, const void *data) {
   TS_Transform *transform = (TS_Transform *)component;
   if (data) {
-    transform->scale[2] = *(float *)data;
+    transform->scale[2] = *(const float *)data;
   }
 }

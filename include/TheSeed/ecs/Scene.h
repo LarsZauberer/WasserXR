@@ -34,19 +34,19 @@ typedef int TS_Field_Permission;
 #define SYSTEM_GROUPS_PREFIX "ts_groups_"
 
 // Component Functions
-// TODO: Add const modifiers to the functions
 typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Schema_Function)(TS_Component_Schema *);
-typedef void *(*TS_Component_Getter)(void *);
-typedef void (*TS_Component_Setter)(void *, void *);
+typedef void *(*TS_Component_Getter)(const void *);
+typedef void (*TS_Component_Setter)(void *, const void *);
 typedef char *(*TS_Component_Serializer)(const void *);
 typedef int (*TS_Component_Deserializer)(void *, const char *);
 
 // System Functions
 typedef int TS_System_Groups;
 typedef void (*TS_System_Function)(TS_Scene *, TS_Entity **, const size_t *);
-typedef TS_System_Groups (*TS_System_Selector)(TS_Scene *, const TS_Entity);
+typedef TS_System_Groups (*TS_System_Selector)(const TS_Scene *,
+                                               const TS_Entity);
 typedef void (*TS_System_Attacher)(TS_Scene *);
 typedef void (*TS_System_Detacher)(TS_Scene *);
 
@@ -179,7 +179,7 @@ char **ts_get_components_of_entity(size_t *size, const TS_Scene *scene,
  * @param component_name Name of the component type to retrieve
  * @return Pointer to the component data, or NULL if not found
  */
-void *ts_entity_get_component(TS_Scene *scene, TS_Entity entity_id,
+void *ts_entity_get_component(const TS_Scene *scene, TS_Entity entity_id,
                               const char *component_id);
 
 /**
@@ -267,7 +267,7 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
  * failure
  */
 TS_Component_Field *ts_create_component_field(
-    char *field_name, size_t size, TS_Primitive_Type type,
+    const char *field_name, size_t size, TS_Primitive_Type type,
     TS_Component_Getter getter, TS_Component_Setter setter,
     TS_Component_Serializer serializer, TS_Component_Deserializer deserializer);
 
@@ -302,7 +302,7 @@ void ts_destroy_component_schema(TS_Component_Schema *schema);
  * @return 0 on success, non-zero on failure
  */
 int ts_add_field_to_component_schema(TS_Component_Schema *schema,
-                                     TS_Component_Field *field);
+                                     const TS_Component_Field *field);
 
 /**
  * Get the schema for a given component instance.
@@ -312,8 +312,8 @@ int ts_add_field_to_component_schema(TS_Component_Schema *schema,
  * @param component Pointer to the component instance
  * @return Pointer to the component's schema, or NULL if not found
  */
-TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
-                                                void *component);
+TS_Component_Schema *ts_get_schema_of_component(const TS_Scene *scene,
+                                                const void *component);
 
 /**
  * Get a field from a component schema by name.
@@ -321,7 +321,8 @@ TS_Component_Schema *ts_get_schema_of_component(TS_Scene *scene,
  * @param field Name of the field to retrieve
  * @return Pointer to the field definition, or NULL if not found
  */
-TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
+TS_Component_Field *ts_get_field(const TS_Component_Schema *schema,
+                                 const char *field);
 
 /**
  * Get the getter function for a specific field in a component schema.
@@ -331,8 +332,8 @@ TS_Component_Field *ts_get_field(TS_Component_Schema *schema, char *field);
  * @param field_name Name of the field
  * @return Function pointer to the getter, or NULL if not found
  */
-TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
-                                        char *field_name);
+TS_Component_Getter ts_get_field_getter(const TS_Component_Schema *schema,
+                                        const char *field_name);
 
 /**
  * Get the setter function for a specific field in a component schema.
@@ -342,8 +343,8 @@ TS_Component_Getter ts_get_field_getter(TS_Component_Schema *schema,
  * @param field_name Name of the field
  * @return Function pointer to the setter, or NULL if not found
  */
-TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
-                                        char *field_name);
+TS_Component_Setter ts_get_field_setter(const TS_Component_Schema *schema,
+                                        const char *field_name);
 
 /**
  * Get the size in bytes of a specific field in a component schema.
@@ -351,7 +352,8 @@ TS_Component_Setter ts_get_field_setter(TS_Component_Schema *schema,
  * @param field_name Name of the field
  * @return Size of the field data in bytes
  */
-size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name);
+size_t ts_get_field_size(const TS_Component_Schema *schema,
+                         const char *field_name);
 
 /**
  * Get the primitive type of a specific field in a component schema.
@@ -359,8 +361,8 @@ size_t ts_get_field_size(TS_Component_Schema *schema, char *field_name);
  * @param field_name Name of the field
  * @return The primitive type (TS_L, TS_F, TS_C, TS_BLOB, TS_S, TS_BLOB_ARRAY)
  */
-TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
-                                    char *field_name);
+TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
+                                    const char *field_name);
 
 /**
  * Get the value of a field from a component instance.
@@ -371,7 +373,7 @@ TS_Primitive_Type ts_get_field_type(TS_Component_Schema *schema,
  * @param field Name of the field to get
  * @return Pointer to the field value, or NULL if not found
  */
-void *ts_get(TS_Scene *scene, void *component, char *field);
+void *ts_get(const TS_Scene *scene, const void *component, const char *field);
 
 /**
  * Set the value of a field on a component instance.
@@ -383,7 +385,8 @@ void *ts_get(TS_Scene *scene, void *component, char *field);
  * @param data Pointer to the new value to set
  * @return 0 on success, non-zero on failure
  */
-int ts_set(TS_Scene *scene, void *component, char *field, void *data);
+int ts_set(const TS_Scene *scene, void *component, const char *field,
+           const void *data);
 
 /**
  * Serializes the loaded plugin from the Scene
@@ -511,25 +514,25 @@ void ts_deserialize_scene_from_file(TS_Scene *scene, const char *path);
  * Print all entities in the scene to stdout.
  * @param scene The scene to print entities from
  */
-void ts_print_entities(TS_Scene *scene);
+void ts_print_entities(const TS_Scene *scene);
 
 /**
  * Print all loaded plugins in the scene to stdout.
  * @param scene The scene to print plugins from
  */
-void ts_print_plugins(TS_Scene *scene);
+void ts_print_plugins(const TS_Scene *scene);
 
 /**
  * Print all registered components in the scene to stdout.
  * @param scene The scene to print components from
  */
-void ts_print_components(TS_Scene *scene);
+void ts_print_components(const TS_Scene *scene);
 
 /**
  * Print all systems in the scene to stdout.
  * @param scene The scene to print systems from
  */
-void ts_print_systems(TS_Scene *scene);
+void ts_print_systems(const TS_Scene *scene);
 
 /** @} */
 
