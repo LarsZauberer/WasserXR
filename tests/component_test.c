@@ -66,3 +66,19 @@ void ts_schema_TS_B(TS_Component_Schema *schema) {
   TS_SCHEMA_FIELD(TS_S, name, ts_get_TS_B_name, ts_set_TS_B_name,
                   ts_serialize_TS_B_name, ts_deserialize_TS_B_name);
 }
+
+typedef struct TS_C_Empty TS_C_Empty;
+
+struct TS_C_Empty {
+  int a;
+};
+
+void *ts_create_TS_C_Empty() {
+  TS_C_Empty *component = malloc(sizeof(TS_C));
+  component->a = 5;
+  return component;
+}
+
+void ts_destroy_TS_C_Empty(void *ptr) { free(ptr); }
+
+void ts_schema_TS_C_Empty(TS_Component_Schema *schema) {}

@@ -908,6 +908,7 @@ ts_serialize_component_fields(size_t *total_size, const TS_Scene *scene,
 
   *total_size = allocation_size;
   if (allocation_size == 0) {
+    g_array_free(serializations, TRUE);
     return NULL;
   }
 
