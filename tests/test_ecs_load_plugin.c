@@ -19,7 +19,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   int result = ts_load_plugin(input->scene, input->plugin_path);
   ts_assert(result == input->expected_result,
             "Load plugin result should match expected");
@@ -39,9 +39,9 @@ int main(int argc, char *argv[]) {
   TS_Scene *valid_scene2 = ts_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                                   // NULL scene
-      {valid_scene, "", 1},                                    // Empty path
-      {valid_scene2, "./libtheseed_components.so", 0},         // Valid plugin
+      {null_scene, NULL, 1},                                // NULL scene
+      {valid_scene, "", 1},                                 // Empty path
+      {valid_scene2, "./libtheseed_test_components.so", 0}, // Valid plugin
   };
 
   // Constructing Tests

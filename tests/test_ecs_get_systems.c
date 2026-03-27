@@ -19,13 +19,13 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   size_t count = 0;
   char **systems = ts_get_systems(&count, input->scene);
-  
+
   ts_assert(count == input->expected_count,
             "System count should match expected");
-  
+
   if (count > 0 && systems != NULL) {
     for (size_t i = 0; i < count; i++) {
       free(systems[i]);
@@ -44,9 +44,10 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *scene_one_system = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_one_system, "./libtheseed_systems.so"),
-            "Failed to load the plugin");
-  ts_add_system(scene_one_system, "TS_TestSystem", 10);
+  ts_assert(
+      0 == ts_load_plugin(scene_one_system, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
+  ts_add_system(scene_one_system, "ts_system_a", 10);
 
   TestCase cases[] = {
       {empty_scene, 0},

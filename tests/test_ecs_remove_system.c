@@ -19,7 +19,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   int result = ts_remove_system(input->scene, input->system_name);
   ts_assert(result == input->expected_result,
             "Remove system result should match expected");
@@ -37,20 +37,28 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *scene_with_system = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_with_system, "./libtheseed_systems.so"),
-            "Failed to load the plugin");
-  ts_add_system(scene_with_system, "TS_TestSystem", 10);
+  ts_assert(
+      0 == ts_load_plugin(scene_with_system, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
+  ts_add_system(scene_with_system, "ts_system_a", 10);
 
   TS_Scene *scene_without_system = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_without_system, "./libtheseed_systems.so"),
-            "Failed to load the plugin");
+  ts_assert(
+      0 == ts_load_plugin(scene_without_system, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
+
+  TS_Scene *scene_with_system2 = ts_create_scene();
+  ts_assert(
+      0 == ts_load_plugin(scene_with_system2, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
+  ts_add_system(scene_with_system2, "ts_system_a", 10);
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                           // NULL scene
-      {empty_scene, "", 1},                            // Empty scene
-      {scene_with_system, "TS_TestSystem", 0},         // Valid removal
-      {scene_without_system, "TS_TestSystem", 1},      // System not added
-      {scene_with_system, "NonExistent", 1},           // Non-existent system
+      {null_scene, NULL, 1},                    // NULL scene
+      {empty_scene, "", 1},                     // Empty scene
+      {scene_with_system, "ts_system_a", 0},    // Valid removal
+      {scene_without_system, "ts_system_a", 1}, // System not added
+      {scene_with_system2, "NonExistent", 1},   // Non-existent system
   };
 
   // Constructing Tests

@@ -19,7 +19,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   int result = ts_unload_plugin(input->scene, input->plugin_name);
   ts_assert(result == input->expected_result,
             "Unload plugin result should match expected");
@@ -37,14 +37,17 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *scene_with_plugin = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_with_plugin, "./libtheseed_components.so"),
-            "Failed to load the plugin");
+  ts_assert(
+      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_test_components.so"),
+      "Failed to load the plugin");
+
+  TS_Scene *empty_scene2 = ts_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                                       // NULL scene
-      {empty_scene, "", 1},                                        // Empty scene
-      {scene_with_plugin, "./libtheseed_components.so", 0},        // Valid unload
-      {empty_scene, "NonExistent", 1},                             // Non-existent plugin
+      {null_scene, NULL, 1},                                     // NULL scene
+      {empty_scene, "", 1},                                      // Empty scene
+      {scene_with_plugin, "./libtheseed_test_components.so", 0}, // Valid unload
+      {empty_scene2, "NonExistent", 1}, // Non-existent plugin
   };
 
   // Constructing Tests
