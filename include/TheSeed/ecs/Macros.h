@@ -4,6 +4,8 @@
 #include <TheSeed/ecs/Scene.h>
 #include <string.h>
 
+// NOLINTBEGIN(bugprone-macro-parentheses)
+
 // Getter and Setter Macros
 
 #define TS_BASIC_GETTER(component_type, field_name, field_exp, field_size)     \
@@ -40,7 +42,6 @@
 
 // Serialization and Deserialization Macros
 
-// NOLINTBEGIN(bugprone-macro-parentheses)
 #define TS_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size)  \
   char *ts_serialize_##component_type##_##field_name(const void *ptr) {        \
     const component_type *component = ptr;                                     \
