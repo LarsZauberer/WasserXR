@@ -72,7 +72,8 @@ TS_Scene *ts_create_scene();
 void ts_destroy_scene(TS_Scene *scene);
 
 /**
- * Resets all the ECS structs in the scene and creates an empty scene
+ * Resets all the entities and their components. It also removes all systems.
+ * All plugins currently loaded persist.
  * @param scene The scene to reset
  */
 void ts_reset_scene(TS_Scene *scene);
@@ -98,12 +99,14 @@ int ts_remove_entity(TS_Scene *scene, TS_Entity entity_id);
  * Returns an array of entities currently in the Scene
  * @param size The pointer which will hold the length of the array
  * @param scene The scene that carries the entities
- * @return The array of entities
+ * @return The array of entities (owned by the caller)
  */
 TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene);
 
 /**
- * Load a plugin into the scene.
+ * Load a plugin into the scene. A more detailed error message will be logged
+ * using the logging system in case the plugin fails to be dynamically linked
+ * into the program.
  * @param scene The scene to load the plugin into
  * @param plugin_path Path to the plugin shared library
  * @return 0 on success, non-zero on failure
@@ -113,7 +116,8 @@ int ts_load_plugin(TS_Scene *scene, const char *plugin_name);
 /**
  * Unload a plugin from the scene. It destroys all the components and systems
  * associated to them so that when the plugin is loaded back in, you need to
- * recreate all the components and systems. To avoid that see ts_reload_plugin
+ * recreate all the components and systems. To avoid that see @ref
+ * ts_reload
  * @param scene The scene to unload the plugin from
  * @param plugin_name Name of the plugin to unload
  * @return 0 on success, non-zero on failure
@@ -134,7 +138,9 @@ char **ts_get_plugins(size_t *size, const TS_Scene *scene);
  * with the new functions and recreates all the components.
  * This function should not be called within a system or component. This would
  * also replace the system it came from and hence the return address would
- * become invalid.
+ * become invalid. To call this function refer to @ref ts_set_scene_reload.
+ * Note that all statically linked plugins cannot be reloaded at runtime. Hence
+ * they won't change their code. But they will still be reconstructed.
  * @param scene The scene whose plugins should be reloaded
  * instead
  * @return 0 on success, non-zero on failure
@@ -142,7 +148,9 @@ char **ts_get_plugins(size_t *size, const TS_Scene *scene);
 int ts_reload(TS_Scene *scene);
 
 /**
- * Add a component to an entity.
+ * Add a component to an entity. This will run the creator function (see @ref
+ * TS_Component_Creator) to create a suitable container. The object that is
+ * created by that function will also be returned by this function.
  * @param scene The scene containing the entity
  * @param entity_id The entity to add the component to
  * @param component_id Name of the component type to add
@@ -152,7 +160,9 @@ void *ts_add_component(TS_Scene *scene, TS_Entity entity_id,
                        const char *component_id);
 
 /**
- * Remove a component from an entity.
+ * Remove a component from an entity. This will completely free the object by
+ * running the destroyer function of the component (see @ref
+ * TS_Component_Destroyer).
  * @param scene The scene containing the entity
  * @param entity_id The entity to remove the component from
  * @param component_name Name of the component type to remove
@@ -210,9 +220,10 @@ int ts_remove_system(TS_Scene *scene, const char *system_id);
 char **ts_get_systems(size_t *size, const TS_Scene *scene);
 
 /**
- * Execute one tick/frame of all systems in the scene.
+ * Execute one tick/frame of all systems in the scene. This will call the system
+ * function of each system (see @ref TS_System_Function)
  * @param scene The scene to tick
- * @return 1 on a normal tick run and 0 if the Scene should be terminated
+ * @return 1 on a normal tick run and 0 if the Scene wants be terminated
  */
 int ts_tick_scene(TS_Scene *scene);
 
@@ -249,12 +260,11 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
  * Fields are the basic building blocks of component schemas, defining
  * individual properties that components can have with their type,
  * size, and access methods.
+ * To make life easier there are some convenience macros defined in @ref
+ * Macros.h . There is defined for example @ref TS_SCHEMA_FIELD
  * @param field_name Name of the field
- * @param size Size of the field data in bytes
  * @param type Primitive type of the field (TS_L, TS_F, TS_C, TS_BLOB,
  * TS_S, TS_BLOB_ARRAY)
- * @param permission Permission flags controlling serialization and
- * other behaviors
  * @param getter Function pointer to get the field value from a
  * component instance
  * @param setter Function pointer to set the field value on a component
@@ -297,6 +307,9 @@ void ts_destroy_component_schema(TS_Component_Schema *schema);
  * Add a field to a component schema.
  * This function registers a field definition with the schema, allowing the ECS
  * to track and access this field on component instances.
+ * This function is often couples with the @ref ts_create_component_field
+ * function which is why there exists in @ref Macros.h some helper macros like
+ * @ref TS_SCHEMA_FIELD to make life easier.
  * @param schema The schema to add the field to
  * @param field The field to add (ownership is transferred to the schema)
  * @return 0 on success, non-zero on failure
@@ -304,6 +317,7 @@ void ts_destroy_component_schema(TS_Component_Schema *schema);
 int ts_add_field_to_component_schema(TS_Component_Schema *schema,
                                      const TS_Component_Field *field);
 
+// TODO: Should be made constant for public usage
 /**
  * Get the schema for a given component instance.
  * This function looks up the schema that defines the structure of the provided
@@ -315,6 +329,7 @@ int ts_add_field_to_component_schema(TS_Component_Schema *schema,
 TS_Component_Schema *ts_get_schema_of_component(const TS_Scene *scene,
                                                 const void *component);
 
+// TODO: Should be made constant for public usage
 /**
  * Get a field from a component schema by name.
  * @param schema The component schema to search
@@ -359,10 +374,15 @@ TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
  * Get the value of a field from a component instance.
  * This is a generic getter that uses the component's schema to look up
  * the appropriate field getter function and retrieve the value.
+ * The value returned is by convention the direct pointer to the struct field.
+ * It is returned as a constant pointer which means unless you know what you do,
+ * the pointer should not be modified directly. Instead you should use the @ref
+ * ts_set function.
  * @param scene The scene containing the component
  * @param component Pointer to the component instance
  * @param field Name of the field to get
- * @return Pointer to the field value, or NULL if not found
+ * @return Pointer to the field value, or NULL if not found. The data/pointer is
+ * not owned by the caller.
  */
 const void *ts_get(const TS_Scene *scene, const void *component,
                    const char *field);
@@ -374,7 +394,8 @@ const void *ts_get(const TS_Scene *scene, const void *component,
  * @param scene The scene containing the component
  * @param component Pointer to the component instance
  * @param field Name of the field to set
- * @param data Pointer to the new value to set
+ * @param data Pointer to the new value to set. The data is copied in the @ref
+ * TS_Component_Setter function and therefore the caller still owns the data.
  * @return 0 on success, non-zero on failure
  */
 int ts_set(const TS_Scene *scene, void *component, const char *field,
@@ -421,12 +442,13 @@ many bytes are in the serialization. The data is owned by the caller.
 char *ts_serialize_entity(const TS_Scene *scene, TS_Entity entity);
 
 /**
- * Serializes the entire scene.
+ * Serializes the entire scene. The serialization data contains information
+ * about the entities, components and systems. Note: It doesn't include
+ * information about the plugins. The plugins are not serialized
  * @param scene The scene that should be serialized
  * @return The byte data of the scene. It contains the information about the
-entities, components, and systems. It is prefixed with a `size_t` which
-tells you how many bytes are in the serialization. The data is owned by the
-caller.
+ * entities, components, and systems. It is prefixed with a `size_t` which tells
+ * you how many bytes are in the serialization. The data is owned by the caller.
  */
 char *ts_serialize_scene(const TS_Scene *scene);
 
@@ -480,14 +502,15 @@ int ts_deserialize_scene(TS_Scene *scene, const char *data);
 
 /**
  * Serializes the scene into a file specified. By convention the file type
-should be `.ts` but could by anything. This serializes entities, components,
-and systems, but does not serialize plugins.
+ * should be `.ts` but could by anything. This serializes entities, components,
+ * and systems, but does not serialize plugins.
+ * If IO Errors occur, they should be logged into the logging system.
  * @param scene The scene that should be serialized
  * @param path The path to the scene file. The user is responsible to make sure
-that the path exists. If the file doesn't exist, it will be created. If it
-already exists, it will be overwritten.
+ * that the path exists. If the file doesn't exist, it will be created. If it
+ * already exists, it will be overwritten.
  * @return It returns the status of the file operation
-  */
+ */
 int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
 
 /**
