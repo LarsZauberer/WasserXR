@@ -124,7 +124,32 @@ endfunction()
 
 # Define tests (each test requires just one line now)
 add_theseed_test(test_utils)
+
+add_theseed_test(test_ecs_add_entity)
+add_theseed_test(test_ecs_remove_entity)
+
+add_theseed_test(test_ecs_add_system)
+add_theseed_test(test_ecs_remove_system)
+
 add_theseed_test(test_ecs_add_component)
+add_theseed_test(test_ecs_remove_component)
+
+add_theseed_test(test_ecs_load_plugin)
+add_theseed_test(test_ecs_unload_plugin)
+
+add_theseed_test(test_ecs_get_plugins)
+add_theseed_test(test_ecs_get_entities)
+add_theseed_test(test_ecs_get_systems)
+add_theseed_test(test_ecs_get_components_of_entity)
+
+add_theseed_test(test_ecs_reset_scene)
+
+add_theseed_test(test_ecs_entity_get_component)
+
+add_theseed_test(test_ecs_tick_scene)
+add_theseed_test(test_ecs_set_scene_reload)
+add_theseed_test(test_ecs_set_scene_terminate)
+
 add_theseed_test(test_ecs_serialize_plugin)
 add_theseed_test(test_ecs_serialize_system)
 add_theseed_test(test_ecs_serialize_component)
