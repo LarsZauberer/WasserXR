@@ -18,13 +18,27 @@ int main() {
   ts_load_plugin(scene, "build/libtheseed_systems.so");
 #endif
 
-  size_t console = ts_add_entity(scene);
+  TS_Entity console = ts_add_entity(scene);
   ts_add_component(scene, console, "TS_Console");
+
+  TS_Entity window = ts_add_entity(scene);
+  ts_add_component(scene, window, "TS_Window");
+
+  TS_Entity camera = ts_add_entity(scene);
+  ts_add_component(scene, camera, "TS_Camera");
+  ts_add_component(scene, camera, "TS_Transform");
 
   // Add the systems
   ts_add_system(scene, "ts_console_system", 100);
 
-  ts_deserialize_scene_from_file(scene, "scenes/main.ts");
+  ts_add_system(scene, "ts_window_pre_renderer", 50);
+  ts_add_system(scene, "ts_window_post_renderer", 150);
+
+  ts_add_system(scene, "ts_window_quiter", 200);
+
+  ts_add_system(scene, "ts_window_reloader", 100);
+
+  ts_add_system(scene, "ts_mesh_renderer", 100);
 
   while (ts_tick_scene(scene)) {
   }
