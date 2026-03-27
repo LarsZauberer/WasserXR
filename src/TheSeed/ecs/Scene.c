@@ -68,7 +68,7 @@ void ts_reset_scene(TS_Scene *scene) {
 }
 
 TS_Entity ts_add_entity(TS_Scene *scene) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during entity creation");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during entity creation");
   TS_Entity entity = scene->entity_counter;
   scene->entity_counter += 1;
   g_array_append_val(scene->entities, entity);
@@ -104,22 +104,31 @@ int ts_remove_entity(TS_Scene *scene, const TS_Entity entity) {
 TS_Entity *ts_get_entities(size_t *size, const TS_Scene *scene) {
   ts_assert_abort_value(size, NULL, "Size is NULL during ts_get_entities");
   ts_assert_abort_value(scene, NULL, "Scene is NULL during ts_get_entities");
+
   *size = scene->entities->len;
-  TS_Entity *data = (TS_Entity *)malloc(sizeof(TS_Entity) * *size);
-  if (!scene->entities->data) {
-    return data;
+  if (*size == 0) {
+    return NULL;
   }
+
+  TS_Entity *data = (TS_Entity *)malloc(sizeof(TS_Entity) * *size);
   memcpy(data, scene->entities->data, sizeof(TS_Entity) * *size);
   return data;
 }
 
 int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_load_plugin");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_load_plugin");
+
+  // check if empty (empty will be accepted for some reason by dlopen)
+  if (strcmp(plugin_name, "") == 0) {
+    return 1;
+  }
+
   long does_exist = ts_get_plugin_index(scene, plugin_name);
   if (does_exist != -1L) {
     ts_warn("Plugin `%s` already loaded", plugin_name);
     return 1;
   }
+
   TS_Plugin_Handler *plugin =
       (TS_Plugin_Handler *)malloc(sizeof(TS_Plugin_Handler));
   ts_assert(plugin, "Malloc failed during ts_load_plugin");
@@ -139,7 +148,7 @@ int ts_load_plugin(TS_Scene *scene, const char *plugin_name) {
 }
 
 int ts_unload_plugin(TS_Scene *scene, const char *plugin_name) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_unload_plugin");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_unload_plugin");
   long index = ts_get_plugin_index(scene, plugin_name);
   if (index == -1L) {
     ts_warn("Plugin `%s` is not loaded", plugin_name);
@@ -306,8 +315,8 @@ void *ts_entity_get_component(const TS_Scene *scene, const TS_Entity entity,
 
 int ts_remove_component(TS_Scene *scene, const TS_Entity entity,
                         const char *component_id) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_remove_component");
-  ts_assert_abort_value(component_id, -1,
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_remove_component");
+  ts_assert_abort_value(component_id, 1,
                         "Id is NULL during ts_remove_component");
   // There can only be one association between the entity and the component
   long index =
@@ -374,8 +383,8 @@ static int ts_default_selector(const TS_Scene *scene,
 }
 
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
-  ts_assert_abort_value(system_id, -1, "Id is NULL during ts_add_system");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_add_system");
+  ts_assert_abort_value(system_id, 1, "Id is NULL during ts_add_system");
   long index = ts_get_system_index(scene, system_id);
 
   if (index != -1L) {
@@ -631,8 +640,8 @@ int ts_tick_scene(TS_Scene *scene) {
 }
 
 int ts_remove_system(TS_Scene *scene, const char *system_id) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_remove_system");
-  ts_assert_abort_value(system_id, -1, "Id is NULL during ts_remove_system");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_remove_system");
+  ts_assert_abort_value(system_id, 1, "Id is NULL during ts_remove_system");
   long index = ts_get_system_index(scene, system_id);
 
   if (index == -1L) {
@@ -660,8 +669,7 @@ int ts_remove_system(TS_Scene *scene, const char *system_id) {
 }
 
 int ts_reload(TS_Scene *scene) {
-  ts_assert_abort_value(scene, -1,
-                        "Scene is NULL during ts_reload_all_plugins");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_reload_all_plugins");
 
   char *serialization = ts_serialize_scene(scene);
   ts_reset_scene(scene);
