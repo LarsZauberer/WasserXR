@@ -24,7 +24,9 @@ void ts_system_ts_window_pre_renderer(TS_Scene *scene, TS_Entity **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    GLFWwindow *glfw_window = (GLFWwindow *)ts_get(
+        scene, window,
+        "window"); // Discard const qualifier because direct access is needed
     if (!glfw_window) {
       ts_warn("Window attribute is NULL");
       continue;
@@ -54,7 +56,9 @@ void ts_system_ts_window_post_renderer(TS_Scene *scene, TS_Entity **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    GLFWwindow *glfw_window = (GLFWwindow *)ts_get(
+        scene, window,
+        "window"); // Discard const qualifier because direct access is needed
     if (!glfw_window) {
       ts_warn("Window attribute is NULL");
       continue;
@@ -101,7 +105,9 @@ void ts_system_ts_window_reloader(TS_Scene *scene, TS_Entity **entities,
     TS_Window *window = (TS_Window *)ts_entity_get_component(
         scene, entities[0][i], "TS_Window");
 
-    GLFWwindow *glfw_window = ts_get(scene, window, "window");
+    GLFWwindow *glfw_window = (GLFWwindow *)ts_get(
+        scene, window,
+        "window"); // Discard const qualifier because direct access is needed
     if (!glfw_window) {
       ts_warn("Window attribute is NULL");
       continue;
