@@ -374,8 +374,8 @@ static int ts_default_selector(const TS_Scene *scene,
 }
 
 int ts_add_system(TS_Scene *scene, const char *system_id, int priority) {
-  ts_assert_abort_value(scene, -1, "Scene is NULL during ts_add_system");
-  ts_assert_abort_value(system_id, -1, "Id is NULL during ts_add_system");
+  ts_assert_abort_value(scene, 1, "Scene is NULL during ts_add_system");
+  ts_assert_abort_value(system_id, 1, "Id is NULL during ts_add_system");
   long index = ts_get_system_index(scene, system_id);
 
   if (index != -1L) {

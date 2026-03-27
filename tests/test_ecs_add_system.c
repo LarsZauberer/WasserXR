@@ -20,7 +20,7 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   int result = ts_add_system(input->scene, input->system_name, input->priority);
   ts_assert(result == input->expected_result,
             "Add system result should match expected");
@@ -38,14 +38,20 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *scene_with_plugin = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_with_plugin, "./libtheseed_systems.so"),
-            "Failed to load the plugin");
+  ts_assert(
+      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
+
+  TS_Scene *scene_with_plugin2 = ts_create_scene();
+  ts_assert(
+      0 == ts_load_plugin(scene_with_plugin2, "./libtheseed_test_systems.so"),
+      "Failed to load the plugin");
 
   TestCase cases[] = {
-      {null_scene, NULL, 0, 1},                        // NULL scene
-      {empty_scene, "", 0, 1},                         // Empty scene without plugin
-      {scene_with_plugin, "TS_TestSystem", 10, 0},     // Valid system add
-      {scene_with_plugin, "NonExistent", 5, 1},        // Non-existent system
+      {null_scene, NULL, 0, 1},                   // NULL scene
+      {empty_scene, "ts_system_a", 0, 1},         // Empty scene without plugin
+      {scene_with_plugin, "asdf", 5, 1},          // Non-existent system
+      {scene_with_plugin2, "ts_system_a", 10, 0}, // Valid system add
   };
 
   // Constructing Tests
