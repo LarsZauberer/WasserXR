@@ -65,6 +65,15 @@ int main(int argc, char *argv[]) {
       ts_add_component(component_scene, entity_id_component, "TS_A");
   ts_assert(component != NULL, "Failed to add component");
 
+  TS_Scene *empty_component_scene = ts_create_scene();
+  ts_assert(0 == ts_load_plugin(empty_component_scene,
+                                "./libtheseed_test_components.so"),
+            "Failed to load the plugin");
+  TS_Entity entity_id_empty_component = ts_add_entity(empty_component_scene);
+  void *empty_component = ts_add_component(
+      empty_component_scene, entity_id_empty_component, "TS_C_Empty");
+  ts_assert(empty_component != NULL, "Failed to add component");
+
   TestCase cases[] = {
       {NULL, NULL, 0, NULL},
       {NULL, NULL, 0, NULL},
@@ -74,11 +83,15 @@ int main(int argc, char *argv[]) {
        sizeof(size_t) + strlen("TS_A") + 1 + sizeof(size_t) + strlen("x") + 1 +
            sizeof(int) + sizeof(size_t) + strlen("extra") + 1 + sizeof(int),
        "\55\0\0\0\0\0\0\0TS_"
-       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"}};
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
+      {empty_component_scene, empty_component,
+       sizeof(size_t) + strlen("TS_C_Empty") + 1,
+       "\23\0\0\0\0\0\0\0TS_C_Empty\0"},
+  };
 
   // Constructing Tests
 
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 6; i++) {
     char *path =
         g_strdup_printf("/theseed/test_ecs_serialize_component/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
