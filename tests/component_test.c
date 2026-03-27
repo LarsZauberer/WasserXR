@@ -21,27 +21,11 @@ void *ts_create_TS_A() {
 
 void ts_destroy_TS_A(void *component) { free(component); }
 
-void *ts_get_TS_A_x(const void *ptr) {
-  const TS_A *component = ptr;
-  return &component->x;
-}
+TS_BASIC_GETTER(TS_A, x, &component->x, sizeof(int));
+TS_BASIC_SETTER(TS_A, x, &component->x, sizeof(int));
 
-void ts_set_TS_A_x(void *ptr, const void *value) {
-  TS_A *component = ptr;
-  int val = *(int *)value;
-  component->x = val;
-}
-
-void *ts_get_TS_A_extra(const void *ptr) {
-  const TS_A *component = ptr;
-  return &component->extra;
-}
-
-void ts_set_TS_A_extra(void *ptr, const void *value) {
-  TS_A *component = ptr;
-  int val = *(int *)value;
-  component->extra = val;
-}
+TS_BASIC_GETTER(TS_A, extra, &component->extra, sizeof(int));
+TS_BASIC_SETTER(TS_A, extra, &component->extra, sizeof(int));
 
 TS_BASIC_SERIALIZE(TS_A, x, &component->x, sizeof(int));
 TS_BASIC_DESERIALIZE(TS_A, x, &component->x, sizeof(int));
@@ -80,15 +64,8 @@ void ts_destroy_TS_B(void *ptr) {
 
 TS_STRING_SERIALIZERS(TS_B, name, component->name);
 
-void *ts_get_TS_B_name(const void *ptr) {
-  const TS_B *component = ptr;
-  return component->name;
-}
-
-void ts_set_TS_B_name(void *ptr, const void *value) {
-  TS_B *component = ptr;
-  component->name = value; // BUG: Memcpy this
-}
+TS_STRING_GETTER(TS_B, name, component->name);
+TS_STRING_SETTER(TS_B, name, component->name);
 
 void ts_schema_TS_B(TS_Component_Schema *schema) {
   TS_Component_Field *field_name = ts_create_component_field(
