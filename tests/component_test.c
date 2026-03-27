@@ -68,9 +68,6 @@ TS_STRING_GETTER(TS_B, name, component->name);
 TS_STRING_SETTER(TS_B, name, component->name);
 
 void ts_schema_TS_B(TS_Component_Schema *schema) {
-  TS_Component_Field *field_name = ts_create_component_field(
-      "name", sizeof(char *), TS_S, ts_get_TS_B_name, ts_set_TS_B_name,
-      ts_serialize_TS_B_name, ts_deserialize_TS_B_name);
-
-  ts_add_field_to_component_schema(schema, field_name);
+  TS_SCHEMA_FIELD(TS_S, name, ts_get_TS_B_name, ts_set_TS_B_name,
+                  ts_serialize_TS_B_name, ts_deserialize_TS_B_name);
 }

@@ -98,6 +98,14 @@
     setter(ptr, (void *)data);                                                 \
     return 0;                                                                  \
   }
+
+// Schema Generation Macros
+
+#define TS_SCHEMA_FIELD(type, name, getter, setter, serializer, deserializer)  \
+  TS_Component_Field *name##_field = ts_create_component_field(                \
+      #name, type, getter, setter, serializer, deserializer);                  \
+  ts_add_field_to_component_schema(schema, name##_field)
+
 // NOLINTEND(bugprone-macro-parentheses)
 
 #endif
