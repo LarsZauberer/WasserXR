@@ -49,7 +49,6 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
 
   TS_Entity window_entity;
   TS_Window *window;
-  GLFWwindow *glfw_window;
 
   if (!sizes[0]) {
     ts_warn("No window!\n");
@@ -64,7 +63,9 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
   window_entity = entities[0][0];
   window =
       (TS_Window *)ts_entity_get_component(scene, window_entity, "TS_Window");
-  glfw_window = ts_get(scene, window, "window");
+  GLFWwindow *glfw_window = (GLFWwindow *)ts_get(
+      scene, window,
+      "window"); // Const qualifier discard because we need direct access
   if (!glfw_window) {
     ts_warn("Window field is NULL");
     return;
@@ -84,10 +85,10 @@ void ts_system_ts_mesh_renderer(TS_Scene *scene, TS_Entity **entities,
     TS_Transform *transform =
         ts_entity_get_component(scene, entity, "TS_Transform");
 
-    TS_Mesh **meshes = ts_get(scene, model, "meshes");
-    unsigned int num_meshes =
-        *(unsigned int *)ts_get(scene, model, "num_meshes");
-    TS_Shader *shader = ts_get(scene, model, "shader");
+    const TS_Mesh **meshes = (const TS_Mesh **)ts_get(scene, model, "meshes");
+    const unsigned int num_meshes =
+        *(const unsigned int *)ts_get(scene, model, "num_meshes");
+    const TS_Shader *shader = ts_get(scene, model, "shader");
 
     // Check if the model is loaded yet
     if (meshes == NULL || shader == NULL) {

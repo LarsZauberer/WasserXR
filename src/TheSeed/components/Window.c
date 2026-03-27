@@ -3,6 +3,7 @@
 #include "GL/gl.h"
 #include "TheSeed/components/Window.h"
 #include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -89,15 +90,8 @@ void ts_destroy_TS_Window(void *window) {
   free(window);
 }
 
+TS_BASIC_GETTER(TS_Window, window, component->window, sizeof(GLFWwindow *));
+
 void ts_schema_TS_Window(TS_Component_Schema *schema) {
-  TS_Component_Field *window_field =
-      ts_create_component_field("window", sizeof(GLFWwindow *), TS_BLOB,
-                                ts_get_TS_Window_window, NULL, NULL, NULL);
-
-  ts_add_field_to_component_schema(schema, window_field);
-}
-
-void *ts_get_TS_Window_window(const void *component) {
-  const TS_Window *window = (const TS_Window *)component;
-  return (void *)window->window;
+  TS_SCHEMA_FIELD(TS_BLOB, window, ts_get_TS_Window_window, NULL, NULL, NULL);
 }

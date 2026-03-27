@@ -71,7 +71,7 @@ void ts_system_ts_console_system(TS_Scene *scene, TS_Entity **entities,
 
   size_t cmd_size =
       *(size_t *)ts_get(scene, console_component, "command_list_size");
-  TS_Command *cmd_list = ts_get(scene, console_component, "command_list");
+  const TS_Command *cmd_list = ts_get(scene, console_component, "command_list");
 
   for (size_t i = 0; i < cmd_size; i++) {
     // Check the first command name

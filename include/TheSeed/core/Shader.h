@@ -34,7 +34,7 @@ int ts_compile_shader(TS_Shader *shader);
  * @param shader The shader object
  * @return 0 on success, 1 on failure
  */
-int ts_use_shader(TS_Shader *shader);
+int ts_use_shader(const TS_Shader *shader);
 
 /**
  * @brief Destroys the shader and frees all resources
@@ -49,7 +49,8 @@ void ts_destroy_shader(TS_Shader *shader);
  * @param value The float value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_1f(TS_Shader *shader, const char *name, float value);
+int ts_set_shader_uniform_1f(const TS_Shader *shader, const char *name,
+                             float value);
 
 /**
  * @brief Set an integer uniform in the shader
@@ -58,7 +59,8 @@ int ts_set_shader_uniform_1f(TS_Shader *shader, const char *name, float value);
  * @param value The integer value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_1i(TS_Shader *shader, const char *name, int value);
+int ts_set_shader_uniform_1i(const TS_Shader *shader, const char *name,
+                             int value);
 
 /**
  * @brief Set a vec2 uniform in the shader
@@ -67,7 +69,8 @@ int ts_set_shader_uniform_1i(TS_Shader *shader, const char *name, int value);
  * @param value The vec2 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_2f(TS_Shader *shader, const char *name, const vec2 value);
+int ts_set_shader_uniform_2f(const TS_Shader *shader, const char *name,
+                             const vec2 value);
 
 /**
  * @brief Set a vec3 uniform in the shader
@@ -76,7 +79,8 @@ int ts_set_shader_uniform_2f(TS_Shader *shader, const char *name, const vec2 val
  * @param value The vec3 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_3f(TS_Shader *shader, const char *name, const vec3 value);
+int ts_set_shader_uniform_3f(const TS_Shader *shader, const char *name,
+                             const vec3 value);
 
 /**
  * @brief Set a vec4 uniform in the shader
@@ -85,7 +89,8 @@ int ts_set_shader_uniform_3f(TS_Shader *shader, const char *name, const vec3 val
  * @param value The vec4 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_4f(TS_Shader *shader, const char *name, const vec4 value);
+int ts_set_shader_uniform_4f(const TS_Shader *shader, const char *name,
+                             const vec4 value);
 
 /**
  * @brief Set a mat2 uniform in the shader
@@ -94,7 +99,8 @@ int ts_set_shader_uniform_4f(TS_Shader *shader, const char *name, const vec4 val
  * @param value The mat2 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_mat2(TS_Shader *shader, const char *name, const mat2 value);
+int ts_set_shader_uniform_mat2(const TS_Shader *shader, const char *name,
+                               const mat2 value);
 
 /**
  * @brief Set a mat3 uniform in the shader
@@ -103,7 +109,8 @@ int ts_set_shader_uniform_mat2(TS_Shader *shader, const char *name, const mat2 v
  * @param value The mat3 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_mat3(TS_Shader *shader, const char *name, const mat3 value);
+int ts_set_shader_uniform_mat3(const TS_Shader *shader, const char *name,
+                               const mat3 value);
 
 /**
  * @brief Set a mat4 uniform in the shader
@@ -112,6 +119,7 @@ int ts_set_shader_uniform_mat3(TS_Shader *shader, const char *name, const mat3 v
  * @param value The mat4 value
  * @return 0 on success, 1 on failure
  */
-int ts_set_shader_uniform_mat4(TS_Shader *shader, const char *name, const mat4 value);
+int ts_set_shader_uniform_mat4(const TS_Shader *shader, const char *name,
+                               const mat4 value);
 
 #endif

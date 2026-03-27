@@ -687,17 +687,14 @@ TS_Component_Schema *ts_create_component_schema() {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-TS_Component_Field *
-ts_create_component_field(const char *field_name, size_t size,
-                          TS_Primitive_Type type, TS_Component_Getter getter,
-                          TS_Component_Setter setter,
-                          TS_Component_Serializer serializer,
-                          TS_Component_Deserializer deserializer) {
+TS_Component_Field *ts_create_component_field(
+    const char *field_name, TS_Primitive_Type type, TS_Component_Getter getter,
+    TS_Component_Setter setter, TS_Component_Serializer serializer,
+    TS_Component_Deserializer deserializer) {
   TS_Component_Field *field =
       (TS_Component_Field *)malloc(sizeof(TS_Component_Field));
 
   field->field_name = ts_copy_char_ptr(field_name);
-  field->size = size;
   field->type = type;
   field->getter = getter;
   field->setter = setter;
@@ -774,15 +771,6 @@ TS_Component_Setter ts_get_field_setter(const TS_Component_Schema *schema,
   return field->setter;
 }
 
-size_t ts_get_field_size(const TS_Component_Schema *schema,
-                         const char *field_name) {
-  ts_assert(schema, "Schema is null during ts_get_getter");
-  TS_Component_Field *field = ts_get_field(schema, field_name);
-  ts_assert(field, "Field `%s` not found during the ts_get_field_size",
-            field_name);
-  return field->size;
-}
-
 TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
                                     const char *field_name) {
   ts_assert(schema, "Schema is null during ts_get_getter");
@@ -792,7 +780,8 @@ TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
   return field->type;
 }
 
-void *ts_get(const TS_Scene *scene, const void *component, const char *field) {
+const void *ts_get(const TS_Scene *scene, const void *component,
+                   const char *field) {
   ts_assert_abort_value(scene, NULL, "Scene is null during ts_get");
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);

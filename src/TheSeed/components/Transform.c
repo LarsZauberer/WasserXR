@@ -25,185 +25,34 @@ void *ts_create_TS_Transform() {
 
 void ts_destroy_TS_Transform(void *ptr) { free(ptr); }
 
-TS_BASIC_SERIALIZE(TS_Transform, x, &component->position[0], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, x, &component->position[0], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, y, &component->position[1], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, y, &component->position[1], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, z, &component->position[2], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, z, &component->position[2], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, rx, &component->rotation[0], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, rx, &component->rotation[0], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, ry, &component->rotation[1], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, ry, &component->rotation[1], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, rz, &component->rotation[2], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, rz, &component->rotation[2], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, sx, &component->scale[0], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, sx, &component->scale[0], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, sy, &component->scale[1], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, sy, &component->scale[1], sizeof(float));
-TS_BASIC_SERIALIZE(TS_Transform, sz, &component->scale[2], sizeof(float));
-TS_BASIC_DESERIALIZE(TS_Transform, sz, &component->scale[2], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, x, &component->position[0], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, y, &component->position[1], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, z, &component->position[2], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, rx, &component->rotation[0], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, ry, &component->rotation[1], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, rz, &component->rotation[2], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, sx, &component->scale[0], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, sy, &component->scale[1], sizeof(float));
+TS_BASIC_SERIALIZERS(TS_Transform, sz, &component->scale[2], sizeof(float));
+
+TS_BASIC_ACCESS(TS_Transform, x, &component->position[0], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, y, &component->position[1], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, z, &component->position[2], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, rx, &component->rotation[0], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, ry, &component->rotation[1], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, rz, &component->rotation[2], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, sx, &component->scale[0], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, sy, &component->scale[1], sizeof(float));
+TS_BASIC_ACCESS(TS_Transform, sz, &component->scale[2], sizeof(float));
 
 void ts_schema_TS_Transform(TS_Component_Schema *schema) {
-  TS_Component_Field *field_x = ts_create_component_field(
-      "x", sizeof(float), TS_F, ts_get_TS_Transform_x, ts_set_TS_Transform_x,
-      ts_serialize_TS_Transform_x, ts_deserialize_TS_Transform_x);
-  ts_add_field_to_component_schema(schema, field_x);
-
-  TS_Component_Field *field_y = ts_create_component_field(
-      "y", sizeof(float), TS_F, ts_get_TS_Transform_y, ts_set_TS_Transform_y,
-      ts_serialize_TS_Transform_y, ts_deserialize_TS_Transform_y);
-  ts_add_field_to_component_schema(schema, field_y);
-
-  TS_Component_Field *field_z = ts_create_component_field(
-      "z", sizeof(float), TS_F, ts_get_TS_Transform_z, ts_set_TS_Transform_z,
-      ts_serialize_TS_Transform_z, ts_deserialize_TS_Transform_z);
-  ts_add_field_to_component_schema(schema, field_z);
-
-  TS_Component_Field *field_rx = ts_create_component_field(
-      "rx", sizeof(float), TS_F, ts_get_TS_Transform_rx, ts_set_TS_Transform_rx,
-      ts_serialize_TS_Transform_rx, ts_deserialize_TS_Transform_rx);
-  ts_add_field_to_component_schema(schema, field_rx);
-
-  TS_Component_Field *field_ry = ts_create_component_field(
-      "ry", sizeof(float), TS_F, ts_get_TS_Transform_ry, ts_set_TS_Transform_ry,
-      ts_serialize_TS_Transform_ry, ts_deserialize_TS_Transform_ry);
-  ts_add_field_to_component_schema(schema, field_ry);
-
-  TS_Component_Field *field_rz = ts_create_component_field(
-      "rz", sizeof(float), TS_F, ts_get_TS_Transform_rz, ts_set_TS_Transform_rz,
-      ts_serialize_TS_Transform_rz, ts_deserialize_TS_Transform_rz);
-  ts_add_field_to_component_schema(schema, field_rz);
-
-  TS_Component_Field *field_sx = ts_create_component_field(
-      "sx", sizeof(float), TS_F, ts_get_TS_Transform_sx, ts_set_TS_Transform_sx,
-      ts_serialize_TS_Transform_sx, ts_deserialize_TS_Transform_sx);
-  ts_add_field_to_component_schema(schema, field_sx);
-
-  TS_Component_Field *field_sy = ts_create_component_field(
-      "sy", sizeof(float), TS_F, ts_get_TS_Transform_sy, ts_set_TS_Transform_sy,
-      ts_serialize_TS_Transform_sy, ts_deserialize_TS_Transform_sy);
-  ts_add_field_to_component_schema(schema, field_sy);
-
-  TS_Component_Field *field_sz = ts_create_component_field(
-      "sz", sizeof(float), TS_F, ts_get_TS_Transform_sz, ts_set_TS_Transform_sz,
-      ts_serialize_TS_Transform_sz, ts_deserialize_TS_Transform_sz);
-  ts_add_field_to_component_schema(schema, field_sz);
-}
-
-void *ts_get_TS_Transform_x(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->position[0];
-}
-
-void ts_set_TS_Transform_x(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->position[0] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_y(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->position[1];
-}
-
-void ts_set_TS_Transform_y(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->position[1] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_z(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->position[2];
-}
-
-void ts_set_TS_Transform_z(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->position[2] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_rx(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->rotation[0];
-}
-
-void ts_set_TS_Transform_rx(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->rotation[0] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_ry(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->rotation[1];
-}
-
-void ts_set_TS_Transform_ry(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->rotation[1] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_rz(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->rotation[2];
-}
-
-void ts_set_TS_Transform_rz(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->rotation[2] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_sx(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->scale[0];
-}
-
-void ts_set_TS_Transform_sx(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->scale[0] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_sy(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->scale[1];
-}
-
-void ts_set_TS_Transform_sy(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->scale[1] = *(const float *)data;
-  }
-}
-
-void *ts_get_TS_Transform_sz(const void *component) {
-  const TS_Transform *transform = (const TS_Transform *)component;
-
-  return (void *)&transform->scale[2];
-}
-
-void ts_set_TS_Transform_sz(void *component, const void *data) {
-  TS_Transform *transform = (TS_Transform *)component;
-  if (data) {
-    transform->scale[2] = *(const float *)data;
-  }
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, x);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, y);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, z);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, rx);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, ry);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, rz);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, sx);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, sy);
+  TS_SCHEMA_FIELD_FULL(TS_Transform, TS_F, sz);
 }
