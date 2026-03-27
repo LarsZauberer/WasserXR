@@ -49,41 +49,6 @@ void ts_destroy_TS_Model(void *ptr) {
   free(model);
 }
 
-TS_STRING_SERIALIZE(TS_Model, model_name, component->model_name);
-TS_SET_DESERIALIZE(TS_Model, model_name, component->model_name,
-                   ts_set_TS_Model_model_name);
-TS_STRING_SERIALIZE(TS_Model, shader_name, component->shader_name);
-TS_SET_DESERIALIZE(TS_Model, shader_name, component->shader_name,
-                   ts_set_TS_Model_shader_name);
-
-void ts_schema_TS_Model(TS_Component_Schema *schema) {
-  TS_Component_Field *model_name_field = ts_create_component_field(
-      "model_name", sizeof(char), TS_S, ts_get_TS_Model_model_name,
-      ts_set_TS_Model_model_name, ts_serialize_TS_Model_model_name,
-      ts_deserialize_TS_Model_model_name);
-  TS_Component_Field *shader_name_field = ts_create_component_field(
-      "shader_name", sizeof(char), TS_S, ts_get_TS_Model_shader_name,
-      ts_set_TS_Model_shader_name, ts_serialize_TS_Model_shader_name,
-      ts_deserialize_TS_Model_shader_name);
-
-  TS_Component_Field *meshes_field =
-      ts_create_component_field("meshes", sizeof(TS_Mesh *), TS_BLOB_ARRAY,
-                                ts_get_TS_Model_meshes, NULL, NULL, NULL);
-  TS_Component_Field *numMeshes_field =
-      ts_create_component_field("num_meshes", sizeof(unsigned int), TS_L,
-                                ts_get_TS_Model_numMeshes, NULL, NULL, NULL);
-
-  TS_Component_Field *shader_field =
-      ts_create_component_field("shader", sizeof(TS_Shader *), TS_BLOB,
-                                ts_get_TS_Model_shader, NULL, NULL, NULL);
-
-  ts_add_field_to_component_schema(schema, model_name_field);
-  ts_add_field_to_component_schema(schema, shader_name_field);
-  ts_add_field_to_component_schema(schema, meshes_field);
-  ts_add_field_to_component_schema(schema, numMeshes_field);
-  ts_add_field_to_component_schema(schema, shader_field);
-}
-
 void ts_set_TS_Model_model_name(void *component, const void *data) {
   TS_Model *model = (TS_Model *)component;
   const char *path = (const char *)data;
@@ -141,27 +106,27 @@ void ts_set_TS_Model_shader_name(void *component, const void *data) {
   }
 }
 
-void *ts_get_TS_Model_shader_name(const void *component) {
-  const TS_Model *model = (const TS_Model *)component;
-  return (void *)model->shader_name;
-}
+TS_STRING_SERIALIZE(TS_Model, model_name, component->model_name);
+TS_SET_DESERIALIZE(TS_Model, model_name, component->model_name,
+                   ts_set_TS_Model_model_name);
+TS_STRING_SERIALIZE(TS_Model, shader_name, component->shader_name);
+TS_SET_DESERIALIZE(TS_Model, shader_name, component->shader_name,
+                   ts_set_TS_Model_shader_name);
 
-void *ts_get_TS_Model_model_name(const void *component) {
-  const TS_Model *model = (const TS_Model *)component;
-  return (void *)model->model_name;
-}
+TS_STRING_GETTER(TS_Model, shader_name, component->shader_name);
+TS_STRING_GETTER(TS_Model, model_name, component->model_name);
 
-void *ts_get_TS_Model_shader(const void *component) {
-  const TS_Model *model = (const TS_Model *)component;
-  return (void *)model->shader;
-}
+TS_BASIC_GETTER(TS_Model, shader, &component->shader, sizeof(TS_Shader *));
+TS_BASIC_GETTER(TS_Model, meshes, &component->meshes, sizeof(TS_Shader *));
 
-void *ts_get_TS_Model_meshes(const void *component) {
-  const TS_Model *model = (const TS_Model *)component;
-  return (void *)model->meshes;
-}
+TS_BASIC_GETTER(TS_Model, num_meshes, &component->numMeshes,
+                sizeof(unsigned int));
 
-void *ts_get_TS_Model_numMeshes(const void *component) {
-  const TS_Model *model = (const TS_Model *)component;
-  return (void *)&model->numMeshes;
+void ts_schema_TS_Model(TS_Component_Schema *schema) {
+  TS_SCHEMA_FIELD_FULL(TS_Model, TS_S, model_name);
+  TS_SCHEMA_FIELD_FULL(TS_Model, TS_S, shader_name);
+
+  TS_SCHEMA_FIELD_GET(TS_Model, TS_BLOB_ARRAY, meshes);
+  TS_SCHEMA_FIELD_GET(TS_Model, TS_BLOB, shader);
+  TS_SCHEMA_FIELD_GET(TS_Model, TS_L, num_meshes);
 }

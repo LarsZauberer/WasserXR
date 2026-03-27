@@ -20,6 +20,10 @@
     memcpy(field_exp, data, field_size);                                       \
   }
 
+#define TS_BASIC_ACCESS(component_type, field_name, field_exp, field_size)     \
+  TS_BASIC_GETTER(component_type, field_name, field_exp, field_size);          \
+  TS_BASIC_SETTER(component_type, field_name, field_exp, field_size)
+
 #define TS_STRING_GETTER(component_type, field_name, field_exp)                \
   void *ts_get_##component_type##_##field_name(const void *ptr) {              \
     const component_type *component = ptr;                                     \
@@ -34,6 +38,10 @@
     }                                                                          \
     field_exp = ts_copy_char_ptr(data);                                        \
   }
+
+#define TS_STRING_ACCESS(component_type, field_name, field_exp)                \
+  TS_STRING_GETTER(component_type, field_name, field_exp);                     \
+  TS_STRING_SETTER(component_type, field_name, field_exp)
 
 // Serialization and Deserialization Macros
 
@@ -105,6 +113,16 @@
   TS_Component_Field *name##_field = ts_create_component_field(                \
       #name, type, getter, setter, serializer, deserializer);                  \
   ts_add_field_to_component_schema(schema, name##_field)
+
+#define TS_SCHEMA_FIELD_FULL(component_type, type, name)                       \
+  TS_SCHEMA_FIELD(type, name, ts_get_##component_type##_##name,                \
+                  ts_set_##component_type##_##name,                            \
+                  ts_serialize_##component_type##_##name,                      \
+                  ts_deserialize_##component_type##_##name)
+
+#define TS_SCHEMA_FIELD_GET(component_type, type, name)                        \
+  TS_SCHEMA_FIELD(type, name, ts_get_##component_type##_##name, NULL, NULL,    \
+                  NULL)
 
 // NOLINTEND(bugprone-macro-parentheses)
 

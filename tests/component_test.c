@@ -33,15 +33,10 @@ TS_BASIC_SERIALIZE(TS_A, extra, &component->extra, sizeof(int));
 TS_BASIC_DESERIALIZE(TS_A, extra, &component->extra, sizeof(int));
 
 void ts_schema_TS_A(TS_Component_Schema *schema) {
-  TS_Component_Field *field_x = ts_create_component_field(
-      "x", sizeof(int), TS_L, ts_get_TS_A_x, ts_set_TS_A_x, ts_serialize_TS_A_x,
-      ts_deserialize_TS_A_x);
-  TS_Component_Field *field_extra = ts_create_component_field(
-      "extra", sizeof(int), TS_L, ts_get_TS_A_extra, ts_set_TS_A_extra,
-      ts_serialize_TS_A_extra, ts_deserialize_TS_A_extra);
-
-  ts_add_field_to_component_schema(schema, field_x);
-  ts_add_field_to_component_schema(schema, field_extra);
+  TS_SCHEMA_FIELD(TS_L, x, ts_get_TS_A_x, ts_set_TS_A_x, ts_serialize_TS_A_x,
+                  ts_deserialize_TS_A_x);
+  TS_SCHEMA_FIELD(TS_L, extra, ts_get_TS_A_extra, ts_set_TS_A_extra,
+                  ts_serialize_TS_A_extra, ts_deserialize_TS_A_extra);
 }
 
 typedef struct TS_B TS_B;

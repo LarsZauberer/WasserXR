@@ -267,9 +267,9 @@ TS_Entity *ts_find_entities_with_selector_and_groups(
  * failure
  */
 TS_Component_Field *ts_create_component_field(
-    const char *field_name, size_t size, TS_Primitive_Type type,
-    TS_Component_Getter getter, TS_Component_Setter setter,
-    TS_Component_Serializer serializer, TS_Component_Deserializer deserializer);
+    const char *field_name, TS_Primitive_Type type, TS_Component_Getter getter,
+    TS_Component_Setter setter, TS_Component_Serializer serializer,
+    TS_Component_Deserializer deserializer);
 
 /**
  * Destroy a component field and free its memory.

@@ -1,5 +1,6 @@
 #include "TheSeed/components/Console.h"
 #include "TheSeed/components/Commands.h"
+#include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 
 #include <stdlib.h>
@@ -20,24 +21,12 @@ void ts_destroy_TS_Console(void *ptr) {
   free(console);
 }
 
+TS_BASIC_GETTER(TS_Console, command_list_size, &component->command_list_size,
+                sizeof(size_t));
+TS_BASIC_GETTER(TS_Console, command_list, component->command_list,
+                sizeof(TS_Command *));
+
 void ts_schema_TS_Console(TS_Component_Schema *schema) {
-  TS_Component_Field *command_list_size_field = ts_create_component_field(
-      "command_list_size", sizeof(size_t), TS_L,
-      ts_get_TS_Console_command_list_size, NULL, NULL, NULL);
-  TS_Component_Field *command_list_field = ts_create_component_field(
-      "command_list", sizeof(TS_Command), TS_BLOB_ARRAY,
-      ts_get_TS_Console_command_list, NULL, NULL, NULL);
-
-  ts_add_field_to_component_schema(schema, command_list_size_field);
-  ts_add_field_to_component_schema(schema, command_list_field);
-}
-
-void *ts_get_TS_Console_command_list_size(const void *component) {
-  const TS_Console *console = (const TS_Console *)component;
-  return (void *)&console->command_list_size;
-}
-
-void *ts_get_TS_Console_command_list(const void *component) {
-  const TS_Console *console = (const TS_Console *)component;
-  return (void *)console->command_list;
+  TS_SCHEMA_FIELD_GET(TS_Console, TS_L, command_list_size);
+  TS_SCHEMA_FIELD_GET(TS_Console, TS_BLOB, command_list);
 }

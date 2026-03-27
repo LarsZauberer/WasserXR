@@ -9,7 +9,4 @@ void *ts_create_TS_Console();
 void ts_destroy_TS_Console(void *ptr);
 void ts_schema_TS_Console(TS_Component_Schema *schema);
 
-void *ts_get_TS_Console_command_list_size(const void *component);
-void *ts_get_TS_Console_command_list(const void *component);
-
 #endif

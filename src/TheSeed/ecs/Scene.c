@@ -687,12 +687,10 @@ TS_Component_Schema *ts_create_component_schema() {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-TS_Component_Field *
-ts_create_component_field(const char *field_name, size_t size,
-                          TS_Primitive_Type type, TS_Component_Getter getter,
-                          TS_Component_Setter setter,
-                          TS_Component_Serializer serializer,
-                          TS_Component_Deserializer deserializer) {
+TS_Component_Field *ts_create_component_field(
+    const char *field_name, TS_Primitive_Type type, TS_Component_Getter getter,
+    TS_Component_Setter setter, TS_Component_Serializer serializer,
+    TS_Component_Deserializer deserializer) {
   TS_Component_Field *field =
       (TS_Component_Field *)malloc(sizeof(TS_Component_Field));
 
