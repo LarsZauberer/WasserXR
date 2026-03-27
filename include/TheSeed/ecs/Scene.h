@@ -347,15 +347,6 @@ TS_Component_Setter ts_get_field_setter(const TS_Component_Schema *schema,
                                         const char *field_name);
 
 /**
- * Get the size in bytes of a specific field in a component schema.
- * @param schema The component schema to search
- * @param field_name Name of the field
- * @return Size of the field data in bytes
- */
-size_t ts_get_field_size(const TS_Component_Schema *schema,
-                         const char *field_name);
-
-/**
  * Get the primitive type of a specific field in a component schema.
  * @param schema The component schema to search
  * @param field_name Name of the field
@@ -477,7 +468,7 @@ int ts_deserialize_component(TS_Scene *scene, TS_Entity entity,
 int ts_deserialize_entity(TS_Scene *scene, const char *data);
 
 /**
- * Deserializes an entire scene bytestream. This deserializes entities, 
+ * Deserializes an entire scene bytestream. This deserializes entities,
  * components, and systems, but does not deserialize plugins.
  * @param scene The scene that should be reconstructed
  * @param data The bytestream that should be deserialized
@@ -500,7 +491,7 @@ int ts_serialize_scene_to_file(const TS_Scene *scene, const char *path);
 
 /**
  * Reads the provided file and deserializes the data from the file into a scene.
- * This deserializes entities, components, and systems, but does not deserialize 
+ * This deserializes entities, components, and systems, but does not deserialize
  * plugins.
  * @param scene The scene that should be constructed
  * @param path The path to the scene file. If the file or path doesn't exist the

@@ -697,7 +697,6 @@ ts_create_component_field(const char *field_name, size_t size,
       (TS_Component_Field *)malloc(sizeof(TS_Component_Field));
 
   field->field_name = ts_copy_char_ptr(field_name);
-  field->size = size;
   field->type = type;
   field->getter = getter;
   field->setter = setter;
@@ -772,15 +771,6 @@ TS_Component_Setter ts_get_field_setter(const TS_Component_Schema *schema,
     return NULL;
   }
   return field->setter;
-}
-
-size_t ts_get_field_size(const TS_Component_Schema *schema,
-                         const char *field_name) {
-  ts_assert(schema, "Schema is null during ts_get_getter");
-  TS_Component_Field *field = ts_get_field(schema, field_name);
-  ts_assert(field, "Field `%s` not found during the ts_get_field_size",
-            field_name);
-  return field->size;
 }
 
 TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,

@@ -53,7 +53,6 @@ struct TS_Component_Schema {
 
 struct TS_Component_Field {
   char *field_name;
-  size_t size;
   TS_Primitive_Type type;
   TS_Component_Getter getter;
   TS_Component_Setter setter;
