@@ -37,7 +37,7 @@ typedef int TS_Field_Permission;
 typedef void *(*TS_Component_Creator)();
 typedef void (*TS_Component_Destroyer)(void *);
 typedef void (*TS_Component_Schema_Function)(TS_Component_Schema *);
-typedef void *(*TS_Component_Getter)(const void *);
+typedef const void *(*TS_Component_Getter)(const void *);
 typedef void (*TS_Component_Setter)(void *, const void *);
 typedef char *(*TS_Component_Serializer)(const void *);
 typedef int (*TS_Component_Deserializer)(void *, const char *);
@@ -364,7 +364,8 @@ TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
  * @param field Name of the field to get
  * @return Pointer to the field value, or NULL if not found
  */
-void *ts_get(const TS_Scene *scene, const void *component, const char *field);
+const void *ts_get(const TS_Scene *scene, const void *component,
+                   const char *field);
 
 /**
  * Set the value of a field on a component instance.

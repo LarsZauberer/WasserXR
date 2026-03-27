@@ -57,26 +57,23 @@ static void unittest(const void *ptr) {
 
     if (strcmp(input->expected_component, "TS_A") == 0) {
       // Get field values
-      void *x_value = ts_get(input->scene, comp, "x");
+      const void *x_value = ts_get(input->scene, comp, "x");
       ts_assert(x_value != NULL, "x field value should not be NULL");
-      int x_int = *(int *)x_value;
+      const int x_int = *(const int *)x_value;
       ts_assert_test(x_int == 1, "Expected: %d", 1, "Got: %d", x_int,
                      "x field value doesn't match");
-      free(x_value);
 
-      void *extra_value = ts_get(input->scene, comp, "extra");
+      const void *extra_value = ts_get(input->scene, comp, "extra");
       ts_assert(extra_value != NULL, "extra field value should not be NULL");
-      int extra = *(int *)extra_value;
+      const int extra = *(const int *)extra_value;
       ts_assert_test(extra == 5, "Expected: %d", 5, "Got: %d", extra,
                      "extra field value doesn't match");
-      free(extra_value);
     } else if (strcmp(input->expected_component, "TS_B") == 0) {
-      void *name_value = ts_get(input->scene, comp, "name");
+      const void *name_value = ts_get(input->scene, comp, "name");
       ts_assert(name_value, "name field value should not be NULL");
-      char *name_string = (char *)name_value;
+      const char *name_string = (const char *)name_value;
       ts_assert(strcmp(name_string, "Hello World!") == 0,
                 "Name is not `Hello World!`. It is: %s", name_string);
-      free(name_value);
     }
 
     for (size_t i = 0; i < component_count; i++) {

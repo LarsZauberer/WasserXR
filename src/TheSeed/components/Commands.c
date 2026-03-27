@@ -116,7 +116,7 @@ void ts_command_get(char **args, TS_Scene *scene) {
     return;
   }
 
-  void *data = getter(component);
+  const void *data = getter(component);
   ts_assert_abort(data, "The getter of the field `%s` returned NULL", args[2]);
   if (type == TS_L) {
     long l_data = *(long *)data;

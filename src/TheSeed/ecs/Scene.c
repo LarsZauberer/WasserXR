@@ -780,7 +780,8 @@ TS_Primitive_Type ts_get_field_type(const TS_Component_Schema *schema,
   return field->type;
 }
 
-void *ts_get(const TS_Scene *scene, const void *component, const char *field) {
+const void *ts_get(const TS_Scene *scene, const void *component,
+                   const char *field) {
   ts_assert_abort_value(scene, NULL, "Scene is null during ts_get");
   TS_Component_Handler *handler =
       ts_find_handler_for_component(scene, component);

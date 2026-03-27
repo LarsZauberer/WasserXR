@@ -7,11 +7,9 @@
 // Getter and Setter Macros
 
 #define TS_BASIC_GETTER(component_type, field_name, field_exp, field_size)     \
-  void *ts_get_##component_type##_##field_name(const void *ptr) {              \
+  const void *ts_get_##component_type##_##field_name(const void *ptr) {        \
     const component_type *component = ptr;                                     \
-    void *data = malloc(field_size);                                           \
-    memcpy(data, field_exp, field_size);                                       \
-    return data;                                                               \
+    return field_exp;                                                          \
   }
 
 #define TS_BASIC_SETTER(component_type, field_name, field_exp, field_size)     \
@@ -25,10 +23,7 @@
   TS_BASIC_SETTER(component_type, field_name, field_exp, field_size)
 
 #define TS_STRING_GETTER(component_type, field_name, field_exp)                \
-  void *ts_get_##component_type##_##field_name(const void *ptr) {              \
-    const component_type *component = ptr;                                     \
-    return ts_copy_char_ptr(field_exp);                                        \
-  }
+  TS_BASIC_GETTER(component_type, field_name, field_exp, 0)
 
 #define TS_STRING_SETTER(component_type, field_name, field_exp)                \
   void ts_set_##component_type##_##field_name(void *ptr, const void *data) {   \
