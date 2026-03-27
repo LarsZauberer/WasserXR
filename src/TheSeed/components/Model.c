@@ -117,7 +117,7 @@ TS_STRING_GETTER(TS_Model, shader_name, component->shader_name);
 TS_STRING_GETTER(TS_Model, model_name, component->model_name);
 
 TS_BASIC_GETTER(TS_Model, shader, component->shader, sizeof(TS_Shader *));
-TS_BASIC_GETTER(TS_Model, meshes, component->meshes, sizeof(TS_Shader *));
+TS_BASIC_GETTER(TS_Model, meshes, component->meshes, sizeof(TS_Mesh **));
 
 TS_BASIC_GETTER(TS_Model, num_meshes, &component->numMeshes,
                 sizeof(unsigned int));

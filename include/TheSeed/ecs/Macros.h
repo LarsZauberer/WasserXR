@@ -17,7 +17,9 @@
 #define TS_BASIC_SETTER(component_type, field_name, field_exp, field_size)     \
   void ts_set_##component_type##_##field_name(void *ptr, const void *data) {   \
     component_type *component = ptr;                                           \
-    memcpy(field_exp, data, field_size);                                       \
+    if (data) {                                                                \
+      memcpy(field_exp, data, field_size);                                     \
+    }                                                                          \
   }
 
 #define TS_BASIC_ACCESS(component_type, field_name, field_exp, field_size)     \
