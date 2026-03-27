@@ -42,6 +42,8 @@ static void *ts_console_loop(void *arg) {
   return NULL;
 }
 
+TS_System_Groups ts_groups_ts_console_system = 1;
+
 void ts_attach_ts_console_system(TS_Scene *scene) {
   pthread_create(&ts_console_thread, NULL, ts_console_loop, NULL);
 }
