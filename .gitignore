@@ -1,6 +1,7 @@
 .cache/
 build/
 .direnv/
+result
 vgcore*
 compile_commands.json
 Testing/*

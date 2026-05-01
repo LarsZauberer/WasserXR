@@ -6,18 +6,48 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+  }:
     flake-utils.lib.eachDefaultSystem (
-      system:
-      let
+      system: let
         pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
+        lib = nixpkgs.lib;
+      in {
+        packages.default = pkgs.stdenv.mkDerivation {
+          pname = "TheSeed";
+          version = "pre 0.1.0";
+
+          src = ./.;
+
+          nativeBuildInputs = [
+            # Build packages
+            pkgs.clang-tools
+            pkgs.clang
+            pkgs.cmake
+            pkgs.doxygen
+
+            # Libraries
+            pkgs.glfw
+            pkgs.glib
+            pkgs.cglm
+            pkgs.pkg-config
+            pkgs.pcre2
+            pkgs.libsysprof-capture
+            pkgs.assimp
+          ];
+
+          cmakeFlags = [
+            (lib.cmakeBool "BUILD_DEBUG" false)
+            (lib.cmakeBool "TS_STATIC" true)
+          ];
+
+          meta = {
+            mainProgram = "theseed";
+          };
+        };
         devShells.default = pkgs.mkShell {
           name = "devShell";
 
