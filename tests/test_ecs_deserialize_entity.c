@@ -1,6 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 #include <string.h>
 
 typedef struct TestCase TestCase;

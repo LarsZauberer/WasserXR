@@ -1,5 +1,5 @@
-#include "TheSeed/core/utils.h"
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/utils.h"
+#include "TheSeed/ecs/logging.h"
 #include <glib.h>
 #include <stddef.h>
 #include <stdio.h>

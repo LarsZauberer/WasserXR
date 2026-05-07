@@ -2,7 +2,7 @@
 
 #include "GL/gl.h"
 #include "TheSeed/components/Window.h"
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <GLFW/glfw3.h>

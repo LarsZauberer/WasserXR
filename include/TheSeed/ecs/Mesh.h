@@ -1,7 +1,7 @@
 #ifndef TS_MESH_H
 #define TS_MESH_H
 
-#include "TheSeed/core/Mesh_Data.h"
+#include "TheSeed/ecs/Mesh_Data.h"
 #include <stddef.h>
 
 typedef struct {

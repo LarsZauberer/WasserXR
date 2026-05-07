@@ -1,6 +1,6 @@
 #include "Scene_internal.h"
 #include "TheSeed/ecs/Scene.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 #include <string.h>
 
 long ts_get_entity_index(const TS_Scene *scene, const TS_Entity entity) {

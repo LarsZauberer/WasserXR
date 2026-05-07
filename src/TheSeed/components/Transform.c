@@ -1,5 +1,5 @@
 #include "TheSeed/components/Transform.h"
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include "cglm/vec3.h"

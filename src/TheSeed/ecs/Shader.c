@@ -1,6 +1,6 @@
-#include "TheSeed/core/Shader.h"
-#include "TheSeed/core/logging.h"
-#include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/Shader.h"
+#include "TheSeed/ecs/logging.h"
+#include "TheSeed/ecs/utils.h"
 #include <cglm/cglm.h>
 #include <glad/gl.h>
 #include <glib.h>

@@ -1,5 +1,5 @@
 #include "TheSeed/components/Camera.h"
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>

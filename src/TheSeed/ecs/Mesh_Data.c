@@ -1,5 +1,5 @@
-#include "TheSeed/core/Mesh_Data.h"
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/Mesh_Data.h"
+#include "TheSeed/ecs/logging.h"
 #include "assimp/cimport.h"
 #include "assimp/mesh.h"
 #include "assimp/postprocess.h"
