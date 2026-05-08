@@ -52,11 +52,11 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene2 = ts_create_scene();
 
   TS_Scene *plugin_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_core.so"),
+  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin");
 
   TS_Scene *system_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_core.so"),
+  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin");
   ts_assert(0 == ts_add_system(system_scene, "ts_system_a", 100),
             "Failed to add the system");

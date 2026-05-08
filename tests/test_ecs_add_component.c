@@ -41,13 +41,13 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *entity_plugin_scene_invalid = ts_create_scene();
   ts_assert(0 == ts_load_plugin(entity_plugin_scene_invalid,
-                                "./libtheseed_components.so"),
+                                "./libtheseed_test_components.so"),
             "Failed to load the plugin");
   TS_Entity entity2 = ts_add_entity(entity_plugin_scene_invalid);
 
   TS_Scene *entity_plugin_scene = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(entity_plugin_scene, "./libtheseed_components.so"),
+      0 == ts_load_plugin(entity_plugin_scene, "./libtheseed_core.so"),
       "Failed to load the plugin");
   TS_Entity entity3 = ts_add_entity(entity_plugin_scene);
 

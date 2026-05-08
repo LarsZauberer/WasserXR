@@ -39,12 +39,12 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *scene_with_plugin = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_core.so"),
+      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_test_systems.so"),
       "Failed to load the plugin");
 
   TS_Scene *scene_with_plugin2 = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_plugin2, "./libtheseed_core.so"),
+      0 == ts_load_plugin(scene_with_plugin2, "./libtheseed_test_systems.so"),
       "Failed to load the plugin");
 
   TestCase cases[] = {

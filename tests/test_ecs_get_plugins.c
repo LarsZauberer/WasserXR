@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *scene_one_plugin = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_one_plugin, "./libtheseed_components.so"),
+  ts_assert(0 == ts_load_plugin(scene_one_plugin, "./libtheseed_test_components.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {

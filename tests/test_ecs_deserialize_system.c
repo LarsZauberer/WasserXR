@@ -59,15 +59,15 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene = ts_create_scene();
 
   TS_Scene *valid_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(valid_scene, "./libtheseed_systems.so"),
+  ts_assert(0 == ts_load_plugin(valid_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {
       {NULL, NULL, NULL, 1},
       {NULL, "", NULL, 1},
-      {empty_scene, "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0", NULL, 1},
-      {valid_scene, "\36\0\0\0\0\0\0\0ts_console_system\0\144\0\0\0",
-       "ts_console_system", 0}};
+      {empty_scene, "\23\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0", NULL, 1},
+      {valid_scene, "\23\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0",
+       "ts_system_a", 0}};
 
   // Constructing Tests
   for (size_t i = 0; i < 4; i++) {

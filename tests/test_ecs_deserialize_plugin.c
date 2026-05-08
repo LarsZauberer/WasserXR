@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
   TestCase cases[] = {{NULL, NULL, NULL, 1},
                       {NULL, "", NULL, 1},
                       {valid_scene,
-                       "\43\0\0\0\0\0\0\0./libtheseed_components.so\0",
-                       "./libtheseed_components.so", 0}};
+                       "\47\0\0\0\0\0\0\0./libtheseed_test_components.so\0",
+                       "./libtheseed_test_components.so", 0}};
 
   // Constructing Tests
   for (size_t i = 0; i < 3; i++) {

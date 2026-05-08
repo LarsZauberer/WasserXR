@@ -51,14 +51,14 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *entity_scene = ts_create_scene();
   ts_assert(0 ==
-                ts_load_plugin(entity_scene, "./libtheseed_core.so"),
+                ts_load_plugin(entity_scene, "./libtheseed_test_components.so"),
             "Failed to load the plugin (test_components)");
   ts_add_entity(entity_scene);
 
   TS_Scene *full_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(full_scene, "./libtheseed_core.so"),
+  ts_assert(0 == ts_load_plugin(full_scene, "./libtheseed_test_components.so"),
             "Failed to load the plugin (test components)");
-  ts_assert(0 == ts_load_plugin(full_scene, "./libtheseed_core.so"),
+  ts_assert(0 == ts_load_plugin(full_scene, "./libtheseed_test_systems.so"),
             "Failed to load the plugin (systems)");
   TS_Entity entity_id_component = ts_add_entity(full_scene);
   ts_assert(ts_add_component(full_scene, entity_id_component, "TS_A") != NULL,

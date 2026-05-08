@@ -91,9 +91,13 @@ enable_testing()
 # Extra Libraries for testing
 add_library(theseed_test_components SHARED tests/component_test.c)
 target_include_directories(theseed_test_components PUBLIC include)
+target_include_directories(theseed_test_components PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_test_components PRIVATE theseed_ecs ${GLIB_LIBRARIES})
 
 add_library(theseed_test_systems SHARED tests/system_test.c)
 target_include_directories(theseed_test_systems PUBLIC include)
+target_include_directories(theseed_test_systems PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_test_systems PRIVATE theseed_ecs ${GLIB_LIBRARIES})
 
 # Helper function to simplify adding tests
 # Usage: add_theseed_test(test_name)

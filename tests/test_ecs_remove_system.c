@@ -38,18 +38,18 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *scene_with_system = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_system, "./libtheseed_core.so"),
+      0 == ts_load_plugin(scene_with_system, "./libtheseed_test_systems.so"),
       "Failed to load the plugin");
   ts_add_system(scene_with_system, "ts_system_a", 10);
 
   TS_Scene *scene_without_system = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_without_system, "./libtheseed_core.so"),
+      0 == ts_load_plugin(scene_without_system, "./libtheseed_test_systems.so"),
       "Failed to load the plugin");
 
   TS_Scene *scene_with_system2 = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_system2, "./libtheseed_core.so"),
+      0 == ts_load_plugin(scene_with_system2, "./libtheseed_test_systems.so"),
       "Failed to load the plugin");
   ts_add_system(scene_with_system2, "ts_system_a", 10);
 

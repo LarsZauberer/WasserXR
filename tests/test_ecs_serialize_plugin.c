@@ -52,22 +52,22 @@ int main(int argc, char *argv[]) {
   TS_Scene *empty_scene2 = ts_create_scene();
 
   TS_Scene *plugin_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_components.so"),
+  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_test_components.so"),
             "Failed to load the plugin");
 
   TS_Scene *plugin_scene2 = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene2, "./libtheseed_components.so"),
+  ts_assert(0 == ts_load_plugin(plugin_scene2, "./libtheseed_test_components.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {
       {NULL, NULL, 0, NULL},
       {NULL, "", 0, NULL},
       {empty_scene, "", 0, NULL},
-      {empty_scene2, "./libtheseed_components.so", 0, NULL},
+      {empty_scene2, "./libtheseed_test_components.so", 0, NULL},
       {plugin_scene, "", 0, NULL},
-      {plugin_scene2, "./libtheseed_components.so",
-       strlen("./libtheseed_components.so") + sizeof(size_t) + 1,
-       "\43\0\0\0\0\0\0\0./libtheseed_components.so\0"}};
+      {plugin_scene2, "./libtheseed_test_components.so",
+       strlen("./libtheseed_test_components.so") + sizeof(size_t) + 1,
+       "\50\0\0\0\0\0\0\0./libtheseed_test_components.so\0"}};
 
   // Constructing Tests
 
