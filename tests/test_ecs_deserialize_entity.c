@@ -72,24 +72,24 @@ int main(int argc, char *argv[]) {
   // Constructing Cases
   TS_Scene *entity_scene = ts_create_scene();
   ts_assert(0 ==
-                ts_load_plugin(entity_scene, "./libtheseed_test_components.so"),
+                ts_load_plugin(entity_scene, "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TS_Scene *component_scene = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(component_scene, "./libtheseed_test_components.so"),
+      0 == ts_load_plugin(component_scene, "./libtheseed_core.so"),
       "Failed to load the plugin");
 
   TS_Scene *multi_entity_scene = ts_create_scene();
   ts_add_entity(multi_entity_scene);
   ts_assert(0 == ts_load_plugin(multi_entity_scene,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TS_Scene *multi_entity_scene2 = ts_create_scene();
   ts_add_entity(multi_entity_scene2);
   ts_assert(0 == ts_load_plugin(multi_entity_scene2,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {

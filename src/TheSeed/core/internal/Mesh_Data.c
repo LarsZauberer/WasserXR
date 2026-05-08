@@ -1,4 +1,4 @@
-#include "TheSeed/ecs/Mesh_Data.h"
+#include "Mesh_internal.h"
 #include "TheSeed/ecs/logging.h"
 #include "assimp/cimport.h"
 #include "assimp/mesh.h"

@@ -100,8 +100,8 @@ int main(int argc, char *argv[]) {
   TS_Scene *entity_scene = ts_create_scene();
   TS_Scene *full_scene = ts_create_scene();
 
-  ts_load_plugin(full_scene, "./libtheseed_test_components.so");
-  ts_load_plugin(full_scene, "./libtheseed_test_systems.so");
+  ts_load_plugin(full_scene, "./libtheseed_core.so");
+  ts_load_plugin(full_scene, "./libtheseed_core.so");
 
   TestCase cases[] = {
       {NULL, NULL, 0, 0, 1},

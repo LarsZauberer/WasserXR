@@ -1,5 +1,5 @@
-#include "TheSeed/components/Console.h"
-#include "TheSeed/components/Commands.h"
+#include "TheSeed/core/Console.h"
+#include "TheSeed/core/Commands.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 

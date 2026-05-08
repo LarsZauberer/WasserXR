@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *scene_one_system = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_one_system, "./libtheseed_test_systems.so"),
+      0 == ts_load_plugin(scene_one_system, "./libtheseed_core.so"),
       "Failed to load the plugin");
   ts_add_system(scene_one_system, "ts_system_a", 10);
 

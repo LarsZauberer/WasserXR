@@ -92,23 +92,23 @@ int main(int argc, char *argv[]) {
 
   // Constructing Cases
   TS_Scene *empty_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(empty_scene, "./libtheseed_test_components.so"),
+  ts_assert(0 == ts_load_plugin(empty_scene, "./libtheseed_core.so"),
             "Failed to load the plugin");
   TS_Entity dummy_entity = ts_add_entity(empty_scene);
 
   TS_Scene *invalid_entity_scene = ts_create_scene();
   ts_assert(0 == ts_load_plugin(invalid_entity_scene,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TS_Scene *valid_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(valid_scene, "./libtheseed_test_components.so"),
+  ts_assert(0 == ts_load_plugin(valid_scene, "./libtheseed_core.so"),
             "Failed to load the plugin");
   TS_Entity valid_entity = ts_add_entity(valid_scene);
 
   TS_Scene *valid_string_scene = ts_create_scene();
   ts_assert(0 == ts_load_plugin(valid_string_scene,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
   TS_Entity valid_string_entity = ts_add_entity(valid_string_scene);
 

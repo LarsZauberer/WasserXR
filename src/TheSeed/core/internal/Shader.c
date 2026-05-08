@@ -1,4 +1,4 @@
-#include "TheSeed/ecs/Shader.h"
+#include "Shader_internal.h"
 #include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/utils.h"
 #include <cglm/cglm.h>
@@ -7,17 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-struct TS_Shader {
-  char *path;
-  unsigned int vertex_shader;
-  unsigned int fragment_shader;
-  unsigned int program;
-  int is_loaded;
-  int is_compiled;
-  char *vertex_source;
-  char *fragment_source;
-};
 
 TS_Shader *ts_create_shader(const char *path) {
   TS_Shader *shader = (TS_Shader *)malloc(sizeof(TS_Shader));

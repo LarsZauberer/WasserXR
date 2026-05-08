@@ -1,4 +1,4 @@
-#include "TheSeed/components/Transform.h"
+#include "TheSeed/core/Transform.h"
 #include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"

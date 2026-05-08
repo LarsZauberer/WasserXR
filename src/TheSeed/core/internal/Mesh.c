@@ -1,6 +1,6 @@
 #include <glad/gl.h>
 
-#include "TheSeed/ecs/Mesh.h"
+#include "Mesh_internal.h"
 #include "TheSeed/ecs/logging.h"
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>

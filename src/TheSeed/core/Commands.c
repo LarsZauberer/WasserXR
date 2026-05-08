@@ -1,5 +1,5 @@
 // This is not a component
-#include "TheSeed/components/Commands.h"
+#include "TheSeed/core/Commands.h"
 #include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>

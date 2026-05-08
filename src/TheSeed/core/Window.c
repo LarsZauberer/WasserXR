@@ -1,7 +1,7 @@
 #include <glad/gl.h>
 
 #include "GL/gl.h"
-#include "TheSeed/components/Window.h"
+#include "TheSeed/core/Window.h"
 #include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
