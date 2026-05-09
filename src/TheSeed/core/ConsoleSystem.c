@@ -1,8 +1,8 @@
-#include "TheSeed/systems/ConsoleSystem.h"
-#include "TheSeed/components/Commands.h"
-#include "TheSeed/components/Console.h"
-#include "TheSeed/core/logging.h"
-#include "TheSeed/core/utils.h"
+#include "TheSeed/core/ConsoleSystem.h"
+#include "TheSeed/core/Commands.h"
+#include "TheSeed/core/Console.h"
+#include "TheSeed/ecs/logging.h"
+#include "TheSeed/ecs/utils.h"
 #include "TheSeed/ecs/Scene.h"
 #include "glib-2.0/glib.h"
 #include <glib.h>

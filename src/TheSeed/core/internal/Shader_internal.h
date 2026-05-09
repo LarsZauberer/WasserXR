@@ -1,5 +1,5 @@
-#ifndef TS_SHADER_H
-#define TS_SHADER_H
+#ifndef TS_SHADER_INTERNAL_H
+#define TS_SHADER_INTERNAL_H
 
 #include <cglm/cglm.h>
 
@@ -7,6 +7,20 @@
  * @brief Opaque shader structure
  */
 typedef struct TS_Shader TS_Shader;
+
+/**
+ * @brief Internal shader structure definition
+ */
+struct TS_Shader {
+  char *path;
+  unsigned int vertex_shader;
+  unsigned int fragment_shader;
+  unsigned int program;
+  int is_loaded;
+  int is_compiled;
+  char *vertex_source;
+  char *fragment_source;
+};
 
 /**
  * @brief Creates a shader object on the heap

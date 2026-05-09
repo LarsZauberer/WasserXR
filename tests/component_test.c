@@ -1,4 +1,4 @@
-#include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/utils.h"
 #include "TheSeed/ecs/Macros.h"
 #include "TheSeed/ecs/Scene.h"
 #include <stdlib.h>

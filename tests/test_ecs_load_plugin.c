@@ -1,6 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 
 typedef struct TestCase TestCase;
 
@@ -39,9 +39,9 @@ int main(int argc, char *argv[]) {
   TS_Scene *valid_scene2 = ts_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                                // NULL scene
-      {valid_scene, "", 1},                                 // Empty path
-      {valid_scene2, "./libtheseed_test_components.so", 0}, // Valid plugin
+      {null_scene, NULL, 1},                     // NULL scene
+      {valid_scene, "", 1},                      // Empty path
+      {valid_scene2, "./libtheseed_core.so", 0}, // Valid plugin
   };
 
   // Constructing Tests

@@ -1,9 +1,9 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glad/gl.h"
 
-#include "TheSeed/components/Window.h"
-#include "TheSeed/core/logging.h"
-#include "TheSeed/systems/WindowRenderer.h"
+#include "TheSeed/core/Window.h"
+#include "TheSeed/ecs/logging.h"
+#include "TheSeed/core/WindowRenderer.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>

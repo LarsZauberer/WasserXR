@@ -1,4 +1,4 @@
-#include "TheSeed/core/logging.h"
+#include "TheSeed/ecs/logging.h"
 #include <glib.h>
 #include <stdio.h>
 #include <string.h>

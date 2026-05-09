@@ -1,6 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 
 typedef struct TestCase TestCase;
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *scene_with_plugin = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_test_components.so"),
+      0 == ts_load_plugin(scene_with_plugin, "./libtheseed_core.so"),
       "Failed to load the plugin");
 
   TS_Scene *empty_scene2 = ts_create_scene();
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
   TestCase cases[] = {
       {null_scene, NULL, 1},                                     // NULL scene
       {empty_scene, "", 1},                                      // Empty scene
-      {scene_with_plugin, "./libtheseed_test_components.so", 0}, // Valid unload
+      {scene_with_plugin, "./libtheseed_core.so", 0}, // Valid unload
       {empty_scene2, "NonExistent", 1}, // Non-existent plugin
   };
 

@@ -1,7 +1,7 @@
 #include "TheSeed/ecs/Scene.h"
 #include "Scene_internal.h"
-#include "TheSeed/core/logging.h"
-#include "TheSeed/core/utils.h"
+#include "TheSeed/ecs/logging.h"
+#include "TheSeed/ecs/utils.h"
 #include <dlfcn.h>
 #include <glib.h>
 #include <stddef.h>

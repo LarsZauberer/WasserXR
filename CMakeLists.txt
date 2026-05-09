@@ -33,52 +33,36 @@ pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(CGLM REQUIRED cglm)
 pkg_check_modules(ASSIMP REQUIRED assimp)
 
-# Core
-file(GLOB CORE_SRC src/TheSeed/core/*.c)
-add_library(theseed_core STATIC ${CORE_SRC})
-target_include_directories(theseed_core PUBLIC include)
-target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
-target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARIES} m ${ASSIMP_LIBRARIES})
-
 # ECS
 file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)
 add_library(theseed_ecs STATIC ${ECS_SRC})
 target_include_directories(theseed_ecs PUBLIC include)
-target_include_directories(theseed_ecs PRIVATE src/TheSeed/ecs) # The `src/TheSeed/ecs` is the private library
-target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS}) 
-target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES} theseed_core)
+target_include_directories(theseed_ecs PRIVATE src/TheSeed/ecs)
+target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES})
 
-# Components
-file(GLOB COMPONENTS_SRC src/TheSeed/components/*.c)
+# Core (merged Components and Systems with internal Shader, Mesh, Mesh_Data utilities)
+file(GLOB CORE_SRC src/TheSeed/core/*.c src/TheSeed/core/internal/*.c)
 if(TS_STATIC)
-  add_library(theseed_components STATIC ${COMPONENTS_SRC})
+  add_library(theseed_core STATIC ${CORE_SRC})
 else()
-  add_library(theseed_components SHARED ${COMPONENTS_SRC})
+  add_library(theseed_core SHARED ${CORE_SRC})
 endif()
-target_include_directories(theseed_components PUBLIC include)
-target_link_libraries(theseed_components PRIVATE glfw theseed_ecs theseed_core)
-
-# Systems
-file(GLOB SYSTEMS_SRC src/TheSeed/systems/*.c)
-if(TS_STATIC)
-  add_library(theseed_systems STATIC ${SYSTEMS_SRC})
-else()
-  add_library(theseed_systems SHARED ${SYSTEMS_SRC})
-endif()
-target_include_directories(theseed_systems PUBLIC include ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS})
-target_link_libraries(theseed_systems PRIVATE glfw pthread ${CGLM_LIBRARIES} m ${GLIB_LIBRARIES} theseed_ecs theseed_core)
+target_include_directories(theseed_core PUBLIC include)
+target_include_directories(theseed_core PRIVATE src/TheSeed/core/internal)
+target_include_directories(theseed_core PRIVATE ${GLIB_INCLUDE_DIRS} ${CGLM_INCLUDE_DIRS} ${ASSIMP_INCLUDE_DIRS})
+target_link_libraries(theseed_core PRIVATE glfw pthread ${CGLM_LIBRARIES} m ${GLIB_LIBRARIES} ${ASSIMP_LIBRARIES} theseed_ecs)
 
 # Generate main executable
 add_executable(theseed src/main.c src/glad/gl.c)
-target_link_libraries(theseed PRIVATE theseed_core theseed_ecs)
+target_link_libraries(theseed PRIVATE theseed_ecs)
 if(TS_STATIC)
   target_link_libraries(theseed PRIVATE -Wl,--whole-archive 
-    theseed_components 
-    theseed_systems 
+    theseed_core 
     -Wl,--no-whole-archive)
 endif()
 
-install(TARGETS theseed theseed_ecs theseed_core theseed_components theseed_systems
+install(TARGETS theseed theseed_ecs theseed_core
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -109,9 +93,13 @@ enable_testing()
 # Extra Libraries for testing
 add_library(theseed_test_components SHARED tests/component_test.c)
 target_include_directories(theseed_test_components PUBLIC include)
+target_include_directories(theseed_test_components PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_test_components PRIVATE theseed_ecs ${GLIB_LIBRARIES})
 
 add_library(theseed_test_systems SHARED tests/system_test.c)
 target_include_directories(theseed_test_systems PUBLIC include)
+target_include_directories(theseed_test_systems PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(theseed_test_systems PRIVATE theseed_ecs ${GLIB_LIBRARIES})
 
 # Helper function to simplify adding tests
 # Usage: add_theseed_test(test_name)
@@ -119,7 +107,7 @@ target_include_directories(theseed_test_systems PUBLIC include)
 function(add_theseed_test test_name)
     add_executable(${test_name} tests/${test_name}.c src/glad/gl.c)
     target_include_directories(${test_name} PRIVATE ${GLIB_INCLUDE_DIRS})
-    target_link_libraries(${test_name} PRIVATE theseed_ecs theseed_core ${GLIB_LIBRARIES})
+    target_link_libraries(${test_name} PRIVATE theseed_ecs ${GLIB_LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endfunction()
 

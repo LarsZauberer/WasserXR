@@ -1,8 +1,8 @@
 #include "Scene_internal.h"
 #include "TheSeed/ecs/Scene.h"
 #include "dlfcn.h"
-#include <TheSeed/core/logging.h>
-#include <TheSeed/core/utils.h>
+#include <TheSeed/ecs/logging.h>
+#include <TheSeed/ecs/utils.h>
 #include <glib.h>
 
 static int ts_compare_systems_priority(gconstpointer left,

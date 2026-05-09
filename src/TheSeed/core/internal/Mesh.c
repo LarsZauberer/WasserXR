@@ -1,7 +1,7 @@
 #include <glad/gl.h>
 
-#include "TheSeed/core/Mesh.h"
-#include "TheSeed/core/logging.h"
+#include "Mesh_internal.h"
+#include "TheSeed/ecs/logging.h"
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>

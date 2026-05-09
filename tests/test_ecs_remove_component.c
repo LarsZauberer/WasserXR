@@ -1,6 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 
 typedef struct TestCase TestCase;
 
@@ -40,20 +40,20 @@ int main(int argc, char *argv[]) {
 
   TS_Scene *scene_with_component = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_component, "./libtheseed_components.so"),
+      0 == ts_load_plugin(scene_with_component, "./libtheseed_core.so"),
       "Failed to load the plugin");
   TS_Entity entity_with_comp = ts_add_entity(scene_with_component);
   ts_add_component(scene_with_component, entity_with_comp, "TS_Transform");
 
   TS_Scene *scene_without_component = ts_create_scene();
   ts_assert(0 == ts_load_plugin(scene_without_component,
-                                "./libtheseed_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
   TS_Entity entity_without_comp = ts_add_entity(scene_without_component);
 
   TS_Scene *scene_with_component2 = ts_create_scene();
   ts_assert(
-      0 == ts_load_plugin(scene_with_component2, "./libtheseed_components.so"),
+      0 == ts_load_plugin(scene_with_component2, "./libtheseed_core.so"),
       "Failed to load the plugin");
   TS_Entity entity_with_comp2 = ts_add_entity(scene_with_component);
   ts_add_component(scene_with_component2, entity_with_comp, "TS_Transform");

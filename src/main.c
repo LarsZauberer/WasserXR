@@ -1,6 +1,6 @@
-#include "TheSeed/core/logging.h"
-#include "TheSeed/core/utils.h"
 #include "TheSeed/ecs/Scene.h"
+#include "TheSeed/ecs/logging.h"
+#include "TheSeed/ecs/utils.h"
 #include <stdio.h>
 
 int main() {
@@ -14,8 +14,7 @@ int main() {
   TS_Scene *scene = ts_create_scene();
 
 #ifndef TS_STATIC
-  ts_load_plugin(scene, "build/libtheseed_components.so");
-  ts_load_plugin(scene, "build/libtheseed_systems.so");
+  ts_load_plugin(scene, "build/libtheseed_core.so");
 #endif
 
   TS_Entity console = ts_add_entity(scene);

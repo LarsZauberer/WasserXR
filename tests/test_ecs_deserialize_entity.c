@@ -1,6 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/core/logging.h>
+#include <TheSeed/ecs/logging.h>
 #include <string.h>
 
 typedef struct TestCase TestCase;
@@ -83,13 +83,13 @@ int main(int argc, char *argv[]) {
   TS_Scene *multi_entity_scene = ts_create_scene();
   ts_add_entity(multi_entity_scene);
   ts_assert(0 == ts_load_plugin(multi_entity_scene,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TS_Scene *multi_entity_scene2 = ts_create_scene();
   ts_add_entity(multi_entity_scene2);
   ts_assert(0 == ts_load_plugin(multi_entity_scene2,
-                                "./libtheseed_test_components.so"),
+                                "./libtheseed_core.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {
