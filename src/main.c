@@ -1,45 +1,45 @@
-#include "TheSeed/ecs/Scene.h"
-#include "TheSeed/ecs/logging.h"
-#include "TheSeed/ecs/utils.h"
+#include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/logging.h"
+#include "WasserXR/ecs/utils.h"
 
 int main() {
   // Create the logging
-  ts_logging_init(TS_LOG_DEBUG);
-  ts_add_logger(ts_stdout_logger);
+  wxr_logging_init(WXR_LOG_DEBUG);
+  wxr_add_logger(wxr_stdout_logger);
 
-  ts_info("Logging Initialized!");
+  wxr_info("Logging Initialized!");
 
   // Create the ecs scene
-  TS_Scene *scene = ts_create_scene();
+  WXR_Scene *scene = wxr_create_scene();
 
-#ifndef TS_STATIC
-  ts_load_plugin(scene, "build/libtheseed_core.so");
+#ifndef WXR_STATIC
+  wxr_load_plugin(scene, "build/libwasserxr_core.so");
 #endif
 
-  TS_Entity console = ts_add_entity(scene);
-  ts_add_component(scene, console, "TS_Console");
+  WXR_Entity console = wxr_add_entity(scene);
+  wxr_add_component(scene, console, "WXR_Console");
 
-  TS_Entity window = ts_add_entity(scene);
-  ts_add_component(scene, window, "TS_Window");
+  WXR_Entity window = wxr_add_entity(scene);
+  wxr_add_component(scene, window, "WXR_Window");
 
-  TS_Entity camera = ts_add_entity(scene);
-  ts_add_component(scene, camera, "TS_Camera");
-  ts_add_component(scene, camera, "TS_Transform");
+  WXR_Entity camera = wxr_add_entity(scene);
+  wxr_add_component(scene, camera, "WXR_Camera");
+  wxr_add_component(scene, camera, "WXR_Transform");
 
   // Add the systems
-  ts_add_system(scene, "ts_console_system", 100);
+  wxr_add_system(scene, "wxr_console_system", 100);
 
-  ts_add_system(scene, "ts_window_pre_renderer", 50);
-  ts_add_system(scene, "ts_window_post_renderer", 150);
+  wxr_add_system(scene, "wxr_window_pre_renderer", 50);
+  wxr_add_system(scene, "wxr_window_post_renderer", 150);
 
-  ts_add_system(scene, "ts_window_quiter", 200);
+  wxr_add_system(scene, "wxr_window_quiter", 200);
 
-  ts_add_system(scene, "ts_window_reloader", 100);
+  wxr_add_system(scene, "wxr_window_reloader", 100);
 
-  ts_add_system(scene, "ts_mesh_renderer", 100);
+  wxr_add_system(scene, "wxr_mesh_renderer", 100);
 
-  while (ts_tick_scene(scene)) {
+  while (wxr_tick_scene(scene)) {
   }
 
-  ts_destroy_scene(scene);
+  wxr_destroy_scene(scene);
 }
