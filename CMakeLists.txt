@@ -44,7 +44,8 @@ target_link_libraries(theseed_core PRIVATE glfw ${GLIB_LIBRARIES} ${CGLM_LIBRARI
 file(GLOB_RECURSE ECS_SRC src/TheSeed/ecs/*.c)
 add_library(theseed_ecs STATIC ${ECS_SRC})
 target_include_directories(theseed_ecs PUBLIC include)
-target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS} src/TheSeed/ecs)
+target_include_directories(theseed_ecs PRIVATE src/TheSeed/ecs) # The `src/TheSeed/ecs` is the private library
+target_include_directories(theseed_ecs PRIVATE ${GLIB_INCLUDE_DIRS}) 
 target_link_libraries(theseed_ecs PRIVATE ${GLIB_LIBRARIES} theseed_core)
 
 # Components
@@ -77,7 +78,7 @@ if(TS_STATIC)
     -Wl,--no-whole-archive)
 endif()
 
-install(TARGETS theseed
+install(TARGETS theseed theseed_ecs theseed_core theseed_components theseed_systems
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
