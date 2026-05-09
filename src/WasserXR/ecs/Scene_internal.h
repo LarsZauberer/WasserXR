@@ -8,7 +8,8 @@ typedef struct WXR_Plugin_Handler WXR_Plugin_Handler;
 typedef struct WXR_Component_Handler WXR_Component_Handler;
 typedef struct WXR_System_Handler WXR_System_Handler;
 typedef struct WXR_Component_Serialization WXR_Component_Serialization;
-typedef struct WXR_Component_Serialization_Item WXR_Component_Serialization_Item;
+typedef struct WXR_Component_Serialization_Item
+    WXR_Component_Serialization_Item;
 
 struct WXR_Plugin_Handler {
   char *path;
@@ -70,10 +71,10 @@ long wxr_get_plugin_index(const WXR_Scene *scene, const char *path);
 long wxr_get_system_index(const WXR_Scene *scene, const char *system_id);
 
 long wxr_get_component_index(const WXR_Scene *scene, WXR_Entity entity,
-                            const char *component_id);
+                             const char *component_id);
 
 WXR_Component_Handler *wxr_find_handler_for_component(const WXR_Scene *scene,
-                                                    const void *component);
+                                                      const void *component);
 
 // ECS functions
 
@@ -84,10 +85,10 @@ WXR_Component_Handler *wxr_find_handler_for_component(const WXR_Scene *scene,
 void wxr_sort_systems(WXR_Scene *scene);
 
 void *wxr_get_abi_symbol_from_plugin(const WXR_Scene *scene,
-                                    const WXR_Plugin_Handler *handler,
-                                    const char *prefix, const char *symbol);
+                                     const WXR_Plugin_Handler *handler,
+                                     const char *prefix, const char *symbol);
 void *wxr_get_abi_symbol(WXR_Plugin_Handler **handler, const WXR_Scene *scene,
-                        const char *prefix, const char *symbol);
+                         const char *prefix, const char *symbol);
 
 void wxr_reload_plugins(WXR_Scene *scene);
 

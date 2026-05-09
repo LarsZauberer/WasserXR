@@ -18,19 +18,19 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   // Add entities before reset
   wxr_add_entity(input->scene);
   wxr_add_entity(input->scene);
-  
+
   // Reset the scene
   wxr_reset_scene(input->scene);
-  
+
   // Check that entities are cleared
   size_t count = 0;
   WXR_Entity *entities = wxr_get_entities(&count, input->scene);
   wxr_assert(count == 0, "Scene should have no entities after reset");
-  
+
   if (entities) {
     free(entities);
   }

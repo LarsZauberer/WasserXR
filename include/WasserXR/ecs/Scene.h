@@ -46,7 +46,7 @@ typedef int (*WXR_Component_Deserializer)(void *, const char *);
 typedef int WXR_System_Groups;
 typedef void (*WXR_System_Function)(WXR_Scene *, WXR_Entity **, const size_t *);
 typedef WXR_System_Groups (*WXR_System_Selector)(const WXR_Scene *,
-                                               const WXR_Entity);
+                                                 const WXR_Entity);
 typedef void (*WXR_System_Attacher)(WXR_Scene *);
 typedef void (*WXR_System_Detacher)(WXR_Scene *);
 
@@ -157,7 +157,7 @@ int wxr_reload(WXR_Scene *scene);
  * @return Pointer to the created component data, or NULL on failure
  */
 void *wxr_add_component(WXR_Scene *scene, WXR_Entity entity_id,
-                       const char *component_id);
+                        const char *component_id);
 
 /**
  * Remove a component from an entity. This will completely free the object by
@@ -169,7 +169,7 @@ void *wxr_add_component(WXR_Scene *scene, WXR_Entity entity_id,
  * @return 0 on success, non-zero on failure
  */
 int wxr_remove_component(WXR_Scene *scene, WXR_Entity entity_id,
-                        const char *component_id);
+                         const char *component_id);
 
 /**
  * Returns an array of component names currently attached to the entity
@@ -180,7 +180,7 @@ int wxr_remove_component(WXR_Scene *scene, WXR_Entity entity_id,
  * components. Caller must free each string in the array and the array itself.
  */
 char **wxr_get_components_of_entity(size_t *size, const WXR_Scene *scene,
-                                   WXR_Entity entity_id);
+                                    WXR_Entity entity_id);
 
 /**
  * Get a component from an entity.
@@ -190,7 +190,7 @@ char **wxr_get_components_of_entity(size_t *size, const WXR_Scene *scene,
  * @return Pointer to the component data, or NULL if not found
  */
 void *wxr_entity_get_component(const WXR_Scene *scene, WXR_Entity entity_id,
-                              const char *component_id);
+                               const char *component_id);
 
 /**
  * Add a system to the scene.
@@ -276,10 +276,12 @@ WXR_Entity *wxr_find_entities_with_selector_and_groups(
  * @return Pointer to the newly created component field, or NULL on
  * failure
  */
-WXR_Component_Field *wxr_create_component_field(
-    const char *field_name, WXR_Primitive_Type type, WXR_Component_Getter getter,
-    WXR_Component_Setter setter, WXR_Component_Serializer serializer,
-    WXR_Component_Deserializer deserializer);
+WXR_Component_Field *
+wxr_create_component_field(const char *field_name, WXR_Primitive_Type type,
+                           WXR_Component_Getter getter,
+                           WXR_Component_Setter setter,
+                           WXR_Component_Serializer serializer,
+                           WXR_Component_Deserializer deserializer);
 
 /**
  * Destroy a component field and free its memory.
@@ -315,7 +317,7 @@ void wxr_destroy_component_schema(WXR_Component_Schema *schema);
  * @return 0 on success, non-zero on failure
  */
 int wxr_add_field_to_component_schema(WXR_Component_Schema *schema,
-                                     const WXR_Component_Field *field);
+                                      const WXR_Component_Field *field);
 
 // TODO: Should be made constant for public usage
 /**
@@ -327,7 +329,7 @@ int wxr_add_field_to_component_schema(WXR_Component_Schema *schema,
  * @return Pointer to the component's schema, or NULL if not found
  */
 WXR_Component_Schema *wxr_get_schema_of_component(const WXR_Scene *scene,
-                                                const void *component);
+                                                  const void *component);
 
 // TODO: Should be made constant for public usage
 /**
@@ -337,7 +339,7 @@ WXR_Component_Schema *wxr_get_schema_of_component(const WXR_Scene *scene,
  * @return Pointer to the field definition, or NULL if not found
  */
 WXR_Component_Field *wxr_get_field(const WXR_Component_Schema *schema,
-                                 const char *field);
+                                   const char *field);
 
 /**
  * Get the getter function for a specific field in a component schema.
@@ -348,7 +350,7 @@ WXR_Component_Field *wxr_get_field(const WXR_Component_Schema *schema,
  * @return Function pointer to the getter, or NULL if not found
  */
 WXR_Component_Getter wxr_get_field_getter(const WXR_Component_Schema *schema,
-                                        const char *field_name);
+                                          const char *field_name);
 
 /**
  * Get the setter function for a specific field in a component schema.
@@ -359,16 +361,17 @@ WXR_Component_Getter wxr_get_field_getter(const WXR_Component_Schema *schema,
  * @return Function pointer to the setter, or NULL if not found
  */
 WXR_Component_Setter wxr_get_field_setter(const WXR_Component_Schema *schema,
-                                        const char *field_name);
+                                          const char *field_name);
 
 /**
  * Get the primitive type of a specific field in a component schema.
  * @param schema The component schema to search
  * @param field_name Name of the field
- * @return The primitive type (WXR_L, WXR_F, WXR_C, WXR_BLOB, WXR_S, WXR_BLOB_ARRAY)
+ * @return The primitive type (WXR_L, WXR_F, WXR_C, WXR_BLOB, WXR_S,
+ * WXR_BLOB_ARRAY)
  */
 WXR_Primitive_Type wxr_get_field_type(const WXR_Component_Schema *schema,
-                                    const char *field_name);
+                                      const char *field_name);
 
 /**
  * Get the value of a field from a component instance.
@@ -385,7 +388,7 @@ WXR_Primitive_Type wxr_get_field_type(const WXR_Component_Schema *schema,
  * not owned by the caller.
  */
 const void *wxr_get(const WXR_Scene *scene, const void *component,
-                   const char *field);
+                    const char *field);
 
 /**
  * Set the value of a field on a component instance.
@@ -399,7 +402,7 @@ const void *wxr_get(const WXR_Scene *scene, const void *component,
  * @return 0 on success, non-zero on failure
  */
 int wxr_set(const WXR_Scene *scene, void *component, const char *field,
-           const void *data);
+            const void *data);
 
 /**
  * Serializes the loaded plugin from the Scene
@@ -479,7 +482,7 @@ int wxr_deserialize_system(WXR_Scene *scene, const char *data);
  * deserialized. If it returns 0 it was successfully deserialized.
  */
 int wxr_deserialize_component(WXR_Scene *scene, WXR_Entity entity,
-                             const char *data);
+                              const char *data);
 
 /**
  * Deserializes an entity bytestream

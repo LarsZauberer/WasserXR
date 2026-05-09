@@ -36,11 +36,11 @@ static void unittest(const void *ptr) {
     char **plugins = wxr_get_plugins(&plugin_count, input->scene);
 
     wxr_assert_test(plugin_count == 1, "Expected: %d", 1, "Got: %ld",
-                   plugin_count, "Plugin count doesn't match");
+                    plugin_count, "Plugin count doesn't match");
     wxr_assert(plugins != NULL, "Plugins array should not be NULL");
     wxr_assert_test(strcmp(plugins[0], input->expected_plugin) == 0,
-                   "Expected: %s", input->expected_plugin, "Got: %s",
-                   plugins[0], "Plugin name doesn't match");
+                    "Expected: %s", input->expected_plugin, "Got: %s",
+                    plugins[0], "Plugin name doesn't match");
 
     for (size_t i = 0; i < plugin_count; i++) {
       free(plugins[i]);
@@ -66,7 +66,8 @@ int main(int argc, char *argv[]) {
 
   // Constructing Tests
   for (size_t i = 0; i < 3; i++) {
-    char *path = g_strdup_printf("/wasserxr/test_ecs_deserialize_plugin/%ld", i);
+    char *path =
+        g_strdup_printf("/wasserxr/test_ecs_deserialize_plugin/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

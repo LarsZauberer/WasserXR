@@ -43,16 +43,16 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene = wxr_create_scene();
 
   WXR_Scene *scene_with_component = wxr_create_scene();
-  wxr_assert(
-      0 == wxr_load_plugin(scene_with_component, "./libwasserxr_core.so"),
-      "Failed to load the plugin");
+  wxr_assert(0 ==
+                 wxr_load_plugin(scene_with_component, "./libwasserxr_core.so"),
+             "Failed to load the plugin");
   WXR_Entity entity_with_comp = wxr_add_entity(scene_with_component);
   wxr_add_component(scene_with_component, entity_with_comp, "WXR_Transform");
 
   WXR_Scene *scene_without_component = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(scene_without_component,
-                                "./libwasserxr_core.so"),
-            "Failed to load the plugin");
+  wxr_assert(
+      0 == wxr_load_plugin(scene_without_component, "./libwasserxr_core.so"),
+      "Failed to load the plugin");
   WXR_Entity entity_without_comp = wxr_add_entity(scene_without_component);
 
   WXR_Scene *scene_with_component2 = wxr_create_scene();
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
       {scene_with_component, entity_with_comp, "WXR_Transform",
        1}, // Valid component
       {scene_without_component, entity_without_comp, "WXR_Transform",
-       0},                                             // Non-existent component
+       0}, // Non-existent component
       {scene_with_component2, 999, "WXR_Transform", 0}, // Invalid entity
   };
 

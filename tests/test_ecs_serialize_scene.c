@@ -28,13 +28,13 @@ static void unittest(const void *ptr) {
   size_t length = 0;
   memcpy(&length, data, sizeof(size_t));
   wxr_assert_test(length == input->length, "%ld", input->length, "%ld", length,
-                 "The size of the data returned doesn't match!");
+                  "The size of the data returned doesn't match!");
   for (size_t i = 0; i < length; i++) {
     char byte_should = input->out[i];
     char byte_out = data[i];
     wxr_assert_test(byte_should == byte_out, "Should: %d", byte_should,
-                   "Output: %d", byte_out, "The Byte at index %d is not equal",
-                   i);
+                    "Output: %d", byte_out, "The Byte at index %d is not equal",
+                    i);
   }
 
   free(data);
@@ -50,27 +50,28 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene = wxr_create_scene();
 
   WXR_Scene *entity_scene = wxr_create_scene();
-  wxr_assert(0 ==
-                wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin (test_components)");
+  wxr_assert(
+      0 == wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin (test_components)");
   wxr_add_entity(entity_scene);
 
   WXR_Scene *full_scene = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(full_scene, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin (test components)");
+  wxr_assert(
+      0 == wxr_load_plugin(full_scene, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin (test components)");
   wxr_assert(0 == wxr_load_plugin(full_scene, "./libwasserxr_test_systems.so"),
-            "Failed to load the plugin (systems)");
+             "Failed to load the plugin (systems)");
   WXR_Entity entity_id_component = wxr_add_entity(full_scene);
-  wxr_assert(wxr_add_component(full_scene, entity_id_component, "WXR_A") != NULL,
-            "Failed to add component");
+  wxr_assert(wxr_add_component(full_scene, entity_id_component, "WXR_A") !=
+                 NULL,
+             "Failed to add component");
   wxr_assert(0 == wxr_add_system(full_scene, "wxr_system_a", 100),
-            "Failed to add system");
+             "Failed to add system");
 
   TestCase cases[] = {
       {NULL, 0, NULL},
       {NULL, 0, NULL},
-      {empty_scene,
-       sizeof(size_t) + sizeof(size_t) + sizeof(size_t),
+      {empty_scene, sizeof(size_t) + sizeof(size_t) + sizeof(size_t),
        "\30\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"
        "\0\0\0\0\0\0\0\0"},
@@ -90,8 +91,8 @@ int main(int argc, char *argv[]) {
        "\1\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\31\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0"
-        "\66\0\0\0\0\0\0\0\56\0\0\0\0\0\0\0WXR_"
-        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
+       "\66\0\0\0\0\0\0\0\56\0\0\0\0\0\0\0WXR_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
   };
 
   // Constructing Tests

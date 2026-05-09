@@ -1,10 +1,10 @@
 #include "WasserXR/core/Model.h"
 #include "Mesh_internal.h"
 #include "Shader_internal.h"
-#include "WasserXR/ecs/logging.h"
-#include "WasserXR/ecs/utils.h"
 #include "WasserXR/ecs/Macros.h"
 #include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/logging.h"
+#include "WasserXR/ecs/utils.h"
 #include <glad/gl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,9 +64,10 @@ void wxr_set_WXR_Model_model_name(void *component, const void *data) {
     }
 
     // Array of pointers
-    WXR_Mesh **meshes = (WXR_Mesh **)malloc(sizeof(WXR_Mesh *) * model->numMeshes);
+    WXR_Mesh **meshes =
+        (WXR_Mesh **)malloc(sizeof(WXR_Mesh *) * model->numMeshes);
     wxr_assert(meshes, "Malloc failed during creation of the meshes array in "
-                      "wxr_activate_WXR_Model");
+                       "wxr_activate_WXR_Model");
 
     // Load the mesh with opengl
     for (unsigned int i = 0; i < model->numMeshes; i++) {
@@ -107,10 +108,10 @@ void wxr_set_WXR_Model_shader_name(void *component, const void *data) {
 
 WXR_STRING_SERIALIZE(WXR_Model, model_name, component->model_name);
 WXR_SET_DESERIALIZE(WXR_Model, model_name, component->model_name,
-                   wxr_set_WXR_Model_model_name);
+                    wxr_set_WXR_Model_model_name);
 WXR_STRING_SERIALIZE(WXR_Model, shader_name, component->shader_name);
 WXR_SET_DESERIALIZE(WXR_Model, shader_name, component->shader_name,
-                   wxr_set_WXR_Model_shader_name);
+                    wxr_set_WXR_Model_shader_name);
 
 WXR_STRING_GETTER(WXR_Model, shader_name, component->shader_name);
 WXR_STRING_GETTER(WXR_Model, model_name, component->model_name);
@@ -119,7 +120,7 @@ WXR_BASIC_GETTER(WXR_Model, shader, component->shader, sizeof(WXR_Shader *));
 WXR_BASIC_GETTER(WXR_Model, meshes, component->meshes, sizeof(WXR_Mesh **));
 
 WXR_BASIC_GETTER(WXR_Model, num_meshes, &component->numMeshes,
-                sizeof(unsigned int));
+                 sizeof(unsigned int));
 
 void wxr_schema_WXR_Model(WXR_Component_Schema *schema) {
   WXR_SCHEMA_FIELD_FULL(WXR_Model, WXR_S, model_name);

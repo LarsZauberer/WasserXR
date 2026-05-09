@@ -19,10 +19,10 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   int result = wxr_remove_entity(input->scene, input->entity);
   wxr_assert(result == input->expected_result,
-            "Remove entity result should match expected");
+             "Remove entity result should match expected");
 }
 
 int main(int argc, char *argv[]) {
@@ -43,10 +43,10 @@ int main(int argc, char *argv[]) {
   wxr_add_entity(scene_for_nonexistent);
 
   TestCase cases[] = {
-      {null_scene, 0, 1},                      // NULL scene should fail
-      {empty_scene, 0, 1},                     // Non-existent entity should fail
-      {scene_with_entity, valid_entity, 0},    // Valid removal should succeed
-      {scene_for_nonexistent, 999, 1},         // Non-existent entity should fail
+      {null_scene, 0, 1},                   // NULL scene should fail
+      {empty_scene, 0, 1},                  // Non-existent entity should fail
+      {scene_with_entity, valid_entity, 0}, // Valid removal should succeed
+      {scene_for_nonexistent, 999, 1},      // Non-existent entity should fail
   };
 
   // Constructing Tests

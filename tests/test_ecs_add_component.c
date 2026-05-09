@@ -41,14 +41,13 @@ int main(int argc, char *argv[]) {
 
   WXR_Scene *entity_plugin_scene_invalid = wxr_create_scene();
   wxr_assert(0 == wxr_load_plugin(entity_plugin_scene_invalid,
-                                "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+                                  "./libwasserxr_test_components.so"),
+             "Failed to load the plugin");
   WXR_Entity entity2 = wxr_add_entity(entity_plugin_scene_invalid);
 
   WXR_Scene *entity_plugin_scene = wxr_create_scene();
-  wxr_assert(
-      0 == wxr_load_plugin(entity_plugin_scene, "./libwasserxr_core.so"),
-      "Failed to load the plugin");
+  wxr_assert(0 == wxr_load_plugin(entity_plugin_scene, "./libwasserxr_core.so"),
+             "Failed to load the plugin");
   WXR_Entity entity3 = wxr_add_entity(entity_plugin_scene);
 
   TestCase cases[] = {

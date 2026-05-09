@@ -17,10 +17,10 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   // Set scene to reload
   wxr_set_scene_reload(input->scene);
-  
+
   // This test just verifies the function can be called without crashing
   // The actual reload behavior is tested through integration tests
   wxr_assert(1, "Scene reload signal set successfully");

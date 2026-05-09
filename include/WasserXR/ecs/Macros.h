@@ -22,8 +22,8 @@
  * @param field_size Size of the field in bytes (used for documentation, not in
  * getter)
  */
-#define WXR_BASIC_GETTER(component_type, field_name, field_exp, field_size)     \
-  const void *wxr_get_##component_type##_##field_name(const void *ptr) {        \
+#define WXR_BASIC_GETTER(component_type, field_name, field_exp, field_size)    \
+  const void *wxr_get_##component_type##_##field_name(const void *ptr) {       \
     const component_type *component = ptr;                                     \
     return field_exp;                                                          \
   }
@@ -37,8 +37,8 @@
  * @param field_exp Expression that evaluates to the field's address
  * @param field_size Size of the field in bytes (used by memcpy)
  */
-#define WXR_BASIC_SETTER(component_type, field_name, field_exp, field_size)     \
-  void wxr_set_##component_type##_##field_name(void *ptr, const void *data) {   \
+#define WXR_BASIC_SETTER(component_type, field_name, field_exp, field_size)    \
+  void wxr_set_##component_type##_##field_name(void *ptr, const void *data) {  \
     component_type *component = ptr;                                           \
     if (data) {                                                                \
       memcpy(field_exp, data, field_size);                                     \
@@ -54,8 +54,8 @@
  * @param field_exp Expression that evaluates to the field's address
  * @param field_size Size of the field in bytes
  */
-#define WXR_BASIC_ACCESS(component_type, field_name, field_exp, field_size)     \
-  WXR_BASIC_GETTER(component_type, field_name, field_exp, field_size);          \
+#define WXR_BASIC_ACCESS(component_type, field_name, field_exp, field_size)    \
+  WXR_BASIC_GETTER(component_type, field_name, field_exp, field_size);         \
   WXR_BASIC_SETTER(component_type, field_name, field_exp, field_size)
 
 /**
@@ -67,7 +67,7 @@
  * @param field_name The name of the string field to generate a getter for
  * @param field_exp Expression that evaluates to the string field's address
  */
-#define WXR_STRING_GETTER(component_type, field_name, field_exp)                \
+#define WXR_STRING_GETTER(component_type, field_name, field_exp)               \
   WXR_BASIC_GETTER(component_type, field_name, field_exp, 0)
 
 /**
@@ -79,13 +79,13 @@
  * @param field_name The name of the string field to generate a setter for
  * @param field_exp Expression that evaluates to the string field's address
  */
-#define WXR_STRING_SETTER(component_type, field_name, field_exp)                \
-  void wxr_set_##component_type##_##field_name(void *ptr, const void *data) {   \
+#define WXR_STRING_SETTER(component_type, field_name, field_exp)               \
+  void wxr_set_##component_type##_##field_name(void *ptr, const void *data) {  \
     component_type *component = ptr;                                           \
     if (field_exp) {                                                           \
       free(field_exp);                                                         \
     }                                                                          \
-    field_exp = wxr_copy_char_ptr(data);                                        \
+    field_exp = wxr_copy_char_ptr(data);                                       \
   }
 
 /**
@@ -96,8 +96,8 @@
  * @param field_name The name of the string field to generate accessors for
  * @param field_exp Expression that evaluates to the string field's address
  */
-#define WXR_STRING_ACCESS(component_type, field_name, field_exp)                \
-  WXR_STRING_GETTER(component_type, field_name, field_exp);                     \
+#define WXR_STRING_ACCESS(component_type, field_name, field_exp)               \
+  WXR_STRING_GETTER(component_type, field_name, field_exp);                    \
   WXR_STRING_SETTER(component_type, field_name, field_exp)
 
 /** @} */
@@ -118,8 +118,8 @@
  * @param field_size Size of the field in bytes
  * @return Dynamically allocated byte array (caller must free)
  */
-#define WXR_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size)  \
-  char *wxr_serialize_##component_type##_##field_name(const void *ptr) {        \
+#define WXR_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size) \
+  char *wxr_serialize_##component_type##_##field_name(const void *ptr) {       \
     const component_type *component = ptr;                                     \
     char *field_id = #field_name;                                              \
                                                                                \
@@ -149,10 +149,10 @@
  * @param field_size Size of the field in bytes
  * @return 0 on success, non-zero on failure
  */
-#define WXR_BASIC_DESERIALIZE(component_type, field_name, field_exp,            \
-                             field_size)                                       \
-  int wxr_deserialize_##component_type##_##field_name(void *ptr,                \
-                                                     const char *data) {       \
+#define WXR_BASIC_DESERIALIZE(component_type, field_name, field_exp,           \
+                              field_size)                                      \
+  int wxr_deserialize_##component_type##_##field_name(void *ptr,               \
+                                                      const char *data) {      \
     component_type *component = ptr;                                           \
     memcpy(field_exp, data, field_size);                                       \
     return 0;                                                                  \
@@ -167,9 +167,9 @@
  * @param field_exp Expression that evaluates to the field's address
  * @param field_size Size of the field in bytes
  */
-#define WXR_BASIC_SERIALIZERS(component_type, field_name, field_exp,            \
-                             field_size)                                       \
-  WXR_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size);       \
+#define WXR_BASIC_SERIALIZERS(component_type, field_name, field_exp,           \
+                              field_size)                                      \
+  WXR_BASIC_SERIALIZE(component_type, field_name, field_exp, field_size);      \
   WXR_BASIC_DESERIALIZE(component_type, field_name, field_exp, field_size)
 
 /**
@@ -182,9 +182,9 @@
  * @param field_exp Expression that evaluates to the string field's address
  * @return Dynamically allocated byte array (caller must free)
  */
-#define WXR_STRING_SERIALIZE(component_type, field_name, field_exp)             \
-  WXR_BASIC_SERIALIZE(component_type, field_name, field_exp,                    \
-                     strlen(field_exp) + 1)
+#define WXR_STRING_SERIALIZE(component_type, field_name, field_exp)            \
+  WXR_BASIC_SERIALIZE(component_type, field_name, field_exp,                   \
+                      strlen(field_exp) + 1)
 
 /**
  * Generate a deserialization function for a string component field.
@@ -196,14 +196,14 @@
  * @param field_exp Expression that evaluates to the string field's address
  * @return 0 on success, non-zero on failure
  */
-#define WXR_STRING_DESERIALIZE(component_type, field_name, field_exp)           \
-  int wxr_deserialize_##component_type##_##field_name(void *ptr,                \
-                                                     const char *data) {       \
+#define WXR_STRING_DESERIALIZE(component_type, field_name, field_exp)          \
+  int wxr_deserialize_##component_type##_##field_name(void *ptr,               \
+                                                      const char *data) {      \
     component_type *component = ptr;                                           \
     if (field_exp) {                                                           \
       free(field_exp);                                                         \
     }                                                                          \
-    field_exp = wxr_copy_char_ptr(data);                                        \
+    field_exp = wxr_copy_char_ptr(data);                                       \
     return 0;                                                                  \
   }
 
@@ -216,8 +216,8 @@
  * @param field_name The name of the string field to generate serializers for
  * @param field_exp Expression that evaluates to the string field's address
  */
-#define WXR_STRING_SERIALIZERS(component_type, field_name, field_exp)           \
-  WXR_STRING_SERIALIZE(component_type, field_name, field_exp);                  \
+#define WXR_STRING_SERIALIZERS(component_type, field_name, field_exp)          \
+  WXR_STRING_SERIALIZE(component_type, field_name, field_exp);                 \
   WXR_STRING_DESERIALIZE(component_type, field_name, field_exp)
 
 /**
@@ -232,9 +232,9 @@
  * @param setter Custom setter function to use for deserialization
  * @return 0 on success, non-zero on failure
  */
-#define WXR_SET_DESERIALIZE(component_type, field_name, field_exp, setter)      \
-  int wxr_deserialize_##component_type##_##field_name(void *ptr,                \
-                                                     const char *data) {       \
+#define WXR_SET_DESERIALIZE(component_type, field_name, field_exp, setter)     \
+  int wxr_deserialize_##component_type##_##field_name(void *ptr,               \
+                                                      const char *data) {      \
     setter(ptr, (void *)data);                                                 \
     return 0;                                                                  \
   }
@@ -252,8 +252,8 @@
  * the most flexible field registration macro, allowing you to specify all
  * field properties including type, getter, setter, serializer, and
  * deserializer.
- * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB, WXR_S,
- * WXR_BLOB_ARRAY)
+ * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB,
+ * WXR_S, WXR_BLOB_ARRAY)
  * @param name Name of the field (will be stringified)
  * @param getter Function pointer to get the field value (WXR_Component_Getter)
  * @param setter Function pointer to set the field value (WXR_Component_Setter)
@@ -262,8 +262,8 @@
  * @param deserializer Function pointer to deserialize the field
  * (WXR_Component_Deserializer)
  */
-#define WXR_SCHEMA_FIELD(type, name, getter, setter, serializer, deserializer)  \
-  WXR_Component_Field *name##_field = wxr_create_component_field(                \
+#define WXR_SCHEMA_FIELD(type, name, getter, setter, serializer, deserializer) \
+  WXR_Component_Field *name##_field = wxr_create_component_field(              \
       #name, type, getter, setter, serializer, deserializer);                  \
   wxr_add_field_to_component_schema(schema, name##_field)
 
@@ -275,15 +275,15 @@
  * deserializer functions using the corresponding macros (e.g., WXR_BASIC_ACCESS
  * and WXR_BASIC_SERIALIZERS).
  * @param component_type The type name of the component struct
- * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB, WXR_S,
- * WXR_BLOB_ARRAY)
+ * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB,
+ * WXR_S, WXR_BLOB_ARRAY)
  * @param name Name of the field
  */
-#define WXR_SCHEMA_FIELD_FULL(component_type, type, name)                       \
-  WXR_SCHEMA_FIELD(type, name, wxr_get_##component_type##_##name,                \
-                  wxr_set_##component_type##_##name,                            \
-                  wxr_serialize_##component_type##_##name,                      \
-                  wxr_deserialize_##component_type##_##name)
+#define WXR_SCHEMA_FIELD_FULL(component_type, type, name)                      \
+  WXR_SCHEMA_FIELD(type, name, wxr_get_##component_type##_##name,              \
+                   wxr_set_##component_type##_##name,                          \
+                   wxr_serialize_##component_type##_##name,                    \
+                   wxr_deserialize_##component_type##_##name)
 
 /**
  * Register a read-only component field in a schema.
@@ -291,13 +291,13 @@
  * field name. Only provides a getter - setter, serializer, and deserializer are
  * set to NULL, making this field read-only and non-serializable.
  * @param component_type The type name of the component struct
- * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB, WXR_S,
- * WXR_BLOB_ARRAY)
+ * @param type Primitive type of the field (WXR_L, WXR_F, WXR_C, WXR_BLOB,
+ * WXR_S, WXR_BLOB_ARRAY)
  * @param name Name of the field
  */
-#define WXR_SCHEMA_FIELD_GET(component_type, type, name)                        \
-  WXR_SCHEMA_FIELD(type, name, wxr_get_##component_type##_##name, NULL, NULL,    \
-                  NULL)
+#define WXR_SCHEMA_FIELD_GET(component_type, type, name)                       \
+  WXR_SCHEMA_FIELD(type, name, wxr_get_##component_type##_##name, NULL, NULL,  \
+                   NULL)
 
 /** @} */
 

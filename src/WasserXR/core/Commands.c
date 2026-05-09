@@ -1,13 +1,14 @@
 // This is not a component
 #include "WasserXR/core/Commands.h"
-#include "WasserXR/ecs/logging.h"
 #include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/logging.h"
 #include <stdlib.h>
 #include <string.h>
 
 WXR_Command *wxr_create_command_list(size_t *size) {
   *size = 17;
-  WXR_Command *command_list = (WXR_Command *)malloc(sizeof(WXR_Command) * *size);
+  WXR_Command *command_list =
+      (WXR_Command *)malloc(sizeof(WXR_Command) * *size);
 
   command_list[0] = (WXR_Command){"reload", wxr_command_reload};
   command_list[1] = (WXR_Command){"exit", wxr_command_exit};
@@ -22,7 +23,8 @@ WXR_Command *wxr_create_command_list(size_t *size) {
   command_list[10] = (WXR_Command){"unloadPlugin", wxr_command_unloadPlugin};
   command_list[11] = (WXR_Command){"showEntities", wxr_command_showEntities};
   command_list[12] = (WXR_Command){"showPlugins", wxr_command_showPlugins};
-  command_list[13] = (WXR_Command){"showComponents", wxr_command_showComponents};
+  command_list[13] =
+      (WXR_Command){"showComponents", wxr_command_showComponents};
   command_list[14] = (WXR_Command){"showSystems", wxr_command_showSystems};
   command_list[15] = (WXR_Command){"save", wxr_command_save};
   command_list[16] = (WXR_Command){"load", wxr_command_load};
@@ -96,7 +98,7 @@ void wxr_command_get(char **args, WXR_Scene *scene) {
   void *component = wxr_entity_get_component(scene, entity_id, args[1]);
   if (!component) {
     wxr_warn("Component `%s` couldn't be found for entity %ld", args[1],
-            entity_id);
+             entity_id);
     return;
   }
   WXR_Component_Schema *schema = wxr_get_schema_of_component(scene, component);
@@ -160,7 +162,7 @@ void wxr_command_set(char **args, WXR_Scene *scene) {
   void *component = wxr_entity_get_component(scene, entity_id, args[1]);
   if (!component) {
     wxr_warn("Component `%s` couldn't be found for entity %ld", args[1],
-            entity_id);
+             entity_id);
     return;
   }
   WXR_Component_Schema *schema = wxr_get_schema_of_component(scene, component);

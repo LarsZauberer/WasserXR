@@ -64,7 +64,7 @@ void wxr_destroy_shader(WXR_Shader *shader);
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_1f(const WXR_Shader *shader, const char *name,
-                             float value);
+                              float value);
 
 /**
  * @brief Set an integer uniform in the shader
@@ -74,7 +74,7 @@ int wxr_set_shader_uniform_1f(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_1i(const WXR_Shader *shader, const char *name,
-                             int value);
+                              int value);
 
 /**
  * @brief Set a vec2 uniform in the shader
@@ -84,7 +84,7 @@ int wxr_set_shader_uniform_1i(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_2f(const WXR_Shader *shader, const char *name,
-                             const vec2 value);
+                              const vec2 value);
 
 /**
  * @brief Set a vec3 uniform in the shader
@@ -94,7 +94,7 @@ int wxr_set_shader_uniform_2f(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_3f(const WXR_Shader *shader, const char *name,
-                             const vec3 value);
+                              const vec3 value);
 
 /**
  * @brief Set a vec4 uniform in the shader
@@ -104,7 +104,7 @@ int wxr_set_shader_uniform_3f(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_4f(const WXR_Shader *shader, const char *name,
-                             const vec4 value);
+                              const vec4 value);
 
 /**
  * @brief Set a mat2 uniform in the shader
@@ -114,7 +114,7 @@ int wxr_set_shader_uniform_4f(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_mat2(const WXR_Shader *shader, const char *name,
-                               const mat2 value);
+                                const mat2 value);
 
 /**
  * @brief Set a mat3 uniform in the shader
@@ -124,7 +124,7 @@ int wxr_set_shader_uniform_mat2(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_mat3(const WXR_Shader *shader, const char *name,
-                               const mat3 value);
+                                const mat3 value);
 
 /**
  * @brief Set a mat4 uniform in the shader
@@ -134,6 +134,6 @@ int wxr_set_shader_uniform_mat3(const WXR_Shader *shader, const char *name,
  * @return 0 on success, 1 on failure
  */
 int wxr_set_shader_uniform_mat4(const WXR_Shader *shader, const char *name,
-                               const mat4 value);
+                                const mat4 value);
 
 #endif

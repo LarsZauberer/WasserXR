@@ -21,9 +21,10 @@ static void free_case(void *ptr) {
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
 
-  int result = wxr_add_system(input->scene, input->system_name, input->priority);
+  int result =
+      wxr_add_system(input->scene, input->system_name, input->priority);
   wxr_assert(result == input->expected_result,
-            "Add system result should match expected");
+             "Add system result should match expected");
 }
 
 int main(int argc, char *argv[]) {
@@ -48,9 +49,9 @@ int main(int argc, char *argv[]) {
       "Failed to load the plugin");
 
   TestCase cases[] = {
-      {null_scene, NULL, 0, 1},                   // NULL scene
+      {null_scene, NULL, 0, 1},                    // NULL scene
       {empty_scene, "wxr_system_a", 0, 1},         // Empty scene without plugin
-      {scene_with_plugin, "asdf", 5, 1},          // Non-existent system
+      {scene_with_plugin, "asdf", 5, 1},           // Non-existent system
       {scene_with_plugin2, "wxr_system_a", 10, 0}, // Valid system add
   };
 

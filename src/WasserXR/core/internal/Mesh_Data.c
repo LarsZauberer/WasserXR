@@ -25,8 +25,8 @@ static WXR_Mesh_Data wxr_process_mesh(const aiMesh *mesh) {
   wxr_assert(
       normals,
       "Malloc returned null for the normals creation during wxr_process_mesh");
-  wxr_assert(uvs,
-            "Malloc returned null for the UVs creation during wxr_process_mesh");
+  wxr_assert(
+      uvs, "Malloc returned null for the UVs creation during wxr_process_mesh");
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
     vertices[(i * 3) + 0] = mesh->mVertices[i].x;
     vertices[(i * 3) + 1] = mesh->mVertices[i].y;
@@ -64,8 +64,8 @@ static WXR_Mesh_Data wxr_process_mesh(const aiMesh *mesh) {
   for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
     const aiFace face = mesh->mFaces[i];
     wxr_assert(face.mNumIndices == 3,
-              "The mesh being processed is not a triangle mesh. Meshes other "
-              "than triangle meshes are not supported");
+               "The mesh being processed is not a triangle mesh. Meshes other "
+               "than triangle meshes are not supported");
     for (unsigned int j = 0; j < face.mNumIndices; j++) {
       indices[(i * 3) + j] = face.mIndices[j];
     }
@@ -77,7 +77,7 @@ static WXR_Mesh_Data wxr_process_mesh(const aiMesh *mesh) {
 }
 
 static void wxr_process_node(GArray *mesh_data, const aiScene *scene,
-                            const aiNode *node) {
+                             const aiNode *node) {
   // process all the node's meshes (if any)
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     const aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
@@ -97,7 +97,7 @@ WXR_Mesh_Data *wxr_read_mesh_data(unsigned int *n, const char *filename) {
 
   if (!scene) {
     wxr_error("Failed to load the model file %s: %s", filename,
-             aiGetErrorString());
+              aiGetErrorString());
     *n = 0;
     return NULL;
   }

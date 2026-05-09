@@ -33,7 +33,7 @@ char *wxr_read_file(const char *filepath) {
   int close_status = fclose(file);
   if (!close_status) {
     wxr_assert_recoverable(!close_status, "Failed to close the file `%s`",
-                          filepath);
+                           filepath);
   }
 
   // Extract the C string and free only the GString wrapper

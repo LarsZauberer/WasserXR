@@ -15,7 +15,8 @@ WXR_Scene *wxr_create_scene() {
   scene->plugins = g_array_new(FALSE, FALSE, sizeof(WXR_Plugin_Handler *));
   scene->entities = g_array_new(FALSE, FALSE, sizeof(WXR_Entity));
   scene->entity_counter = 0;
-  scene->components = g_array_new(FALSE, FALSE, sizeof(WXR_Component_Handler *));
+  scene->components =
+      g_array_new(FALSE, FALSE, sizeof(WXR_Component_Handler *));
   scene->systems = g_array_new(FALSE, FALSE, sizeof(WXR_System_Handler *));
   scene->should_reload = 0;
   scene->should_terminate = 0;
@@ -210,10 +211,10 @@ char **wxr_get_plugins(size_t *size, const WXR_Scene *scene) {
 }
 
 void *wxr_add_component(WXR_Scene *scene, const WXR_Entity entity_id,
-                       const char *component_id) {
+                        const char *component_id) {
   wxr_assert_abort_value(scene, NULL, "Scene is NULL during wxr_add_component");
   wxr_assert_abort_value(component_id, NULL,
-                        "Id is NULL during wxr_add_component");
+                         "Id is NULL during wxr_add_component");
   // Check if the entity exists
   long entity_index = wxr_get_entity_index(scene, entity_id);
   if (entity_index == -1) {
@@ -223,7 +224,7 @@ void *wxr_add_component(WXR_Scene *scene, const WXR_Entity entity_id,
   void *component = wxr_entity_get_component(scene, entity_id, component_id);
   if (component) {
     wxr_warn("Component `%s` already exists on entity %ld", component_id,
-            entity_id);
+             entity_id);
     return NULL;
   }
 
@@ -232,8 +233,9 @@ void *wxr_add_component(WXR_Scene *scene, const WXR_Entity entity_id,
       wxr_get_abi_symbol(&plugin, scene, CREATOR_FUNCTION_PREFIX, component_id);
   WXR_Component_Destroyer destroyer = wxr_get_abi_symbol_from_plugin(
       scene, plugin, DESTROYER_FUNCTION_PREFIX, component_id);
-  WXR_Component_Schema_Function schema_function = wxr_get_abi_symbol_from_plugin(
-      scene, plugin, SCHEMA_FUNCTION_PREFIX, component_id);
+  WXR_Component_Schema_Function schema_function =
+      wxr_get_abi_symbol_from_plugin(scene, plugin, SCHEMA_FUNCTION_PREFIX,
+                                     component_id);
 
   if (!creator) {
     wxr_error("Failed to find creator for `%s`", component_id);
@@ -252,12 +254,12 @@ void *wxr_add_component(WXR_Scene *scene, const WXR_Entity entity_id,
 
   // Create the actual data container
   wxr_debug("Running creator for component `%s` on entity %ld", component_id,
-           entity_id);
+            entity_id);
   component = creator();
   wxr_assert(component,
-            "The component returned by the creator of the "
-            "component `%s` was NULL",
-            component);
+             "The component returned by the creator of the "
+             "component `%s` was NULL",
+             component);
 
   WXR_Component_Schema *schema = wxr_create_component_schema();
   schema_function(schema);
@@ -282,10 +284,10 @@ void *wxr_add_component(WXR_Scene *scene, const WXR_Entity entity_id,
 }
 
 long wxr_get_component_index_from_entity_and_id(const WXR_Scene *scene,
-                                               const WXR_Entity entity,
-                                               const char *component_id) {
+                                                const WXR_Entity entity,
+                                                const char *component_id) {
   wxr_assert(scene,
-            "Scene is NULL during wxr_get_component_index_from_entity_and_id");
+             "Scene is NULL during wxr_get_component_index_from_entity_and_id");
   // Entity and id can uniquely identify a component
   for (long i = 0; i < scene->components->len; i++) {
     const WXR_Component_Handler *component =
@@ -299,9 +301,9 @@ long wxr_get_component_index_from_entity_and_id(const WXR_Scene *scene,
 }
 
 void *wxr_entity_get_component(const WXR_Scene *scene, const WXR_Entity entity,
-                              const char *component_id) {
+                               const char *component_id) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_entity_get_component");
+                         "Scene is NULL during wxr_entity_get_component");
   long index =
       wxr_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
@@ -314,15 +316,16 @@ void *wxr_entity_get_component(const WXR_Scene *scene, const WXR_Entity entity,
 }
 
 int wxr_remove_component(WXR_Scene *scene, const WXR_Entity entity,
-                        const char *component_id) {
+                         const char *component_id) {
   wxr_assert_abort_value(scene, 1, "Scene is NULL during wxr_remove_component");
   wxr_assert_abort_value(component_id, 1,
-                        "Id is NULL during wxr_remove_component");
+                         "Id is NULL during wxr_remove_component");
   // There can only be one association between the entity and the component
   long index =
       wxr_get_component_index_from_entity_and_id(scene, entity, component_id);
   if (index == -1L) {
-    wxr_warn("Component `%s` doesn't exist on entity %ld", component_id, entity);
+    wxr_warn("Component `%s` doesn't exist on entity %ld", component_id,
+             entity);
     return 1;
   }
 
@@ -346,11 +349,11 @@ int wxr_remove_component(WXR_Scene *scene, const WXR_Entity entity,
 }
 
 char **wxr_get_components_of_entity(size_t *size, const WXR_Scene *scene,
-                                   const WXR_Entity entity_id) {
+                                    const WXR_Entity entity_id) {
   wxr_assert_abort_value(size, NULL,
-                        "Size is NULL during wxr_get_components_of_entity");
+                         "Size is NULL during wxr_get_components_of_entity");
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_get_components_of_entity");
+                         "Scene is NULL during wxr_get_components_of_entity");
   wxr_assert_abort_value(
       entity_id < scene->entity_counter, NULL,
       "Entity ID is invalid during wxr_get_components_of_entity");
@@ -378,7 +381,7 @@ char **wxr_get_components_of_entity(size_t *size, const WXR_Scene *scene,
 }
 
 static int wxr_default_selector(const WXR_Scene *scene,
-                               const WXR_Entity entity_id) {
+                                const WXR_Entity entity_id) {
   return 0;
 }
 
@@ -468,7 +471,7 @@ char **wxr_get_systems(size_t *size, const WXR_Scene *scene) {
 WXR_Entity *wxr_find_entities_with_selector_and_groups(
     size_t *size, WXR_Scene *scene, WXR_System_Selector selector, int group) {
   wxr_assert(scene,
-            "Scene is NULL during wxr_find_entities_with_selector_and_groups");
+             "Scene is NULL during wxr_find_entities_with_selector_and_groups");
   wxr_assert(
       selector,
       "Selector is NULL during wxr_find_entities_with_selector_and_groups");
@@ -484,11 +487,11 @@ WXR_Entity *wxr_find_entities_with_selector_and_groups(
 }
 
 static int wxr_deserialize_scene_from_file_internal(WXR_Scene *scene,
-                                                   char *path) {
-  wxr_assert_abort_value(scene, 1,
-                        "Scene is NULL during wxr_deserialize_scene_from_file");
+                                                    char *path) {
+  wxr_assert_abort_value(
+      scene, 1, "Scene is NULL during wxr_deserialize_scene_from_file");
   wxr_assert_abort_value(path, 1,
-                        "Path is NULL during wxr_deserialize_scene_from_file");
+                         "Path is NULL during wxr_deserialize_scene_from_file");
 
   // Open the file for binary reading
   FILE *file = fopen(path, "rb");
@@ -530,7 +533,7 @@ static int wxr_deserialize_scene_from_file_internal(WXR_Scene *scene,
   char *data = (char *)malloc((size_t)file_size);
   if (!data) {
     wxr_error("Failed to allocate memory for file '%s' (%ld bytes)", path,
-             file_size);
+              file_size);
     int status = fclose(file);
     wxr_assert_abort_value(
         !status, 1,
@@ -541,8 +544,9 @@ static int wxr_deserialize_scene_from_file_internal(WXR_Scene *scene,
   // Read the file data
   size_t bytes_read = fread(data, 1, (size_t)file_size, file);
   if (bytes_read != (size_t)file_size) {
-    wxr_error("Failed to read complete data from file '%s' (%zu/%ld bytes read)",
-             path, bytes_read, file_size);
+    wxr_error(
+        "Failed to read complete data from file '%s' (%zu/%ld bytes read)",
+        path, bytes_read, file_size);
     free(data);
     int status = fclose(file);
     wxr_assert_abort_value(
@@ -610,7 +614,8 @@ int wxr_tick_scene(WXR_Scene *scene) {
     // entity_array has length groups
     // entity_array[i] has length size_array[i]
     size_t *size_array = (size_t *)g_array_free(entity_groups_size, FALSE);
-    WXR_Entity **entity_array = (WXR_Entity **)g_array_free(entity_groups, FALSE);
+    WXR_Entity **entity_array =
+        (WXR_Entity **)g_array_free(entity_groups, FALSE);
 
     system->system(scene, entity_array, size_array);
 
@@ -669,7 +674,8 @@ int wxr_remove_system(WXR_Scene *scene, const char *system_id) {
 }
 
 int wxr_reload(WXR_Scene *scene) {
-  wxr_assert_abort_value(scene, 1, "Scene is NULL during ts_reload_all_plugins");
+  wxr_assert_abort_value(scene, 1,
+                         "Scene is NULL during ts_reload_all_plugins");
 
   char *serialization = wxr_serialize_scene(scene);
   wxr_reset_scene(scene);
@@ -695,10 +701,12 @@ WXR_Component_Schema *wxr_create_component_schema() {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-WXR_Component_Field *wxr_create_component_field(
-    const char *field_name, WXR_Primitive_Type type, WXR_Component_Getter getter,
-    WXR_Component_Setter setter, WXR_Component_Serializer serializer,
-    WXR_Component_Deserializer deserializer) {
+WXR_Component_Field *
+wxr_create_component_field(const char *field_name, WXR_Primitive_Type type,
+                           WXR_Component_Getter getter,
+                           WXR_Component_Setter setter,
+                           WXR_Component_Serializer serializer,
+                           WXR_Component_Deserializer deserializer) {
   WXR_Component_Field *field =
       (WXR_Component_Field *)malloc(sizeof(WXR_Component_Field));
 
@@ -717,7 +725,7 @@ void wxr_destroy_component_schema(WXR_Component_Schema *schema) {
     return;
   }
   wxr_assert(schema->fields,
-            "The fields in the schema are NULL during schema destruction");
+             "The fields in the schema are NULL during schema destruction");
   for (size_t i = 0; i < schema->fields->len; i++) {
     WXR_Component_Field *field =
         g_array_index(schema->fields, WXR_Component_Field *, i);
@@ -733,21 +741,21 @@ void wxr_destroy_component_field(WXR_Component_Field *field) {
 }
 
 int wxr_add_field_to_component_schema(WXR_Component_Schema *schema,
-                                     const WXR_Component_Field *field) {
+                                      const WXR_Component_Field *field) {
   for (size_t i = 0; i < schema->fields->len; i++) {
     WXR_Component_Field *other =
         g_array_index(schema->fields, WXR_Component_Field *, i);
     wxr_assert_abort_value(field != other, 1,
-                          "Schema field has been added twice");
+                           "Schema field has been added twice");
     wxr_assert_abort_value(strcmp(field->field_name, other->field_name) != 0, 1,
-                          "Schema field has been added twice");
+                           "Schema field has been added twice");
   }
   g_array_append_val(schema->fields, field);
   return 0;
 }
 
 WXR_Component_Field *wxr_get_field(const WXR_Component_Schema *schema,
-                                 const char *field_name) {
+                                   const char *field_name) {
   wxr_assert_abort_value(schema, NULL, "Schema is null during wxr_get_field");
   for (size_t i = 0; i < schema->fields->len; i++) {
     WXR_Component_Field *field =
@@ -760,7 +768,7 @@ WXR_Component_Field *wxr_get_field(const WXR_Component_Schema *schema,
 }
 
 WXR_Component_Getter wxr_get_field_getter(const WXR_Component_Schema *schema,
-                                        const char *field_name) {
+                                          const char *field_name) {
   wxr_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
   WXR_Component_Field *field = wxr_get_field(schema, field_name);
   if (!field) {
@@ -770,7 +778,7 @@ WXR_Component_Getter wxr_get_field_getter(const WXR_Component_Schema *schema,
 }
 
 WXR_Component_Setter wxr_get_field_setter(const WXR_Component_Schema *schema,
-                                        const char *field_name) {
+                                          const char *field_name) {
   wxr_assert_abort_value(schema, NULL, "Schema is null during ts_get_getter");
   WXR_Component_Field *field = wxr_get_field(schema, field_name);
   if (!field) {
@@ -780,50 +788,51 @@ WXR_Component_Setter wxr_get_field_setter(const WXR_Component_Schema *schema,
 }
 
 WXR_Primitive_Type wxr_get_field_type(const WXR_Component_Schema *schema,
-                                    const char *field_name) {
+                                      const char *field_name) {
   wxr_assert(schema, "Schema is null during ts_get_getter");
   WXR_Component_Field *field = wxr_get_field(schema, field_name);
   wxr_assert(field, "Field `%s` not found during the wxr_get_field_type",
-            field_name);
+             field_name);
   return field->type;
 }
 
 const void *wxr_get(const WXR_Scene *scene, const void *component,
-                   const char *field) {
+                    const char *field) {
   wxr_assert_abort_value(scene, NULL, "Scene is null during wxr_get");
   WXR_Component_Handler *handler =
       wxr_find_handler_for_component(scene, component);
-  wxr_assert_abort_value(handler, NULL,
-                        "The component pointer couldn't be found in the scene");
+  wxr_assert_abort_value(
+      handler, NULL, "The component pointer couldn't be found in the scene");
 
   WXR_Component_Getter getter = wxr_get_field_getter(handler->schema, field);
   wxr_assert_abort_value(getter, NULL, "No getter found for the field `%s`",
-                        field);
+                         field);
   return getter(component);
 }
 
 int wxr_set(const WXR_Scene *scene, void *component, const char *field,
-           const void *data) {
+            const void *data) {
   wxr_assert_abort_value(scene, 1, "Scene is null during wxr_get");
   WXR_Component_Handler *handler =
       wxr_find_handler_for_component(scene, component);
-  wxr_assert_abort_value(handler, 1,
-                        "The component pointer couldn't be found in the scene");
+  wxr_assert_abort_value(
+      handler, 1, "The component pointer couldn't be found in the scene");
 
   WXR_Component_Setter setter = wxr_get_field_setter(handler->schema, field);
-  wxr_assert_abort_value(setter, 1, "No setter found for the field `%s`", field);
+  wxr_assert_abort_value(setter, 1, "No setter found for the field `%s`",
+                         field);
   setter(component, data);
   return 0;
 }
 
 WXR_Component_Schema *wxr_get_schema_of_component(const WXR_Scene *scene,
-                                                const void *component) {
+                                                  const void *component) {
   WXR_Component_Handler *handler =
       wxr_find_handler_for_component(scene, component);
   wxr_assert_abort_value(handler, NULL,
-                        "Handler is null during wxr_get_schema_of_component");
+                         "Handler is null during wxr_get_schema_of_component");
   wxr_assert_abort_value(handler->schema, NULL,
-                        "Schema is null during wxr_get_schema_of_component");
+                         "Schema is null during wxr_get_schema_of_component");
   return handler->schema;
 }
 
@@ -838,9 +847,9 @@ static size_t wxr_get_byte_length(const char *data) {
 
 char *wxr_serialize_plugin(const WXR_Scene *scene, const char *plugin_id) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_serialize_plugin");
+                         "Scene is NULL during wxr_serialize_plugin");
   wxr_assert_abort_value(plugin_id, NULL,
-                        "Plugin ID is NULL during wxr_serialize_plugin");
+                         "Plugin ID is NULL during wxr_serialize_plugin");
 
   long plugin_index = wxr_get_plugin_index(scene, plugin_id);
   if (plugin_index == -1L) {
@@ -861,9 +870,9 @@ char *wxr_serialize_plugin(const WXR_Scene *scene, const char *plugin_id) {
 
 char *wxr_serialize_system(const WXR_Scene *scene, const char *system_id) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_serialize_plugin");
+                         "Scene is NULL during wxr_serialize_plugin");
   wxr_assert_abort_value(system_id, NULL,
-                        "System ID is NULL during wxr_serialize_plugin");
+                         "System ID is NULL during wxr_serialize_plugin");
 
   long system_index = wxr_get_system_index(scene, system_id);
   if (system_index == -1L) {
@@ -891,9 +900,9 @@ char *wxr_serialize_system(const WXR_Scene *scene, const char *system_id) {
 
 static char *
 wxr_serialize_component_fields(size_t *total_size, const WXR_Scene *scene,
-                              const WXR_Component_Handler *handler) {
+                               const WXR_Component_Handler *handler) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_serialize_component_fields");
+                         "Scene is NULL during wxr_serialize_component_fields");
   wxr_assert_abort_value(
       handler, NULL,
       "Component Handler is NULL during wxr_serialize_component_fields");
@@ -938,15 +947,15 @@ wxr_serialize_component_fields(size_t *total_size, const WXR_Scene *scene,
 
 char *wxr_serialize_component(const WXR_Scene *scene, const void *component) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_serialize_component");
+                         "Scene is NULL during wxr_serialize_component");
   wxr_assert_abort_value(component, NULL,
-                        "Component is NULL during wxr_serialize_component");
+                         "Component is NULL during wxr_serialize_component");
 
   WXR_Component_Handler *component_handler =
       wxr_find_handler_for_component(scene, component);
   if (!component_handler) {
     wxr_error("Failed to find the component in the register during "
-             "wxr_serialize_component");
+              "wxr_serialize_component");
     return NULL;
   }
 
@@ -976,9 +985,9 @@ char *wxr_serialize_component(const WXR_Scene *scene, const void *component) {
 
 char *wxr_serialize_entity(const WXR_Scene *scene, const WXR_Entity entity_id) {
   wxr_assert_abort_value(scene, NULL,
-                        "Scene is NULL during wxr_serialize_entity");
+                         "Scene is NULL during wxr_serialize_entity");
   wxr_assert_abort_value(entity_id < scene->entity_counter, NULL,
-                        "Entity ID is invalid");
+                         "Entity ID is invalid");
 
   // Compute the length of the component array
   size_t component_counter = 0;
@@ -1048,7 +1057,8 @@ char *wxr_serialize_entity(const WXR_Scene *scene, const WXR_Entity entity_id) {
 }
 
 char *wxr_serialize_scene(const WXR_Scene *scene) {
-  wxr_assert_abort_value(scene, NULL, "Scene is NULL during wxr_serialize_scene");
+  wxr_assert_abort_value(scene, NULL,
+                         "Scene is NULL during wxr_serialize_scene");
 
   size_t allocation = sizeof(size_t) + sizeof(size_t) + sizeof(size_t);
 
@@ -1111,7 +1121,8 @@ char *wxr_serialize_scene(const WXR_Scene *scene) {
 }
 
 int wxr_deserialize_plugin(WXR_Scene *scene, const char *data) {
-  wxr_assert_abort_value(scene, 1, "Scene is NULL during wxr_deserialize_plugin");
+  wxr_assert_abort_value(scene, 1,
+                         "Scene is NULL during wxr_deserialize_plugin");
   wxr_assert_abort_value(data, 1, "Data is NULL during wxr_deserialize_plugin");
 
   const char *iter = data + sizeof(size_t);
@@ -1122,7 +1133,8 @@ int wxr_deserialize_plugin(WXR_Scene *scene, const char *data) {
 }
 
 int wxr_deserialize_system(WXR_Scene *scene, const char *data) {
-  wxr_assert_abort_value(scene, 1, "Scene is NULL during wxr_deserialize_system");
+  wxr_assert_abort_value(scene, 1,
+                         "Scene is NULL during wxr_deserialize_system");
   wxr_assert_abort_value(data, 1, "Data is NULL during wxr_deserialize_system");
 
   size_t size = wxr_get_byte_length(data);
@@ -1139,12 +1151,12 @@ int wxr_deserialize_system(WXR_Scene *scene, const char *data) {
 }
 
 static int wxr_deserialize_component_fields(WXR_Scene *scene, const char *data,
-                                           WXR_Component_Handler *handler,
-                                           const char *end) {
-  wxr_assert_abort_value(scene, 1,
-                        "Scene is NULL during wxr_deserialize_component_fields");
-  wxr_assert_abort_value(data, 1,
-                        "Data is NULL during wxr_deserialize_component_fields");
+                                            WXR_Component_Handler *handler,
+                                            const char *end) {
+  wxr_assert_abort_value(
+      scene, 1, "Scene is NULL during wxr_deserialize_component_fields");
+  wxr_assert_abort_value(
+      data, 1, "Data is NULL during wxr_deserialize_component_fields");
   wxr_assert_abort_value(
       handler, 1,
       "Component Handler is NULL during wxr_deserialize_component_fields");
@@ -1182,11 +1194,11 @@ static int wxr_deserialize_component_fields(WXR_Scene *scene, const char *data,
 }
 
 int wxr_deserialize_component(WXR_Scene *scene, const WXR_Entity entity,
-                             const char *data) {
+                              const char *data) {
   wxr_assert_abort_value(scene, 1,
-                        "Scene is NULL during wxr_deserialize_component");
+                         "Scene is NULL during wxr_deserialize_component");
   wxr_assert_abort_value(data, 1,
-                        "Data is NULL during wxr_deserialize_component");
+                         "Data is NULL during wxr_deserialize_component");
   const size_t size = wxr_get_byte_length(data);
 
   const char *component_name = data + sizeof(size_t);
@@ -1205,7 +1217,8 @@ int wxr_deserialize_component(WXR_Scene *scene, const WXR_Entity entity,
 }
 
 int wxr_deserialize_entity(WXR_Scene *scene, const char *data) {
-  wxr_assert_abort_value(scene, 1, "Scene is NULL during wxr_deserialize_entity");
+  wxr_assert_abort_value(scene, 1,
+                         "Scene is NULL during wxr_deserialize_entity");
   wxr_assert_abort_value(data, 1, "Data is NULL during wxr_deserialize_entity");
 
   const size_t size = wxr_get_byte_length(data);
@@ -1222,8 +1235,9 @@ int wxr_deserialize_entity(WXR_Scene *scene, const char *data) {
   }
 
   if (iter != end) {
-    wxr_error("Invalid component deserialization while deserializing entity %ld",
-             entity);
+    wxr_error(
+        "Invalid component deserialization while deserializing entity %ld",
+        entity);
     return 1;
   }
 
@@ -1231,7 +1245,8 @@ int wxr_deserialize_entity(WXR_Scene *scene, const char *data) {
 }
 
 int wxr_deserialize_scene(WXR_Scene *scene, const char *data) {
-  wxr_assert_abort_value(scene, 1, "Scene is NULL during wxr_deserialize_scene");
+  wxr_assert_abort_value(scene, 1,
+                         "Scene is NULL during wxr_deserialize_scene");
   wxr_assert_abort_value(data, 1, "Data is NULL during wxr_deserialize_scene");
 
   const size_t size = wxr_get_byte_length(data);
@@ -1268,9 +1283,9 @@ int wxr_deserialize_scene(WXR_Scene *scene, const char *data) {
 
 int wxr_serialize_scene_to_file(const WXR_Scene *scene, const char *path) {
   wxr_assert_abort_value(scene, 1,
-                        "Scene is NULL during wxr_serialize_scene_to_file");
+                         "Scene is NULL during wxr_serialize_scene_to_file");
   wxr_assert_abort_value(path, 1,
-                        "Path is NULL during wxr_serialize_scene_to_file");
+                         "Path is NULL during wxr_serialize_scene_to_file");
 
   // Serialize the scene
   char *data = wxr_serialize_scene(scene);
@@ -1293,8 +1308,8 @@ int wxr_serialize_scene_to_file(const WXR_Scene *scene, const char *path) {
   size_t written = fwrite(data, 1, size, file);
   if (written != size) {
     wxr_error("Failed to write complete data to file '%s' (%zu/%zu bytes "
-             "written)",
-             path, written, size);
+              "written)",
+              path, written, size);
     int status = fclose(file);
     if (status) {
       wxr_error("Also failed to close the file");
@@ -1308,7 +1323,8 @@ int wxr_serialize_scene_to_file(const WXR_Scene *scene, const char *path) {
   // Close the file
   int status = fclose(file);
   if (status) {
-    wxr_warn("Failed to close the file (still the write succeeded). Proceeding");
+    wxr_warn(
+        "Failed to close the file (still the write succeeded). Proceeding");
   }
 
   // Cleanup
@@ -1320,7 +1336,8 @@ int wxr_serialize_scene_to_file(const WXR_Scene *scene, const char *path) {
 }
 
 void wxr_deserialize_scene_from_file(WXR_Scene *scene, const char *path) {
-  wxr_assert_abort(scene, "Scene is NULL during wxr_deserialize_scene_from_file");
+  wxr_assert_abort(scene,
+                   "Scene is NULL during wxr_deserialize_scene_from_file");
   wxr_assert_abort(path, "Path is NULL during wxr_deserialize_scene_from_file");
 
   scene->should_load = wxr_copy_char_ptr(path);

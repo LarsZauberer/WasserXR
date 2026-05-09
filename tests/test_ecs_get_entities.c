@@ -19,13 +19,13 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   size_t count = 0;
   WXR_Entity *entities = wxr_get_entities(&count, input->scene);
-  
+
   wxr_assert(count == input->expected_count,
-            "Entity count should match expected");
-  
+             "Entity count should match expected");
+
   if (count > 0) {
     wxr_assert(entities != NULL, "Entities array should not be NULL");
     free(entities);

@@ -19,13 +19,13 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   size_t count = 0;
   char **plugins = wxr_get_plugins(&count, input->scene);
-  
+
   wxr_assert(count == input->expected_count,
-            "Plugin count should match expected");
-  
+             "Plugin count should match expected");
+
   if (count > 0 && plugins != NULL) {
     for (size_t i = 0; i < count; i++) {
       free(plugins[i]);
@@ -44,8 +44,9 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene = wxr_create_scene();
 
   WXR_Scene *scene_one_plugin = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(scene_one_plugin, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+  wxr_assert(0 == wxr_load_plugin(scene_one_plugin,
+                                  "./libwasserxr_test_components.so"),
+             "Failed to load the plugin");
 
   TestCase cases[] = {
       {empty_scene, 0},

@@ -1,14 +1,14 @@
-#include "WasserXR/core/Camera.h"
 #include "Mesh_internal.h"
+#include "WasserXR/core/Camera.h"
 #include "glad/gl.h"
 
 #include "GLFW/glfw3.h"
+#include "Shader_internal.h"
 #include "WasserXR/core/Model.h"
 #include "WasserXR/core/Transform.h"
 #include "WasserXR/core/Window.h"
-#include "Shader_internal.h"
-#include "WasserXR/ecs/logging.h"
 #include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/logging.h"
 #include "cglm/affine-pre.h"
 #include "cglm/affine.h"
 #include "cglm/cam.h"
@@ -21,7 +21,7 @@
 WXR_System_Groups wxr_groups_wxr_mesh_renderer = 3;
 
 WXR_System_Groups wxr_select_wxr_mesh_renderer(const WXR_Scene *scene,
-                                            const WXR_Entity entity) {
+                                               const WXR_Entity entity) {
   size_t normal_object =
       wxr_entity_get_component(scene, entity, "WXR_Transform") &&
       wxr_entity_get_component(scene, entity, "WXR_Model");
@@ -42,7 +42,7 @@ WXR_System_Groups wxr_select_wxr_mesh_renderer(const WXR_Scene *scene,
 }
 
 void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
-                                const size_t *sizes) {
+                                  const size_t *sizes) {
   WXR_Entity camera_entity;
   WXR_Camera *camera;
   WXR_Transform *cam_transform;
@@ -61,8 +61,8 @@ void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
   }
 
   window_entity = entities[0][0];
-  window =
-      (WXR_Window *)wxr_entity_get_component(scene, window_entity, "WXR_Window");
+  window = (WXR_Window *)wxr_entity_get_component(scene, window_entity,
+                                                  "WXR_Window");
   GLFWwindow *glfw_window = (GLFWwindow *)wxr_get(
       scene, window,
       "window"); // Const qualifier discard because we need direct access
@@ -72,10 +72,10 @@ void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
   }
 
   camera_entity = entities[1][0];
-  cam_transform = (WXR_Transform *)wxr_entity_get_component(scene, camera_entity,
-                                                          "WXR_Transform");
-  camera =
-      (WXR_Camera *)wxr_entity_get_component(scene, camera_entity, "WXR_Camera");
+  cam_transform = (WXR_Transform *)wxr_entity_get_component(
+      scene, camera_entity, "WXR_Transform");
+  camera = (WXR_Camera *)wxr_entity_get_component(scene, camera_entity,
+                                                  "WXR_Camera");
 
   for (size_t i = 0; i < sizes[2]; i++) {
     // Normal mesh entity
@@ -85,7 +85,8 @@ void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
     WXR_Transform *transform =
         wxr_entity_get_component(scene, entity, "WXR_Transform");
 
-    const WXR_Mesh **meshes = (const WXR_Mesh **)wxr_get(scene, model, "meshes");
+    const WXR_Mesh **meshes =
+        (const WXR_Mesh **)wxr_get(scene, model, "meshes");
     const unsigned int num_meshes =
         *(const unsigned int *)wxr_get(scene, model, "num_meshes");
     const WXR_Shader *shader = wxr_get(scene, model, "shader");
@@ -155,8 +156,8 @@ void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
     int status = wxr_use_shader(shader);
     if (status) {
       wxr_warn("Shader couldn't be applied to the mesh of entity %ld. Skipping "
-              "rendering of entity",
-              entity);
+               "rendering of entity",
+               entity);
       continue;
     }
 

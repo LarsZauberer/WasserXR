@@ -36,11 +36,11 @@ static void unittest(const void *ptr) {
     char **systems = wxr_get_systems(&system_count, input->scene);
 
     wxr_assert_test(system_count == 1, "Expected: %d", 1, "Got: %ld",
-                   system_count, "System count doesn't match");
+                    system_count, "System count doesn't match");
     wxr_assert(systems != NULL, "Systems array should not be NULL");
     wxr_assert_test(strcmp(systems[0], input->expected_system) == 0,
-                   "Expected: %s", input->expected_system, "Got: %s",
-                   systems[0], "System name doesn't match");
+                    "Expected: %s", input->expected_system, "Got: %s",
+                    systems[0], "System name doesn't match");
 
     for (size_t i = 0; i < system_count; i++) {
       free(systems[i]);
@@ -60,18 +60,19 @@ int main(int argc, char *argv[]) {
 
   WXR_Scene *valid_scene = wxr_create_scene();
   wxr_assert(0 == wxr_load_plugin(valid_scene, "./libwasserxr_test_systems.so"),
-            "Failed to load the plugin");
+             "Failed to load the plugin");
 
   TestCase cases[] = {
       {NULL, NULL, NULL, 1},
       {NULL, "", NULL, 1},
       {empty_scene, "\23\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0", NULL, 1},
-      {valid_scene, "\23\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0",
-       "wxr_system_a", 0}};
+      {valid_scene, "\23\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0", "wxr_system_a",
+       0}};
 
   // Constructing Tests
   for (size_t i = 0; i < 4; i++) {
-    char *path = g_strdup_printf("/wasserxr/test_ecs_deserialize_system/%ld", i);
+    char *path =
+        g_strdup_printf("/wasserxr/test_ecs_deserialize_system/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

@@ -40,13 +40,13 @@ long wxr_get_system_index(const WXR_Scene *scene, const char *system_id) {
 }
 
 long wxr_get_component_index(const WXR_Scene *scene, const WXR_Entity entity,
-                            const char *component_id) {
+                             const char *component_id) {
   wxr_assert_abort_value(scene, -1,
-                        "Scene is NULL during wxr_get_component_index");
+                         "Scene is NULL during wxr_get_component_index");
   wxr_assert_abort_value(component_id, -1,
-                        "Component ID is NULL during wxr_get_component_index");
+                         "Component ID is NULL during wxr_get_component_index");
   wxr_assert_abort_value(entity < scene->entity_counter, -1,
-                        "Entity is invalid during wxr_get_component_index");
+                         "Entity is invalid during wxr_get_component_index");
   for (long i = 0; i < scene->components->len; i++) {
     const WXR_Component_Handler *handler =
         g_array_index(scene->components, WXR_Component_Handler *, i);
@@ -58,7 +58,7 @@ long wxr_get_component_index(const WXR_Scene *scene, const WXR_Entity entity,
 }
 
 WXR_Component_Handler *wxr_find_handler_for_component(const WXR_Scene *scene,
-                                                    const void *component) {
+                                                      const void *component) {
   for (size_t i = 0; i < scene->components->len; i++) {
     WXR_Component_Handler *handler =
         g_array_index(scene->components, WXR_Component_Handler *, i);

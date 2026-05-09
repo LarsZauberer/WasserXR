@@ -22,9 +22,9 @@ void wxr_destroy_WXR_Console(void *ptr) {
 }
 
 WXR_BASIC_GETTER(WXR_Console, command_list_size, &component->command_list_size,
-                sizeof(size_t));
+                 sizeof(size_t));
 WXR_BASIC_GETTER(WXR_Console, command_list, component->command_list,
-                sizeof(WXR_Command *));
+                 sizeof(WXR_Command *));
 
 void wxr_schema_WXR_Console(WXR_Component_Schema *schema) {
   WXR_SCHEMA_FIELD_GET(WXR_Console, WXR_L, command_list_size);

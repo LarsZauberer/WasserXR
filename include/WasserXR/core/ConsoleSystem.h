@@ -7,8 +7,8 @@
 void wxr_attach_wxr_console_system(WXR_Scene *scene);
 void wxr_detach_wxr_console_system(WXR_Scene *scene);
 void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
-                                 const size_t *groups);
+                                   const size_t *groups);
 WXR_System_Groups wxr_select_wxr_console_system(const WXR_Scene *scene,
-                                             WXR_Entity entity);
+                                                WXR_Entity entity);
 
 #endif

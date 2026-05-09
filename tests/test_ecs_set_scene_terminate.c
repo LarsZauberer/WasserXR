@@ -17,10 +17,10 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   // Set scene to terminate
   wxr_set_scene_terminate(input->scene);
-  
+
   // Next tick should return 0 (terminate signal)
   int result = wxr_tick_scene(input->scene);
   wxr_assert(result == 0, "Tick should return 0 after terminate");
@@ -41,7 +41,8 @@ int main(int argc, char *argv[]) {
 
   // Constructing Tests
   for (size_t i = 0; i < 1; i++) {
-    char *path = g_strdup_printf("/wasserxr/test_ecs_set_scene_terminate/%ld", i);
+    char *path =
+        g_strdup_printf("/wasserxr/test_ecs_set_scene_terminate/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

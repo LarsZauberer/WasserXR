@@ -22,7 +22,7 @@ static void unittest(const void *ptr) {
 
   int result = wxr_remove_system(input->scene, input->system_name);
   wxr_assert(result == input->expected_result,
-            "Remove system result should match expected");
+             "Remove system result should match expected");
 }
 
 int main(int argc, char *argv[]) {
@@ -43,9 +43,9 @@ int main(int argc, char *argv[]) {
   wxr_add_system(scene_with_system, "wxr_system_a", 10);
 
   WXR_Scene *scene_without_system = wxr_create_scene();
-  wxr_assert(
-      0 == wxr_load_plugin(scene_without_system, "./libwasserxr_test_systems.so"),
-      "Failed to load the plugin");
+  wxr_assert(0 == wxr_load_plugin(scene_without_system,
+                                  "./libwasserxr_test_systems.so"),
+             "Failed to load the plugin");
 
   WXR_Scene *scene_with_system2 = wxr_create_scene();
   wxr_assert(
@@ -54,11 +54,11 @@ int main(int argc, char *argv[]) {
   wxr_add_system(scene_with_system2, "wxr_system_a", 10);
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                    // NULL scene
-      {empty_scene, "", 1},                     // Empty scene
+      {null_scene, NULL, 1},                     // NULL scene
+      {empty_scene, "", 1},                      // Empty scene
       {scene_with_system, "wxr_system_a", 0},    // Valid removal
       {scene_without_system, "wxr_system_a", 1}, // System not added
-      {scene_with_system2, "NonExistent", 1},   // Non-existent system
+      {scene_with_system2, "NonExistent", 1},    // Non-existent system
   };
 
   // Constructing Tests

@@ -19,14 +19,14 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   if (input->should_terminate) {
     wxr_set_scene_terminate(input->scene);
   }
-  
+
   int result = wxr_tick_scene(input->scene);
   wxr_assert(result == input->expected_result,
-            "Tick scene result should match expected");
+             "Tick scene result should match expected");
 }
 
 int main(int argc, char *argv[]) {
@@ -41,8 +41,8 @@ int main(int argc, char *argv[]) {
   WXR_Scene *terminate_scene = wxr_create_scene();
 
   TestCase cases[] = {
-      {normal_scene, 0, 1},       // Normal tick
-      {terminate_scene, 1, 0},    // Terminated tick
+      {normal_scene, 0, 1},    // Normal tick
+      {terminate_scene, 1, 0}, // Terminated tick
   };
 
   // Constructing Tests

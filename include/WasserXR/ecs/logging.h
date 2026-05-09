@@ -22,25 +22,25 @@ void wxr_critical(const char * /*fmt*/, ...);
 
 #ifndef WXR_NO_ASSERTS
 
-#define wxr_assert(exp, fmt, ...)                                               \
+#define wxr_assert(exp, fmt, ...)                                              \
   if (!(exp)) {                                                                \
-    wxr_critical(fmt __VA_OPT__(, ) __VA_ARGS__);                               \
+    wxr_critical(fmt __VA_OPT__(, ) __VA_ARGS__);                              \
   }
 
-#define wxr_assert_recoverable(exp, fmt, ...)                                   \
+#define wxr_assert_recoverable(exp, fmt, ...)                                  \
   if (!(exp)) {                                                                \
-    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
+    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                 \
   }
 
-#define wxr_assert_abort(exp, fmt, ...)                                         \
+#define wxr_assert_abort(exp, fmt, ...)                                        \
   if (!(exp)) {                                                                \
-    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
+    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                 \
     return;                                                                    \
   }
 
-#define wxr_assert_abort_value(exp, value, fmt, ...)                            \
+#define wxr_assert_abort_value(exp, value, fmt, ...)                           \
   if (!(exp)) {                                                                \
-    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
+    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                 \
     return value;                                                              \
   }
 
@@ -56,11 +56,11 @@ void wxr_critical(const char * /*fmt*/, ...);
 
 #endif
 
-#define wxr_assert_test(exp, should, should_val, out, out_val, fmt, ...)        \
+#define wxr_assert_test(exp, should, should_val, out, out_val, fmt, ...)       \
   if (!(exp)) {                                                                \
-    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                  \
-    wxr_error(should, should_val);                                              \
-    wxr_error(out, out_val);                                                    \
+    wxr_error(fmt __VA_OPT__(, ) __VA_ARGS__);                                 \
+    wxr_error(should, should_val);                                             \
+    wxr_error(out, out_val);                                                   \
     exit(1);                                                                   \
   }
 

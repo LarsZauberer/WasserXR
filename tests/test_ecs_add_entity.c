@@ -18,17 +18,17 @@ static void free_case(void *ptr) {
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  
+
   if (!input->should_succeed) {
     // For NULL scene, we can't really test much as behavior is undefined
     return;
   }
-  
+
   // Add multiple entities and verify they have unique IDs
   WXR_Entity entity1 = wxr_add_entity(input->scene);
   WXR_Entity entity2 = wxr_add_entity(input->scene);
   WXR_Entity entity3 = wxr_add_entity(input->scene);
-  
+
   // Check that entities have different IDs
   wxr_assert(entity1 != entity2, "Entity IDs should be unique");
   wxr_assert(entity2 != entity3, "Entity IDs should be unique");

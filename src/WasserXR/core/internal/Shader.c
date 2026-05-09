@@ -143,7 +143,7 @@ int wxr_use_shader(const WXR_Shader *shader) {
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled. Call wxr_compile_shader() first "
-             "before trying to use the shader");
+              "before trying to use the shader");
     return 1;
   }
 
@@ -168,9 +168,9 @@ void wxr_destroy_shader(WXR_Shader *shader) {
 }
 
 int wxr_set_shader_uniform_1f(const WXR_Shader *shader, const char *name,
-                             float value) {
+                              float value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_1f");
+                         "Shader is NULL during wxr_set_shader_uniform_1f");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -188,9 +188,9 @@ int wxr_set_shader_uniform_1f(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_1i(const WXR_Shader *shader, const char *name,
-                             int value) {
+                              int value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_1i");
+                         "Shader is NULL during wxr_set_shader_uniform_1i");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -208,9 +208,9 @@ int wxr_set_shader_uniform_1i(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_2f(const WXR_Shader *shader, const char *name,
-                             const vec2 value) {
+                              const vec2 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_2f");
+                         "Shader is NULL during wxr_set_shader_uniform_2f");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -228,9 +228,9 @@ int wxr_set_shader_uniform_2f(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_3f(const WXR_Shader *shader, const char *name,
-                             const vec3 value) {
+                              const vec3 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_3f");
+                         "Shader is NULL during wxr_set_shader_uniform_3f");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -248,9 +248,9 @@ int wxr_set_shader_uniform_3f(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_4f(const WXR_Shader *shader, const char *name,
-                             const vec4 value) {
+                              const vec4 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_4f");
+                         "Shader is NULL during wxr_set_shader_uniform_4f");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -268,9 +268,9 @@ int wxr_set_shader_uniform_4f(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_mat2(const WXR_Shader *shader, const char *name,
-                               const mat2 value) {
+                                const mat2 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_mat2");
+                         "Shader is NULL during wxr_set_shader_uniform_mat2");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -288,9 +288,9 @@ int wxr_set_shader_uniform_mat2(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_mat3(const WXR_Shader *shader, const char *name,
-                               const mat3 value) {
+                                const mat3 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_mat3");
+                         "Shader is NULL during wxr_set_shader_uniform_mat3");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");
@@ -308,9 +308,9 @@ int wxr_set_shader_uniform_mat3(const WXR_Shader *shader, const char *name,
 }
 
 int wxr_set_shader_uniform_mat4(const WXR_Shader *shader, const char *name,
-                               const mat4 value) {
+                                const mat4 value) {
   wxr_assert_abort_value(shader, -1,
-                        "Shader is NULL during wxr_set_shader_uniform_mat4");
+                         "Shader is NULL during wxr_set_shader_uniform_mat4");
 
   if (!shader->is_compiled) {
     wxr_error("Error: Shader not compiled");

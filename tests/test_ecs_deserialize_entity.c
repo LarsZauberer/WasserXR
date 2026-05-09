@@ -37,22 +37,23 @@ static void unittest(const void *ptr) {
   WXR_Entity *entities = wxr_get_entities(&entity_count, input->scene);
 
   wxr_assert_test(entity_count == input->expected_entity_count, "Expected: %d",
-                 input->expected_entity_count, "Got: %ld", entity_count,
-                 "Entity count doesn't match");
+                  input->expected_entity_count, "Got: %ld", entity_count,
+                  "Entity count doesn't match");
 
   if (entities != NULL && entity_count > 0) {
     size_t component_count = 0;
     char **components = wxr_get_components_of_entity(&component_count,
-                                                    input->scene, entities[0]);
+                                                     input->scene, entities[0]);
 
     wxr_assert_test(component_count == input->expected_components,
-                   "Expected: %d", input->expected_components, "Got: %ld",
-                   component_count, "Component count doesn't match");
+                    "Expected: %d", input->expected_components, "Got: %ld",
+                    component_count, "Component count doesn't match");
 
     if (component_count > 0 && input->expected_component_name) {
-      wxr_assert_test(strcmp(components[0], input->expected_component_name) == 0,
-                     "Expected: %s", input->expected_component_name, "Got: %s",
-                     components[0], "Component name doesn't match");
+      wxr_assert_test(strcmp(components[0], input->expected_component_name) ==
+                          0,
+                      "Expected: %s", input->expected_component_name, "Got: %s",
+                      components[0], "Component name doesn't match");
     }
 
     for (size_t i = 0; i < component_count; i++) {
@@ -71,9 +72,9 @@ int main(int argc, char *argv[]) {
 
   // Constructing Cases
   WXR_Scene *entity_scene = wxr_create_scene();
-  wxr_assert(0 ==
-                wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+  wxr_assert(
+      0 == wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin");
 
   WXR_Scene *component_scene = wxr_create_scene();
   wxr_assert(
@@ -82,30 +83,29 @@ int main(int argc, char *argv[]) {
 
   WXR_Scene *multi_entity_scene = wxr_create_scene();
   wxr_add_entity(multi_entity_scene);
-  wxr_assert(0 == wxr_load_plugin(multi_entity_scene,
-                                "./libwasserxr_core.so"),
-            "Failed to load the plugin");
+  wxr_assert(0 == wxr_load_plugin(multi_entity_scene, "./libwasserxr_core.so"),
+             "Failed to load the plugin");
 
   WXR_Scene *multi_entity_scene2 = wxr_create_scene();
   wxr_add_entity(multi_entity_scene2);
-  wxr_assert(0 == wxr_load_plugin(multi_entity_scene2,
-                                "./libwasserxr_core.so"),
-            "Failed to load the plugin");
+  wxr_assert(0 == wxr_load_plugin(multi_entity_scene2, "./libwasserxr_core.so"),
+             "Failed to load the plugin");
 
   TestCase cases[] = {
       {NULL, NULL, 0, 0, NULL, 1},
       {NULL, "", 0, 0, NULL, 1},
       {entity_scene, "\10\0\0\0\0\0\0\0", 1, 0, NULL, 0},
-       {component_scene,
-        "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0WXR_"
-        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
-        1, 1, "WXR_A", 0},
+      {component_scene,
+       "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0WXR_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
+       1, 1, "WXR_A", 0},
       {multi_entity_scene, "\10\0\0\0\0\0\0\0", 2, 0, NULL, 0},
       {multi_entity_scene2, "\10\0\0\0\0\0\0\0", 2, 0, NULL, 0}};
 
   // Constructing Tests
   for (size_t i = 0; i < 6; i++) {
-    char *path = g_strdup_printf("/wasserxr/test_ecs_deserialize_entity/%ld", i);
+    char *path =
+        g_strdup_printf("/wasserxr/test_ecs_deserialize_entity/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

@@ -29,13 +29,13 @@ static void unittest(const void *ptr) {
   size_t length = 0;
   memcpy(&length, data, sizeof(size_t));
   wxr_assert_test(length == input->length, "%ld", input->length, "%ld", length,
-                 "The size of the data returned doesn't match!");
+                  "The size of the data returned doesn't match!");
   for (size_t i = 0; i < length; i++) {
     char byte_should = input->out[i];
     char byte_out = data[i];
     wxr_assert_test(byte_should == byte_out, "Should: %d", byte_should,
-                   "Output: %d", byte_out, "The Byte at index %d is not equal",
-                   i);
+                    "Output: %d", byte_out, "The Byte at index %d is not equal",
+                    i);
   }
 
   free(data);
@@ -52,12 +52,14 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene2 = wxr_create_scene();
 
   WXR_Scene *plugin_scene = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(plugin_scene, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+  wxr_assert(
+      0 == wxr_load_plugin(plugin_scene, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin");
 
   WXR_Scene *plugin_scene2 = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(plugin_scene2, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+  wxr_assert(
+      0 == wxr_load_plugin(plugin_scene2, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin");
 
   TestCase cases[] = {
       {NULL, NULL, 0, NULL},

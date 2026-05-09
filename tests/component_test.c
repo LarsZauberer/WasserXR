@@ -1,6 +1,6 @@
-#include "WasserXR/ecs/utils.h"
 #include "WasserXR/ecs/Macros.h"
 #include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/utils.h"
 #include <stdlib.h>
 
 typedef struct WXR_A WXR_A;
@@ -33,10 +33,10 @@ WXR_BASIC_SERIALIZE(WXR_A, extra, &component->extra, sizeof(int));
 WXR_BASIC_DESERIALIZE(WXR_A, extra, &component->extra, sizeof(int));
 
 void wxr_schema_WXR_A(WXR_Component_Schema *schema) {
-  WXR_SCHEMA_FIELD(WXR_L, x, wxr_get_WXR_A_x, wxr_set_WXR_A_x, wxr_serialize_WXR_A_x,
-                  wxr_deserialize_WXR_A_x);
+  WXR_SCHEMA_FIELD(WXR_L, x, wxr_get_WXR_A_x, wxr_set_WXR_A_x,
+                   wxr_serialize_WXR_A_x, wxr_deserialize_WXR_A_x);
   WXR_SCHEMA_FIELD(WXR_L, extra, wxr_get_WXR_A_extra, wxr_set_WXR_A_extra,
-                  wxr_serialize_WXR_A_extra, wxr_deserialize_WXR_A_extra);
+                   wxr_serialize_WXR_A_extra, wxr_deserialize_WXR_A_extra);
 }
 
 typedef struct WXR_B WXR_B;
@@ -64,7 +64,7 @@ WXR_STRING_SETTER(WXR_B, name, component->name);
 
 void wxr_schema_WXR_B(WXR_Component_Schema *schema) {
   WXR_SCHEMA_FIELD(WXR_S, name, wxr_get_WXR_B_name, wxr_set_WXR_B_name,
-                  wxr_serialize_WXR_B_name, wxr_deserialize_WXR_B_name);
+                   wxr_serialize_WXR_B_name, wxr_deserialize_WXR_B_name);
 }
 
 typedef struct WXR_C_Empty WXR_C_Empty;

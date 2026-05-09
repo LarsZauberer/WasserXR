@@ -1,9 +1,9 @@
 #include "WasserXR/core/ConsoleSystem.h"
 #include "WasserXR/core/Commands.h"
 #include "WasserXR/core/Console.h"
+#include "WasserXR/ecs/Scene.h"
 #include "WasserXR/ecs/logging.h"
 #include "WasserXR/ecs/utils.h"
-#include "WasserXR/ecs/Scene.h"
 #include "glib-2.0/glib.h"
 #include <glib.h>
 #include <pthread.h>
@@ -54,7 +54,7 @@ void wxr_detach_wxr_console_system(WXR_Scene *scene) {
 }
 
 void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
-                                 const size_t *groups) {
+                                   const size_t *groups) {
   if (!wxr_console_buffer) {
     return;
   }
@@ -73,7 +73,8 @@ void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
 
   size_t cmd_size =
       *(size_t *)wxr_get(scene, console_component, "command_list_size");
-  const WXR_Command *cmd_list = wxr_get(scene, console_component, "command_list");
+  const WXR_Command *cmd_list =
+      wxr_get(scene, console_component, "command_list");
 
   for (size_t i = 0; i < cmd_size; i++) {
     // Check the first command name
@@ -101,7 +102,7 @@ void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
 }
 
 WXR_System_Groups wxr_select_wxr_console_system(const WXR_Scene *scene,
-                                             const WXR_Entity entity) {
+                                                const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Console")) {
     return 1;
   }

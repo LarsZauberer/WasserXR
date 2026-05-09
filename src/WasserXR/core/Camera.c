@@ -1,7 +1,7 @@
 #include "WasserXR/core/Camera.h"
-#include "WasserXR/ecs/logging.h"
 #include "WasserXR/ecs/Macros.h"
 #include "WasserXR/ecs/Scene.h"
+#include "WasserXR/ecs/logging.h"
 #include <stdlib.h>
 
 struct WXR_Camera {

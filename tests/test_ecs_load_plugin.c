@@ -22,7 +22,7 @@ static void unittest(const void *ptr) {
 
   int result = wxr_load_plugin(input->scene, input->plugin_path);
   wxr_assert(result == input->expected_result,
-            "Load plugin result should match expected");
+             "Load plugin result should match expected");
 }
 
 int main(int argc, char *argv[]) {
@@ -39,8 +39,8 @@ int main(int argc, char *argv[]) {
   WXR_Scene *valid_scene2 = wxr_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                     // NULL scene
-      {valid_scene, "", 1},                      // Empty path
+      {null_scene, NULL, 1},                      // NULL scene
+      {valid_scene, "", 1},                       // Empty path
       {valid_scene2, "./libwasserxr_core.so", 0}, // Valid plugin
   };
 

@@ -9,7 +9,7 @@ static WXR_Log_Level wxr_lowest_level = WXR_LOG_INFO;
 static GArray *wxr_loggers = NULL;
 
 static WXR_Log_Entry wxr_create_entry(WXR_Log_Level log_level, const char *fmt,
-                                    va_list args) {
+                                      va_list args) {
   char *formatted_string = g_strdup_vprintf(fmt, args);
   const WXR_Log_Entry entry = {log_level, formatted_string};
   return entry;

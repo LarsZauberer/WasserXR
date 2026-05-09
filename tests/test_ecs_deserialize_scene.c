@@ -44,13 +44,13 @@ static void unittest(const void *ptr) {
   size_t system_count = 0;
   char **systems = wxr_get_systems(&system_count, input->scene);
   wxr_assert_test(system_count == input->expected_systems,
-                 "Expected systems: %d", input->expected_systems, "Got: %ld",
-                 system_count, "System count doesn't match");
+                  "Expected systems: %d", input->expected_systems, "Got: %ld",
+                  system_count, "System count doesn't match");
 
   if (system_count > 0) {
     wxr_assert_test(strcmp(systems[0], "wxr_system_a") == 0, "Expected: %s",
-                   "wxr_system_a", "Got: %s", systems[0],
-                   "System name doesn't match");
+                    "wxr_system_a", "Got: %s", systems[0],
+                    "System name doesn't match");
   }
 
   destroy_char_array(systems, system_count);
@@ -59,28 +59,28 @@ static void unittest(const void *ptr) {
   size_t entity_count = 0;
   WXR_Entity *entities = wxr_get_entities(&entity_count, input->scene);
   wxr_assert_test(entity_count == input->expected_entities,
-                 "Expected entities: %d", input->expected_entities, "Got: %ld",
-                 entity_count, "Entity count doesn't match");
+                  "Expected entities: %d", input->expected_entities, "Got: %ld",
+                  entity_count, "Entity count doesn't match");
 
   // Verify entity components if there are entities
   if (entity_count > 0) {
     size_t component_count = 0;
     char **components = wxr_get_components_of_entity(&component_count,
-                                                    input->scene, entities[0]);
+                                                     input->scene, entities[0]);
 
     if (input->expected_systems > 0) {
       // Full scene case - should have component
       wxr_assert_test(component_count == 1, "Expected: %d", 1, "Got: %ld",
-                     component_count, "Component count doesn't match");
+                      component_count, "Component count doesn't match");
       if (component_count > 0) {
         wxr_assert_test(strcmp(components[0], "WXR_A") == 0, "Expected: %s",
-                       "WXR_A", "Got: %s", components[0],
-                       "Component name doesn't match");
+                        "WXR_A", "Got: %s", components[0],
+                        "Component name doesn't match");
       }
     } else {
       // Entity scene case - no components
       wxr_assert_test(component_count == 0, "Expected: %d", 0, "Got: %ld",
-                     component_count, "Component count doesn't match");
+                      component_count, "Component count doesn't match");
     }
 
     destroy_char_array(components, component_count);
@@ -122,8 +122,8 @@ int main(int argc, char *argv[]) {
        "\1\0\0\0\0\0\0\0"
        "\1\0\0\0\0\0\0\0"
        "\31\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0"
-        "\66\0\0\0\0\0\0\0\56\0\0\0\0\0\0\0WXR_"
-        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
+       "\66\0\0\0\0\0\0\0\56\0\0\0\0\0\0\0WXR_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
        1, 1, 0}};
 
   // Constructing Tests

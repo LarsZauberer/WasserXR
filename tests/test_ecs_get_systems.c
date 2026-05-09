@@ -24,7 +24,7 @@ static void unittest(const void *ptr) {
   char **systems = wxr_get_systems(&count, input->scene);
 
   wxr_assert(count == input->expected_count,
-            "System count should match expected");
+             "System count should match expected");
 
   if (count > 0 && systems != NULL) {
     for (size_t i = 0; i < count; i++) {
