@@ -117,19 +117,19 @@ int main(int argc, char *argv[]) {
       {NULL, 0, "", NULL, 1},
       {empty_scene, dummy_entity, NULL, NULL, 1},
       {invalid_entity_scene, 999,
-       "\55\0\0\0\0\0\0\0"
+       "\56\0\0\0\0\0\0\0"
        "WXR_A\0"
        "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
        "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
        NULL, 1},
       {valid_scene, valid_entity,
-       "\55\0\0\0\0\0\0\0"
+       "\56\0\0\0\0\0\0\0"
        "WXR_A\0"
        "\16\0\0\0\0\0\0\0x\0\1\0\0\0"
        "\22\0\0\0\0\0\0\0extra\0\5\0\0\0",
        "WXR_A", 0},
       {valid_string_scene, valid_string_entity,
-       "\47\0\0\0\0\0\0\0"
+       "\50\0\0\0\0\0\0\0"
        "WXR_B\0"
        "\32\0\0\0\0\0\0\0name\0Hello World!\0",
        "WXR_B", 0},

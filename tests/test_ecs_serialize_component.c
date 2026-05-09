@@ -29,13 +29,13 @@ static void unittest(const void *ptr) {
   size_t length = 0;
   memcpy(&length, data, sizeof(size_t));
   wxr_assert_test(length == input->length, "%ld", input->length, "%ld", length,
-                 "The size of the data returned doesn't match!");
+                  "The size of the data returned doesn't match!");
   for (size_t i = 0; i < length; i++) {
     char byte_should = input->out[i];
     char byte_out = data[i];
     wxr_assert_test(byte_should == byte_out, "Should: %d", byte_should,
-                   "Output: %d", byte_out, "The Byte at index %d is not equal",
-                   i);
+                    "Output: %d", byte_out, "The Byte at index %d is not equal",
+                    i);
   }
 
   free(data);
@@ -51,9 +51,9 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene = wxr_create_scene();
 
   WXR_Scene *entity_scene = wxr_create_scene();
-  wxr_assert(0 ==
-                wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+  wxr_assert(
+      0 == wxr_load_plugin(entity_scene, "./libwasserxr_test_components.so"),
+      "Failed to load the plugin");
   wxr_add_entity(entity_scene);
 
   WXR_Scene *component_scene = wxr_create_scene();
@@ -67,8 +67,8 @@ int main(int argc, char *argv[]) {
 
   WXR_Scene *empty_component_scene = wxr_create_scene();
   wxr_assert(0 == wxr_load_plugin(empty_component_scene,
-                                "./libwasserxr_test_components.so"),
-            "Failed to load the plugin");
+                                  "./libwasserxr_test_components.so"),
+             "Failed to load the plugin");
   WXR_Entity entity_id_empty_component = wxr_add_entity(empty_component_scene);
   void *empty_component = wxr_add_component(
       empty_component_scene, entity_id_empty_component, "WXR_C_Empty");
@@ -82,11 +82,11 @@ int main(int argc, char *argv[]) {
       {component_scene, component,
        sizeof(size_t) + strlen("WXR_A") + 1 + sizeof(size_t) + strlen("x") + 1 +
            sizeof(int) + sizeof(size_t) + strlen("extra") + 1 + sizeof(int),
-        "\55\0\0\0\0\0\0\0WXR_"
-        "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
-       {empty_component_scene, empty_component,
-        sizeof(size_t) + strlen("WXR_C_Empty") + 1,
-        "\23\0\0\0\0\0\0\0WXR_C_Empty\0"},
+       "\56\0\0\0\0\0\0\0WXR_"
+       "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
+      {empty_component_scene, empty_component,
+       sizeof(size_t) + strlen("WXR_C_Empty") + 1,
+       "\24\0\0\0\0\0\0\0WXR_C_Empty\0"},
   };
 
   // Constructing Tests

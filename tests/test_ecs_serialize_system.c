@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
                       {plugin_scene, "wxr_system_a", 0, NULL},
                       {system_scene, "wxr_system_a",
                        sizeof(size_t) + strlen("wxr_system_a") + 1 + sizeof(int),
-                       "\30\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0"}};
+                       "\31\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0"}};
 
   // Constructing Tests
 

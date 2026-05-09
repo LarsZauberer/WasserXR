@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
       {plugin_scene, "", 0, NULL},
       {plugin_scene2, "./libwasserxr_test_components.so",
        strlen("./libwasserxr_test_components.so") + sizeof(size_t) + 1,
-       "\50\0\0\0\0\0\0\0./libwasserxr_test_components.so\0"}};
+       "\51\0\0\0\0\0\0\0./libwasserxr_test_components.so\0"}};
 
   // Constructing Tests
 

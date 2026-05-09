@@ -74,7 +74,7 @@ struct WXR_C_Empty {
 };
 
 void *wxr_create_WXR_C_Empty() {
-  WXR_C_Empty *component = malloc(sizeof(WXR_C));
+  WXR_C_Empty *component = malloc(sizeof(WXR_C_Empty));
   component->a = 5;
   return component;
 }

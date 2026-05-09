@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
        sizeof(size_t) + sizeof(size_t) + strlen("WXR_A") + 1 + sizeof(size_t) +
            strlen("x") + 1 + sizeof(int) + sizeof(size_t) + strlen("extra") +
            1 + sizeof(int),
-        "\65\0\0\0\0\0\0\0\55\0\0\0\0\0\0\0WXR_"
+        "\66\0\0\0\0\0\0\0\56\0\0\0\0\0\0\0WXR_"
         "A\0\16\0\0\0\0\0\0\0x\0\1\0\0\0\22\0\0\0\0\0\0\0extra\0\5\0\0\0"},
       {multi_entity_scene, entity_a, sizeof(size_t), "\10\0\0\0\0\0\0\0"},
       {multi_entity_scene2, entity2_b, sizeof(size_t), "\10\0\0\0\0\0\0\0"},
