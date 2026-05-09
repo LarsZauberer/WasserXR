@@ -33,5 +33,5 @@ jobs:
       run: |
         nix develop --command bash -c "
           cd build
-          run-clang-tidy -p . -warnings-as-errors='*' './src/TheSeed/.*\.c$'
+          run-clang-tidy -p . -warnings-as-errors='*' './src/WasserXR/.*\.c$'
         "

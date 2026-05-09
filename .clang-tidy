@@ -10,5 +10,5 @@ Checks: >
   performance-*,
   portability-*,
   -readability-magic-numbers,
-HeaderFilterRegex: ".*/include/TheSeed/.*"
+HeaderFilterRegex: ".*/include/WasserXR/.*"
 FormatStyle: file

@@ -1,6 +1,6 @@
-#include "TheSeed/ecs/Scene.h"
+#include "WasserXR/ecs/Scene.h"
 
-int ts_groups_ts_system_a = 0;
+int wxr_groups_wxr_system_a = 0;
 
-void ts_system_ts_system_a(TS_Scene *scene, TS_Entity **entities,
+void wxr_system_wxr_system_a(WXR_Scene *scene, WXR_Entity **entities,
                            const size_t *groups) {}

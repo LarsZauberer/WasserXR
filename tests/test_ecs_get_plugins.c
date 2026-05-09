@@ -1,19 +1,19 @@
-#include "TheSeed/ecs/Scene.h"
+#include "WasserXR/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/ecs/logging.h>
+#include <WasserXR/ecs/logging.h>
 #include <stdlib.h>
 
 typedef struct TestCase TestCase;
 
 struct TestCase {
-  TS_Scene *scene;
+  WXR_Scene *scene;
   size_t expected_count;
 };
 
 static void free_case(void *ptr) {
   TestCase *input = ptr;
   if (input->scene) {
-    ts_destroy_scene(input->scene);
+    wxr_destroy_scene(input->scene);
   }
 }
 
@@ -21,9 +21,9 @@ static void unittest(const void *ptr) {
   const TestCase *input = ptr;
   
   size_t count = 0;
-  char **plugins = ts_get_plugins(&count, input->scene);
+  char **plugins = wxr_get_plugins(&count, input->scene);
   
-  ts_assert(count == input->expected_count,
+  wxr_assert(count == input->expected_count,
             "Plugin count should match expected");
   
   if (count > 0 && plugins != NULL) {
@@ -37,14 +37,14 @@ static void unittest(const void *ptr) {
 int main(int argc, char *argv[]) {
   g_test_init(&argc, &argv, NULL);
 
-  ts_logging_init(TS_LOG_DEBUG);
-  ts_add_logger(ts_stdout_logger);
+  wxr_logging_init(WXR_LOG_DEBUG);
+  wxr_add_logger(wxr_stdout_logger);
 
   // Constructing Cases
-  TS_Scene *empty_scene = ts_create_scene();
+  WXR_Scene *empty_scene = wxr_create_scene();
 
-  TS_Scene *scene_one_plugin = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(scene_one_plugin, "./libtheseed_test_components.so"),
+  WXR_Scene *scene_one_plugin = wxr_create_scene();
+  wxr_assert(0 == wxr_load_plugin(scene_one_plugin, "./libwasserxr_test_components.so"),
             "Failed to load the plugin");
 
   TestCase cases[] = {
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
   // Constructing Tests
   for (size_t i = 0; i < 2; i++) {
-    char *path = g_strdup_printf("/theseed/test_ecs_get_plugins/%ld", i);
+    char *path = g_strdup_printf("/wasserxr/test_ecs_get_plugins/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

@@ -1,12 +1,12 @@
-#include "TheSeed/ecs/Scene.h"
+#include "WasserXR/ecs/Scene.h"
 #include "glib.h"
-#include <TheSeed/ecs/logging.h>
+#include <WasserXR/ecs/logging.h>
 #include <string.h>
 
 typedef struct TestCase TestCase;
 
 struct TestCase {
-  TS_Scene *scene;
+  WXR_Scene *scene;
   char *system;
   size_t length;
   char *out;
@@ -15,25 +15,25 @@ struct TestCase {
 static void free_case(void *ptr) {
   TestCase *input = ptr;
 
-  ts_destroy_scene(input->scene);
+  wxr_destroy_scene(input->scene);
 }
 
 static void unittest(const void *ptr) {
   const TestCase *input = ptr;
-  char *data = ts_serialize_system(input->scene, input->system);
+  char *data = wxr_serialize_system(input->scene, input->system);
   if (!input->out) {
-    ts_assert(data == NULL, "Data should be NULL");
+    wxr_assert(data == NULL, "Data should be NULL");
     return;
   }
-  ts_assert(data != NULL, "Data is NULL");
+  wxr_assert(data != NULL, "Data is NULL");
   size_t length = 0;
   memcpy(&length, data, sizeof(size_t));
-  ts_assert_test(length == input->length, "%ld", input->length, "%ld", length,
+  wxr_assert_test(length == input->length, "%ld", input->length, "%ld", length,
                  "The size of the data returned doesn't match!");
   for (size_t i = 0; i < length; i++) {
     char byte_should = input->out[i];
     char byte_out = data[i];
-    ts_assert_test(byte_should == byte_out, "Should: %d", byte_should,
+    wxr_assert_test(byte_should == byte_out, "Should: %d", byte_should,
                    "Output: %d", byte_out, "The Byte at index %d is not equal",
                    i);
   }
@@ -44,36 +44,36 @@ static void unittest(const void *ptr) {
 int main(int argc, char *argv[]) {
   g_test_init(&argc, &argv, NULL);
 
-  ts_logging_init(TS_LOG_DEBUG);
-  ts_add_logger(ts_stdout_logger);
+  wxr_logging_init(WXR_LOG_DEBUG);
+  wxr_add_logger(wxr_stdout_logger);
 
   // Constructing Cases
-  TS_Scene *empty_scene = ts_create_scene();
-  TS_Scene *empty_scene2 = ts_create_scene();
+  WXR_Scene *empty_scene = wxr_create_scene();
+  WXR_Scene *empty_scene2 = wxr_create_scene();
 
-  TS_Scene *plugin_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(plugin_scene, "./libtheseed_test_systems.so"),
+  WXR_Scene *plugin_scene = wxr_create_scene();
+  wxr_assert(0 == wxr_load_plugin(plugin_scene, "./libwasserxr_test_systems.so"),
             "Failed to load the plugin");
 
-  TS_Scene *system_scene = ts_create_scene();
-  ts_assert(0 == ts_load_plugin(system_scene, "./libtheseed_test_systems.so"),
+  WXR_Scene *system_scene = wxr_create_scene();
+  wxr_assert(0 == wxr_load_plugin(system_scene, "./libwasserxr_test_systems.so"),
             "Failed to load the plugin");
-  ts_assert(0 == ts_add_system(system_scene, "ts_system_a", 100),
+  wxr_assert(0 == wxr_add_system(system_scene, "wxr_system_a", 100),
             "Failed to add the system");
 
   TestCase cases[] = {{NULL, NULL, 0, NULL},
                       {NULL, "", 0, NULL},
                       {empty_scene, "", 0, NULL},
-                      {empty_scene2, "ts_system_a", 0, NULL},
-                      {plugin_scene, "ts_system_a", 0, NULL},
-                      {system_scene, "ts_system_a",
-                       sizeof(size_t) + strlen("ts_system_a") + 1 + sizeof(int),
-                       "\30\0\0\0\0\0\0\0ts_system_a\0\144\0\0\0"}};
+                      {empty_scene2, "wxr_system_a", 0, NULL},
+                      {plugin_scene, "wxr_system_a", 0, NULL},
+                      {system_scene, "wxr_system_a",
+                       sizeof(size_t) + strlen("wxr_system_a") + 1 + sizeof(int),
+                       "\30\0\0\0\0\0\0\0wxr_system_a\0\144\0\0\0"}};
 
   // Constructing Tests
 
   for (size_t i = 0; i < 6; i++) {
-    char *path = g_strdup_printf("/theseed/test_ecs_serialize_system/%ld", i);
+    char *path = g_strdup_printf("/wasserxr/test_ecs_serialize_system/%ld", i);
     g_test_add_data_func_full(path, &cases[i], unittest, free_case);
     free(path);
   }

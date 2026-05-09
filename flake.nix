@@ -17,7 +17,7 @@
         lib = nixpkgs.lib;
       in {
         packages.default = pkgs.stdenv.mkDerivation {
-          pname = "TheSeed";
+          pname = "WasserXR";
           version = "pre 0.1.0";
 
           src = ./.;
@@ -41,11 +41,11 @@
 
           cmakeFlags = [
             (lib.cmakeBool "BUILD_DEBUG" false)
-            (lib.cmakeBool "TS_STATIC" true)
+            (lib.cmakeBool "WXR_STATIC" true)
           ];
 
           meta = {
-            mainProgram = "theseed";
+            mainProgram = "wasserxr";
           };
         };
         devShells.default = pkgs.mkShell {
