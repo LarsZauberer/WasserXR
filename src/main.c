@@ -1,7 +1,6 @@
 #include "TheSeed/ecs/Scene.h"
 #include "TheSeed/ecs/logging.h"
 #include "TheSeed/ecs/utils.h"
-#include <stdio.h>
 
 int main() {
   // Create the logging
