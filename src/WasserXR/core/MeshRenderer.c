@@ -30,15 +30,15 @@ WXR_System_Groups wxr_select_wxr_mesh_renderer(const WXR_Scene *scene,
       wxr_entity_get_component(scene, entity, "WXR_Camera");
   size_t window = (size_t)wxr_entity_get_component(scene, entity, "WXR_Window");
   if (window) {
-    return 1;
+    return 0;
   }
   if (camera_object) {
-    return 2;
+    return 1;
   }
   if (normal_object) {
-    return 3;
+    return 2;
   }
-  return 0;
+  return -1;
 }
 
 void wxr_system_wxr_mesh_renderer(WXR_Scene *scene, WXR_Entity **entities,
