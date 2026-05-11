@@ -59,8 +59,12 @@ void wxr_reset_scene(WXR_Scene *scene) {
   }
   // Clean up all the rest of the entities
   const size_t entities_len = scene->entities->len;
-  for (size_t i = 0; i < entities_len; i++) {
-    const WXR_Entity entity = g_array_index(scene->entities, WXR_Entity, 0);
+  // We deinitialize the entities in reverse order to have dependencies between
+  // entities excluded.
+  // We also do this weird i-1 computation because with `size_t` we can never
+  // reach -1.
+  for (size_t i = entities_len; i > 0; i--) {
+    const WXR_Entity entity = g_array_index(scene->entities, WXR_Entity, i - 1);
     // This will also destroy all the components associated with the entity
     wxr_remove_entity(scene, entity);
   }
@@ -88,14 +92,17 @@ int wxr_remove_entity(WXR_Scene *scene, const WXR_Entity entity) {
   g_array_remove_index(scene->entities, index);
 
   // Cleanup the components
-  for (size_t i = 0; i < scene->components->len; i++) {
+  // We go through in reverse order because of component initialization
+  // dependencies. We deinitialize components in the order they were initialized
+  // We also need to have this weird i-1 because we will never reach -1 with
+  // `size_t`
+  for (size_t i = scene->components->len; i > 0; i--) {
     WXR_Component_Handler *component =
-        g_array_index(scene->components, WXR_Component_Handler *, i);
+        g_array_index(scene->components, WXR_Component_Handler *, i - 1);
     if (component->entity == entity) {
       char *copy_id = wxr_copy_char_ptr(component->id);
       wxr_remove_component(scene, entity, copy_id);
       free(copy_id);
-      i--;
     }
   }
 

@@ -38,21 +38,8 @@ void wxr_command_reload(char **args, WXR_Scene *scene) {
   wxr_set_scene_reload(scene);
 }
 
-static int wxr_get_window(const WXR_Scene *scene, const WXR_Entity entity) {
-  if (wxr_entity_get_component(scene, entity, "WXR_Window")) {
-    return 1;
-  }
-  return 0;
-}
-
 void wxr_command_exit(char **args, WXR_Scene *scene) {
-  size_t num_entities = 0;
-  WXR_Entity *entities = wxr_find_entities_with_selector_and_groups(
-      &num_entities, scene, wxr_get_window, 1);
-  for (size_t i = 0; i < num_entities; i++) {
-    wxr_remove_entity(scene, entities[i]);
-  }
-  free(entities);
+  wxr_set_scene_terminate(scene);
 }
 
 void wxr_command_addEntity(char **args, WXR_Scene *scene) {

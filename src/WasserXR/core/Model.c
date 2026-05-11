@@ -36,10 +36,12 @@ void wxr_destroy_WXR_Model(void *ptr) {
   free(model->shader_name);
 
   // Free all the meshes
-  for (unsigned int i = 0; i < model->numMeshes; i++) {
-    wxr_destroy_mesh(model->meshes[i]);
+  if (model->meshes) {
+    for (unsigned int i = 0; i < model->numMeshes; i++) {
+      wxr_destroy_mesh(model->meshes[i]);
+    }
+    free(model->meshes);
   }
-  free(model->meshes);
 
   // Free the shader
   wxr_destroy_shader(model->shader);
@@ -56,11 +58,16 @@ void wxr_set_WXR_Model_model_name(void *component, const void *data) {
     free(model->model_name);
     model->model_name = wxr_copy_char_ptr(path);
 
+    // Save the old numMeshes for later to destroy the old meshes
+    unsigned int old_numMeshes = model->numMeshes;
+
     // Read all the mesh data (array)
     WXR_Mesh_Data *mesh_data =
         wxr_read_mesh_data(&model->numMeshes, model->model_name);
     if (!mesh_data) {
       wxr_warn("Failed to read the mesh data of `%s`", model->model_name);
+      model->numMeshes = old_numMeshes;
+      return;
     }
 
     // Array of pointers
@@ -77,9 +84,13 @@ void wxr_set_WXR_Model_model_name(void *component, const void *data) {
     }
     free(mesh_data);
 
+    // Clear old meshes
+    for (unsigned int i = 0; i < old_numMeshes; i++) {
+      wxr_destroy_mesh(model->meshes[i]);
+    }
+    free(model->meshes);
+
     model->meshes = meshes;
-  } else {
-    // TODO: Clean the old data and set null
   }
 }
 
@@ -91,6 +102,9 @@ void wxr_set_WXR_Model_shader_name(void *component, const void *data) {
     free(model->shader_name);
     model->shader_name = wxr_copy_char_ptr(path);
 
+    // Unload old shader
+    wxr_destroy_shader(model->shader);
+
     model->shader = wxr_create_shader(model->shader_name);
     int status = wxr_load_shader(model->shader);
     if (status) {
@@ -101,8 +115,6 @@ void wxr_set_WXR_Model_shader_name(void *component, const void *data) {
         wxr_warn("Failed to compile the shader: %s", model->shader_name);
       }
     }
-  } else {
-    // TODO: Clean the old data and set null
   }
 }
 
