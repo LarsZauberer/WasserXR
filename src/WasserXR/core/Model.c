@@ -66,6 +66,7 @@ void wxr_set_WXR_Model_model_name(void *component, const void *data) {
         wxr_read_mesh_data(&model->numMeshes, model->model_name);
     if (!mesh_data) {
       wxr_warn("Failed to read the mesh data of `%s`", model->model_name);
+      model->numMeshes = old_numMeshes;
       return;
     }
 
