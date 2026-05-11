@@ -78,23 +78,14 @@ void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
 
   for (size_t i = 0; i < cmd_size; i++) {
     // Check the first command name
-    int prefix_status =
-        g_str_has_prefix(wxr_console_buffer, cmd_list[i].command);
-    if (prefix_status) {
+    char **tokens = g_strsplit(wxr_console_buffer, " ", -1);
+    char *command = tokens[0];
+    char **args = tokens + 1;
+    if (strcmp(command, cmd_list[i].command) == 0) {
       // Get the arguments list
-      char *args_begin = wxr_console_buffer + strlen(cmd_list[i].command) + 1;
-      char **args = g_strsplit(args_begin, " ", -1);
       cmd_list[i].func(args, scene);
-      // Clean up
-      size_t clear_i = 0;
-      while (1) {
-        if (!args[clear_i]) {
-          break;
-        }
-        free(args[clear_i++]);
-      }
-      free(args);
     }
+    g_strfreev(tokens);
   }
 
   free(wxr_console_buffer);
