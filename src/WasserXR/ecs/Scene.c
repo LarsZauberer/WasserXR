@@ -602,7 +602,7 @@ int wxr_tick_scene(WXR_Scene *scene) {
     }
 
     // Create all the helper arrays
-    for (WXR_System_Groups i = 1; i <= groups; i++) {
+    for (WXR_System_Groups i = 0; i < groups; i++) {
       size_t num_entities = 0;
       WXR_Entity *entities = wxr_find_entities_with_selector_and_groups(
           &num_entities, scene, system->selector, i);
@@ -617,6 +617,7 @@ int wxr_tick_scene(WXR_Scene *scene) {
     WXR_Entity **entity_array =
         (WXR_Entity **)g_array_free(entity_groups, FALSE);
 
+    // Call the system
     system->system(scene, entity_array, size_array);
 
     free(size_array);

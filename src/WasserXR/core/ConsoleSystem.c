@@ -104,7 +104,7 @@ void wxr_system_wxr_console_system(WXR_Scene *scene, WXR_Entity **entities,
 WXR_System_Groups wxr_select_wxr_console_system(const WXR_Scene *scene,
                                                 const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Console")) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return -1;
 }

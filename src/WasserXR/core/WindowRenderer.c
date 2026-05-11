@@ -13,9 +13,9 @@ WXR_System_Groups wxr_groups_wxr_window_pre_renderer = 1;
 WXR_System_Groups wxr_select_wxr_window_pre_renderer(const WXR_Scene *scene,
                                                      const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Window")) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return -1;
 }
 
 void wxr_system_wxr_window_pre_renderer(WXR_Scene *scene, WXR_Entity **entities,
@@ -45,9 +45,9 @@ WXR_System_Groups wxr_groups_wxr_window_post_renderer = 1;
 WXR_System_Groups wxr_select_wxr_window_post_renderer(const WXR_Scene *scene,
                                                       const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Window")) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return -1;
 }
 
 void wxr_system_wxr_window_post_renderer(WXR_Scene *scene,
@@ -78,9 +78,9 @@ WXR_System_Groups wxr_groups_wxr_window_quiter = 1;
 WXR_System_Groups wxr_select_wxr_window_quiter(const WXR_Scene *scene,
                                                const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Window")) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return -1;
 }
 
 void wxr_system_wxr_window_quiter(WXR_Scene *scene, WXR_Entity **entities,
@@ -95,9 +95,9 @@ WXR_System_Groups wxr_groups_wxr_window_reloader = 1;
 WXR_System_Groups wxr_select_wxr_window_reloader(const WXR_Scene *scene,
                                                  const WXR_Entity entity) {
   if (wxr_entity_get_component(scene, entity, "WXR_Window")) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return -1;
 }
 
 void wxr_system_wxr_window_reloader(WXR_Scene *scene, WXR_Entity **entities,
