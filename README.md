@@ -1,6 +1,8 @@
 # WasserXR
 
-<img src="./logo.svg">
+<p align="center">
+    <img src="./logo.svg" width="50%">
+</p>
 
 A **dynamic XR Engine** to help you stay in the **flow**
 
