@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Ian Wasser
+ * Licensed under the WasserXR License.
+ * You may not use this file except in compliance with the License.
+ * See LICENSE.md for details.
+ */
+
 #include "WasserXR/ecs/Scene.h"
 #include "Scene_internal.h"
 #include "WasserXR/ecs/logging.h"

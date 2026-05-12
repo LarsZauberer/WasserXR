@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Ian Wasser
+ * Licensed under the WasserXR License.
+ * You may not use this file except in compliance with the License.
+ * See LICENSE.md for details.
+ */
+
 #ifndef WXR_Scene_H
 #define WXR_Scene_H
 
