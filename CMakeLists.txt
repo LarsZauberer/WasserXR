@@ -88,12 +88,12 @@ install(DIRECTORY ${CMAKE_BINARY_DIR}/docs/man/man3
 enable_testing()
 
 # Extra Libraries for testing
-add_library(wasserxr_test_components SHARED tests/component_test.c)
+add_library(wasserxr_test_components SHARED tests/test_components.c)
 target_include_directories(wasserxr_test_components PUBLIC include)
 target_include_directories(wasserxr_test_components PRIVATE ${GLIB_INCLUDE_DIRS})
 target_link_libraries(wasserxr_test_components PRIVATE wasserxr_ecs ${GLIB_LIBRARIES})
 
-add_library(wasserxr_test_systems SHARED tests/system_test.c)
+add_library(wasserxr_test_systems SHARED tests/test_systems.c)
 target_include_directories(wasserxr_test_systems PUBLIC include)
 target_include_directories(wasserxr_test_systems PRIVATE ${GLIB_INCLUDE_DIRS})
 target_link_libraries(wasserxr_test_systems PRIVATE wasserxr_ecs ${GLIB_LIBRARIES})
