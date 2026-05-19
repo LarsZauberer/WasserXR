@@ -63,6 +63,33 @@
             };
           };
         };
+        checks.clang-tidy = self.packages.${system}.default.overrideAttrs (oldAttrs: {
+          pname = "WasserXR-clang-tidy";
+          nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ pkgs.python3 ];
+          cmakeFlags = [
+            (lib.cmakeBool "WXR_TESTS" false)
+            (lib.cmakeBool "BUILD_DEBUG" false)
+          ];
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            python3 $(command -v run-clang-tidy) -p . -warnings-as-errors='*' 'src/WasserXR/.*\.c$'
+            runHook postCheck
+          '';
+        });
+        checks.default = self.packages.${system}.default.overrideAttrs (_: {
+          pname = "WasserXR-tests";
+          cmakeFlags = [
+            (lib.cmakeBool "WXR_TESTS" true)
+            (lib.cmakeBool "BUILD_DEBUG" false)
+          ];
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            ctest --output-on-failure
+            runHook postCheck
+          '';
+        });
         devShells.default = pkgs.mkShell {
           name = "devShell";
 
