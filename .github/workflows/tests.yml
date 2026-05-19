@@ -21,11 +21,4 @@ jobs:
           experimental-features = nix-command flakes
     
     - name: Build project and run tests
-      run: |
-        nix develop --command bash -c "
-          mkdir -p build
-          cd build
-          cmake -DBUILD_DEBUG=ON ..
-          cmake --build .
-          ctest --output-on-failure
-        "
+      run: nix build ".#checks.$(nix eval --impure --raw --expr 'builtins.currentSystem').default"

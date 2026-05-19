@@ -20,18 +20,5 @@ jobs:
         extra_nix_config: |
           experimental-features = nix-command flakes
     
-    - name: Build project
-      run: |
-        nix develop --command bash -c "
-          mkdir -p build
-          cd build
-          cmake -DBUILD_DEBUG=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
-          cmake --build .
-        "
-    
     - name: Run clang-tidy
-      run: |
-        nix develop --command bash -c "
-          cd build
-          run-clang-tidy -p . -warnings-as-errors='*' './src/WasserXR/.*\.c$'
-        "
+      run: nix build ".#checks.$(nix eval --impure --raw --expr 'builtins.currentSystem').clang-tidy"
