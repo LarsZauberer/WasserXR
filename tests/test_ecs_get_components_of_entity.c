@@ -47,11 +47,11 @@ int main(int argc, char *argv[]) {
   WXR_Entity empty_entity = wxr_add_entity(scene_empty_entity);
 
   WXR_Scene *scene_with_component = wxr_create_scene();
-  wxr_assert(0 ==
-                 wxr_load_plugin(scene_with_component, "./libwasserxr_core.so"),
+  wxr_assert(0 == wxr_load_plugin(scene_with_component,
+                                  "./libwasserxr_test_components.so"),
              "Failed to load the plugin");
   WXR_Entity entity_with_comp = wxr_add_entity(scene_with_component);
-  wxr_add_component(scene_with_component, entity_with_comp, "WXR_Transform");
+  wxr_add_component(scene_with_component, entity_with_comp, "WXR_A");
 
   TestCase cases[] = {
       {scene_empty_entity, empty_entity, 0},

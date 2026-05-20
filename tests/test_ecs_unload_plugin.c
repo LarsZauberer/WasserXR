@@ -37,16 +37,18 @@ int main(int argc, char *argv[]) {
   WXR_Scene *empty_scene = wxr_create_scene();
 
   WXR_Scene *scene_with_plugin = wxr_create_scene();
-  wxr_assert(0 == wxr_load_plugin(scene_with_plugin, "./libwasserxr_core.so"),
+  wxr_assert(0 == wxr_load_plugin(scene_with_plugin,
+                                  "./libwasserxr_test_components.so"),
              "Failed to load the plugin");
 
   WXR_Scene *empty_scene2 = wxr_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                           // NULL scene
-      {empty_scene, "", 1},                            // Empty scene
-      {scene_with_plugin, "./libwasserxr_core.so", 0}, // Valid unload
-      {empty_scene2, "NonExistent", 1},                // Non-existent plugin
+      {null_scene, NULL, 1}, // NULL scene
+      {empty_scene, "", 1},  // Empty scene
+      {scene_with_plugin, "./libwasserxr_test_components.so",
+       0},                              // Valid unload
+      {empty_scene2, "NonExistent", 1}, // Non-existent plugin
   };
 
   // Constructing Tests

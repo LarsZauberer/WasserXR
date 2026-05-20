@@ -1,26 +1,40 @@
 {
-  description = "A very basic flake";
+  description = "A flake for WasserXR";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-  }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
         lib = nixpkgs.lib;
-      in {
+      in
+      {
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "WasserXR";
           version = "pre 0.1.0";
 
-          src = ./.;
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter =
+              path: type:
+              let
+                baseName = builtins.baseNameOf path;
+              in
+              !(baseName == "build");
+          };
 
           nativeBuildInputs = [
             # Build packages
@@ -30,22 +44,23 @@
             pkgs.doxygen
 
             # Libraries
-            pkgs.glfw
             pkgs.glib
-            pkgs.cglm
             pkgs.pkg-config
             pkgs.pcre2
             pkgs.libsysprof-capture
-            pkgs.assimp
           ];
 
           cmakeFlags = [
+            (lib.cmakeBool "WXR_TESTS" false)
             (lib.cmakeBool "BUILD_DEBUG" false)
-            (lib.cmakeBool "WXR_STATIC" true)
           ];
 
           meta = {
-            mainProgram = "wasserxr";
+            license = {
+              fullName = "WasserXR License";
+              url = "https://github.com/LarsZauberer/WasserXR/blob/main/LICENSE.md";
+              free = false;
+            };
           };
         };
         devShells.default = pkgs.mkShell {
@@ -60,13 +75,10 @@
 
             pkgs.doxygen
 
-            pkgs.glfw
             pkgs.glib
-            pkgs.cglm
             pkgs.pkg-config
             pkgs.pcre2
             pkgs.libsysprof-capture
-            pkgs.assimp
           ];
 
           shellHook = ''

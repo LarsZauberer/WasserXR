@@ -39,9 +39,9 @@ int main(int argc, char *argv[]) {
   WXR_Scene *valid_scene2 = wxr_create_scene();
 
   TestCase cases[] = {
-      {null_scene, NULL, 1},                      // NULL scene
-      {valid_scene, "", 1},                       // Empty path
-      {valid_scene2, "./libwasserxr_core.so", 0}, // Valid plugin
+      {null_scene, NULL, 1},                                 // NULL scene
+      {valid_scene, "", 1},                                  // Empty path
+      {valid_scene2, "./libwasserxr_test_components.so", 0}, // Valid plugin
   };
 
   // Constructing Tests

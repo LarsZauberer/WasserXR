@@ -83,12 +83,14 @@ int main(int argc, char *argv[]) {
 
   WXR_Scene *multi_entity_scene = wxr_create_scene();
   wxr_add_entity(multi_entity_scene);
-  wxr_assert(0 == wxr_load_plugin(multi_entity_scene, "./libwasserxr_core.so"),
+  wxr_assert(0 == wxr_load_plugin(multi_entity_scene,
+                                  "./libwasserxr_test_components.so"),
              "Failed to load the plugin");
 
   WXR_Scene *multi_entity_scene2 = wxr_create_scene();
   wxr_add_entity(multi_entity_scene2);
-  wxr_assert(0 == wxr_load_plugin(multi_entity_scene2, "./libwasserxr_core.so"),
+  wxr_assert(0 == wxr_load_plugin(multi_entity_scene2,
+                                  "./libwasserxr_test_components.so"),
              "Failed to load the plugin");
 
   TestCase cases[] = {
