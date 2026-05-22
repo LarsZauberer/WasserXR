@@ -64,6 +64,56 @@
               };
             };
           };
+          docs = self.packages.${system}.default.overrideAttrs (_: {
+            pname = "WasserXR-docs";
+            postInstall = ''
+              mkdir -p $out/share/doc/wasserxr
+              cp -r docs/html $out/share/doc/wasserxr/html
+            '';
+          });
+          docker =
+            let
+              docsPackage = self.packages.${system}.docs;
+              nginxConf = pkgs.writeTextDir "etc/nginx/nginx.conf" ''
+                user nobody nobody;
+                events {}
+                http {
+                  include ${pkgs.nginx}/conf/mime.types;
+                  server {
+                    listen 80;
+                    root ${docsPackage}/share/doc/wasserxr/html;
+                    index index.html;
+                  }
+                }
+              '';
+            in
+            pkgs.dockerTools.buildLayeredImage {
+              name = "wasserxr-docs";
+              tag = "latest";
+              contents = [
+                pkgs.nginx
+                pkgs.dockerTools.fakeNss
+                docsPackage
+                nginxConf
+              ];
+              extraCommands = ''
+                mkdir -p var/log/nginx var/cache/nginx tmp
+              '';
+              config = {
+                Cmd = [
+                  "${pkgs.nginx}/bin/nginx"
+                  "-c"
+                  "/etc/nginx/nginx.conf"
+                  "-e"
+                  "/dev/stderr"
+                  "-g"
+                  "daemon off;"
+                ];
+                ExposedPorts = {
+                  "80/tcp" = { };
+                };
+              };
+            };
         };
         checks = {
           clang-tidy = self.packages.${system}.default.overrideAttrs (oldAttrs: {
