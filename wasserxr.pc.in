@@ -3,8 +3,9 @@ exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
-Name: wasserxr_ecs
+Name: wasserxr
 Description: WasserXR ECS library
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lwasserxr_ecs
+Requires: glib-2.0
+Libs: -L${libdir} -lwasserxr
 Cflags: -I${includedir}

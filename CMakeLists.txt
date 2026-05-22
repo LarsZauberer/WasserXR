@@ -24,11 +24,11 @@ pkg_check_modules(GLIB REQUIRED glib-2.0)
 
 # ECS
 file(GLOB_RECURSE ECS_SRC src/WasserXR/ecs/*.c)
-add_library(wasserxr_ecs STATIC ${ECS_SRC})
-target_include_directories(wasserxr_ecs PUBLIC include)
-target_include_directories(wasserxr_ecs PRIVATE src/WasserXR/ecs)
-target_include_directories(wasserxr_ecs PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(wasserxr_ecs PRIVATE ${GLIB_LIBRARIES})
+add_library(wasserxr STATIC ${ECS_SRC})
+target_include_directories(wasserxr PUBLIC include)
+target_include_directories(wasserxr PRIVATE src/WasserXR/ecs)
+target_include_directories(wasserxr PRIVATE ${GLIB_INCLUDE_DIRS})
+target_link_libraries(wasserxr PRIVATE ${GLIB_LIBRARIES})
 
 # ===
 # Install
@@ -36,7 +36,7 @@ target_link_libraries(wasserxr_ecs PRIVATE ${GLIB_LIBRARIES})
 
 include(GNUInstallDirs)
 
-install(TARGETS wasserxr_ecs
+install(TARGETS wasserxr
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -48,13 +48,13 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 # Create the .pc file for pkg-config
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/wasserxr_ecs.pc.in
-    ${CMAKE_CURRENT_BINARY_DIR}/wasserxr_ecs.pc
+    ${CMAKE_CURRENT_SOURCE_DIR}/wasserxr.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/wasserxr.pc
     @ONLY
 )
 
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/wasserxr_ecs.pc
+    ${CMAKE_CURRENT_BINARY_DIR}/wasserxr.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
 
@@ -91,12 +91,12 @@ enable_testing()
 add_library(wasserxr_test_components SHARED tests/test_components.c)
 target_include_directories(wasserxr_test_components PUBLIC include)
 target_include_directories(wasserxr_test_components PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(wasserxr_test_components PRIVATE wasserxr_ecs ${GLIB_LIBRARIES})
+target_link_libraries(wasserxr_test_components PRIVATE wasserxr ${GLIB_LIBRARIES})
 
 add_library(wasserxr_test_systems SHARED tests/test_systems.c)
 target_include_directories(wasserxr_test_systems PUBLIC include)
 target_include_directories(wasserxr_test_systems PRIVATE ${GLIB_INCLUDE_DIRS})
-target_link_libraries(wasserxr_test_systems PRIVATE wasserxr_ecs ${GLIB_LIBRARIES})
+target_link_libraries(wasserxr_test_systems PRIVATE wasserxr ${GLIB_LIBRARIES})
 
 # Helper function to simplify adding tests
 # Usage: add_wasserxr_test(test_name)
@@ -104,7 +104,7 @@ target_link_libraries(wasserxr_test_systems PRIVATE wasserxr_ecs ${GLIB_LIBRARIE
 function(add_wasserxr_test test_name)
     add_executable(${test_name} tests/${test_name}.c)
     target_include_directories(${test_name} PRIVATE ${GLIB_INCLUDE_DIRS})
-    target_link_libraries(${test_name} PRIVATE wasserxr_ecs ${GLIB_LIBRARIES})
+    target_link_libraries(${test_name} PRIVATE wasserxr ${GLIB_LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endfunction()
 
