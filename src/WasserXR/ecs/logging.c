@@ -25,7 +25,10 @@ static WXR_Log_Entry wxr_create_entry(WXR_Log_Level log_level, const char *fmt,
 static void wxr_destroy_entry(WXR_Log_Entry entry) { free(entry.msg); }
 
 static void wxr_send_entry_to_loggers(const WXR_Log_Entry entry) {
-  g_assert(wxr_loggers);
+  if (!wxr_loggers) {
+    printf("`wxr_loggers` is NULL during wxr_send_entry_to_loggers\n");
+    exit(1);
+  };
   for (unsigned int i = 0; i < wxr_loggers->len; i++) {
     const WXR_Logger logger = g_array_index(wxr_loggers, WXR_Logger, i);
     logger(entry);

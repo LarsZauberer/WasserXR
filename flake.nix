@@ -22,46 +22,77 @@
         lib = nixpkgs.lib;
       in
       {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "WasserXR";
-          version = "pre 0.1.0";
+        packages = {
+          default = pkgs.stdenv.mkDerivation {
+            pname = "WasserXR";
+            version = "pre 0.1.0";
 
-          src = pkgs.lib.cleanSourceWith {
-            src = ./.;
-            filter =
-              path: type:
-              let
-                baseName = builtins.baseNameOf path;
-              in
-              !(baseName == "build");
-          };
+            src = pkgs.lib.cleanSourceWith {
+              src = ./.;
+              filter =
+                path: type:
+                let
+                  baseName = builtins.baseNameOf path;
+                in
+                !(baseName == "build");
+            };
 
-          nativeBuildInputs = [
-            # Build packages
-            pkgs.clang-tools
-            pkgs.clang
-            pkgs.cmake
-            pkgs.doxygen
+            nativeBuildInputs = [
+              # Build packages
+              pkgs.clang-tools
+              pkgs.clang
+              pkgs.cmake
+              pkgs.doxygen
 
-            # Libraries
-            pkgs.glib
-            pkgs.pkg-config
-            pkgs.pcre2
-            pkgs.libsysprof-capture
-          ];
+              # Libraries
+              pkgs.glib
+              pkgs.pkg-config
+              pkgs.pcre2
+              pkgs.libsysprof-capture
+            ];
 
-          cmakeFlags = [
-            (lib.cmakeBool "WXR_TESTS" false)
-            (lib.cmakeBool "BUILD_DEBUG" false)
-          ];
+            cmakeFlags = [
+              (lib.cmakeBool "WXR_TESTS" false)
+              (lib.cmakeBool "BUILD_DEBUG" false)
+            ];
 
-          meta = {
-            license = {
-              fullName = "WasserXR License";
-              url = "https://github.com/LarsZauberer/WasserXR/blob/main/LICENSE.md";
-              free = false;
+            meta = {
+              license = {
+                fullName = "WasserXR License";
+                url = "https://github.com/LarsZauberer/WasserXR/blob/main/LICENSE.md";
+                free = false;
+              };
             };
           };
+        };
+        checks = {
+          clang-tidy = self.packages.${system}.default.overrideAttrs (oldAttrs: {
+            pname = "WasserXR-clang-tidy";
+            nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ pkgs.python3 ];
+            cmakeFlags = [
+              (lib.cmakeBool "WXR_TESTS" false)
+              (lib.cmakeBool "BUILD_DEBUG" false)
+            ];
+            doCheck = true;
+            checkPhase = ''
+              runHook preCheck
+              python3 $(command -v run-clang-tidy) -p . -warnings-as-errors='*' 'src/WasserXR/.*\.c$'
+              runHook postCheck
+            '';
+          });
+          default = self.packages.${system}.default.overrideAttrs (_: {
+            pname = "WasserXR-tests";
+            cmakeFlags = [
+              (lib.cmakeBool "WXR_TESTS" true)
+              (lib.cmakeBool "BUILD_DEBUG" false)
+            ];
+            doCheck = true;
+            checkPhase = ''
+              runHook preCheck
+              ctest --output-on-failure
+              runHook postCheck
+            '';
+          });
         };
         devShells.default = pkgs.mkShell {
           name = "devShell";
@@ -71,7 +102,6 @@
             pkgs.clang
             pkgs.cmake
             pkgs.gdb
-            pkgs.valgrind
 
             pkgs.doxygen
 

@@ -5,8 +5,8 @@
  * See LICENSE.md for details.
  */
 
-#ifndef _WXR_SCENE_INTERNAL_H
-#define _WXR_SCENE_INTERNAL_H
+#ifndef WXR_SCENE_INTERNAL_H
+#define WXR_SCENE_INTERNAL_H
 
 #include <WasserXR/ecs/Scene.h>
 #include <glib.h>
