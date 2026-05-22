@@ -52,8 +52,8 @@
             ];
 
             cmakeFlags = [
+              (lib.cmakeBool "BUILD_DEBUG" true)
               (lib.cmakeBool "WXR_TESTS" false)
-              (lib.cmakeBool "BUILD_DEBUG" false)
             ];
 
             meta = {
@@ -70,8 +70,8 @@
             pname = "WasserXR-clang-tidy";
             nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ pkgs.python3 ];
             cmakeFlags = [
+              (lib.cmakeBool "BUILD_DEBUG" true)
               (lib.cmakeBool "WXR_TESTS" false)
-              (lib.cmakeBool "BUILD_DEBUG" false)
             ];
             doCheck = true;
             checkPhase = ''
@@ -83,8 +83,8 @@
           default = self.packages.${system}.default.overrideAttrs (_: {
             pname = "WasserXR-tests";
             cmakeFlags = [
+              (lib.cmakeBool "BUILD_DEBUG" true)
               (lib.cmakeBool "WXR_TESTS" true)
-              (lib.cmakeBool "BUILD_DEBUG" false)
             ];
             doCheck = true;
             checkPhase = ''
