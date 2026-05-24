@@ -95,3 +95,9 @@ void *wxr_memcpy_till_null(const void *data, size_t element_size) {
 
   return copy;
 }
+
+char *wxr_append_string(const char *init, const char *suffix) {
+  GString *vertex_path_gstring = g_string_new(init);
+  g_string_append(vertex_path_gstring, suffix);
+  return g_string_free(vertex_path_gstring, FALSE);
+}

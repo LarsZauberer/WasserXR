@@ -25,3 +25,5 @@ char *wxr_read_file(const char *filepath);
 size_t wxr_len_till_null(const void *data, size_t element_size);
 
 void *wxr_memcpy_till_null(const void *data, size_t element_size);
+
+char *wxr_append_char_ptr(const char *init, const char *suffix);
