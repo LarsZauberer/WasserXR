@@ -1,8 +1,10 @@
 use core::{ffi::c_void, ptr::null_mut};
 use std::ffi::CString;
 
+use crate::scene::system::System;
+
 pub struct Plugin {
-    path: String,
+    path: Option<String>,
     fd: *mut c_void,
 }
 
@@ -22,20 +24,19 @@ impl Plugin {
         }
 
         Some(Plugin {
-            path: path.to_owned(),
+            path: Some(path.to_owned()),
             fd: fd,
         })
     }
 
-    pub fn get_abi_symbol_from_plugin<T>(&self, symbol: &str) -> Option<T> {
-        Self::get_abi_symbol_from_fd(self.fd, symbol)
+    pub fn new_static() -> Self {
+        Plugin {
+            path: None,
+            fd: libc::RTLD_DEFAULT,
+        }
     }
 
-    pub fn get_abi_symbol_from_static<T>(symbol: &str) -> Option<T> {
-        Self::get_abi_symbol_from_fd(libc::RTLD_DEFAULT, symbol)
-    }
-
-    fn get_abi_symbol_from_fd<T>(handler: *mut c_void, symbol: &str) -> Option<T> {
+    fn get_abi_symbol<T>(&self, symbol: &str) -> Option<T> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
         let symbol_cstring = CString::new(symbol.to_owned());
         if symbol_cstring.is_err() {
@@ -44,7 +45,7 @@ impl Plugin {
         let symbol_cstring = symbol_cstring.unwrap();
 
         // Safety: Will return either null or will return the function pointer
-        let ptr = unsafe { libc::dlsym(handler, symbol_cstring.as_ptr()) };
+        let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
         if ptr.is_null() {
             return None;
         }
@@ -79,7 +80,8 @@ mod tests {
 
     #[test]
     fn load_static_plugin() {
-        let func: Option<TestFunction> = Plugin::get_abi_symbol_from_static("my_func");
+        let plugin = Plugin::new_static();
+        let func: Option<TestFunction> = plugin.get_abi_symbol("my_func");
         assert!(func.is_some());
 
         let func: unsafe extern "C" fn(usize) -> usize = unsafe { std::mem::transmute(func) };
