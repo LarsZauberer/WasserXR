@@ -17,4 +17,4 @@ result
 .envrc
 
 # Rust
-/target
+target/
