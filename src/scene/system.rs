@@ -5,11 +5,9 @@ pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *mut Entity, *c
 pub type Attacher = unsafe extern "C" fn(*mut Scene);
 pub type Detacher = unsafe extern "C" fn(*mut Scene);
 
-pub struct System<'plugin, 'scene> {
+pub struct System {
     id: String,
     priority: usize,
-    scene: &'scene mut Scene,
-    plugin: Option<&'plugin Plugin>,
     selector: Option<Selector>,
     runner: Runner,
     attacher: Option<Attacher>,
@@ -17,13 +15,8 @@ pub struct System<'plugin, 'scene> {
     groups: usize,
 }
 
-impl<'plugin, 'scene> System<'plugin, 'scene> {
-    pub fn new(
-        scene: &'scene mut Scene,
-        id: &str,
-        priority: usize,
-        plugin: Option<&'plugin Plugin>,
-    ) -> Option<Self> {
+impl System {
+    pub fn new(scene: &mut Scene, plugin: &Plugin, id: &str, priority: usize) -> Option<Self> {
         let selector_symbol = "wxr_select_".to_owned() + id;
         let runner_symbol = "wxr_system_".to_owned() + id;
         let attacher_symbol = "wxr_attach_".to_owned() + id;
@@ -61,7 +54,6 @@ impl<'plugin, 'scene> System<'plugin, 'scene> {
                 Some(Self {
                     id: id.to_owned(),
                     priority,
-                    scene,
                     plugin: Some(plugin),
                     groups,
                     selector,
@@ -95,7 +87,6 @@ impl<'plugin, 'scene> System<'plugin, 'scene> {
                 Some(Self {
                     id: id.to_owned(),
                     priority,
-                    scene,
                     plugin: None,
                     groups,
                     selector,
@@ -107,14 +98,14 @@ impl<'plugin, 'scene> System<'plugin, 'scene> {
         }
     }
 
-    pub fn run(&mut self) {
-        let scene = self.scene as *mut Scene;
+    pub fn run(&mut self, scene: &mut Scene) {
+        let scene_ptr = scene as *mut Scene;
         let mut groups = vec![Vec::<*mut Entity>::new(); self.groups];
 
         if self.selector.is_some() {
             let selector = self.selector.unwrap();
-            for entity in self.scene.entities.iter_mut() {
-                let group = unsafe { selector(scene as *const Scene, entity as *const Entity) };
+            for entity in scene.entities.iter_mut() {
+                let group = unsafe { selector(scene_ptr as *const Scene, entity as *const Entity) };
                 if group >= 0 {
                     groups[group as usize].push(entity as *mut Entity);
                 }
@@ -127,24 +118,26 @@ impl<'plugin, 'scene> System<'plugin, 'scene> {
 
         unsafe { (self.runner)(scene, entities.as_ptr(), sizes.as_ptr()) }
     }
-}
 
-impl<'plugin, 'scene> Drop for System<'plugin, 'scene> {
-    fn drop(&mut self) {
+    pub fn destroy(&self, scene: &mut Scene) {
+        let scene_ptr = scene as *mut Scene;
+
         if self.detacher.is_some() {
-            let detacher = self.detacher.unwrap();
-            unsafe { detacher(self.scene as *mut Scene) };
+            unsafe {
+                let detacher = self.detacher.unwrap();
+                detacher(scene_ptr);
+            }
         }
     }
 }
 
-impl<'plugin, 'scene> PartialOrd for System<'plugin, 'scene> {
+impl<'plugin> PartialOrd for System<'plugin> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.priority.partial_cmp(&other.priority)
     }
 }
 
-impl<'plugin, 'scene> PartialEq for System<'plugin, 'scene> {
+impl<'plugin> PartialEq for System<'plugin> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
@@ -174,6 +167,8 @@ mod tests {
         let mut scene = Scene::new();
         let system = System::new(&mut scene, "basic_system", 100, None);
         assert!(system.is_some());
+        let system = system.unwrap();
+        system.destroy(&mut scene);
     }
 
     #[unsafe(no_mangle)]
@@ -215,6 +210,7 @@ mod tests {
         let system = System::new(&mut scene, "selecting_system", 100, None);
         assert!(system.is_some());
         let mut system = system.unwrap();
-        system.run();
+        system.run(&mut scene);
+        system.destroy(&mut scene);
     }
 }
