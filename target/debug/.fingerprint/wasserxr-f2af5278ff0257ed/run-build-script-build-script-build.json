@@ -1,1 +1,0 @@
-{"rustc":8999539375451197318,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[5115960225755462600,"build_script_build",false,5174764829373963334]],"local":[{"RerunIfChanged":{"output":"debug/build/wasserxr-f2af5278ff0257ed/output","paths":["build.rs","src/scene.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}
