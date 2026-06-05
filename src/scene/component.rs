@@ -106,6 +106,10 @@ impl Component {
         self.schema = schema;
         res
     }
+
+    pub fn get_id(&self) -> String {
+        self.id.to_owned()
+    }
 }
 
 impl Drop for Component {
@@ -178,11 +182,7 @@ impl ComponentField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        ffi::CStr,
-        os::raw::c_char,
-        sync::atomic::{AtomicUsize, Ordering},
-    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     // Testing Component Struct
     #[repr(C)]

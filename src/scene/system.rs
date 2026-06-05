@@ -158,7 +158,7 @@ mod tests {
 
             let first_entity = *first_group;
             assert!(!first_entity.is_null());
-            assert_eq!(*first_entity, 0);
+            assert_eq!((*first_entity).get_id(), 0);
         }
     }
 
