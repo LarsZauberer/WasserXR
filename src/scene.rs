@@ -44,6 +44,21 @@ impl Scene {
         }
     }
 
+    pub fn unload_plugin(&mut self, path: &str) -> bool {
+        if let Some(index) = self.plugins.iter().position(|plugin| {
+            if let Some(p) = plugin.get_path() {
+                p == path
+            } else {
+                false
+            }
+        }) {
+            self.plugins.remove(index);
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn add_system(&mut self, id: &str, priority: usize) -> bool {
         // We iterate in reverse order because we want to have the newest plugins that have been loaded
         // be prioritized and especially the static linked plugin be used at last
@@ -55,6 +70,19 @@ impl Scene {
 
         self.plugins = plugins;
         added
+    }
+
+    pub fn remove_system(&mut self, id: &str) -> bool {
+        let mut plugins = std::mem::take(&mut self.plugins);
+
+        let res = if let Some(plugin) = plugins.iter_mut().find(|plugin| plugin.system_exists(id)) {
+            plugin.remove_system(self, id)
+        } else {
+            false
+        };
+
+        self.plugins = plugins;
+        res
     }
 
     pub fn tick(&mut self) -> bool {

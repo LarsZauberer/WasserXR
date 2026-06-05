@@ -38,6 +38,10 @@ impl Plugin {
         }
     }
 
+    pub fn get_path(&self) -> Option<String> {
+        self.path.clone()
+    }
+
     pub fn get_abi_symbol<T>(&self, symbol: &str) -> Option<T> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
 
@@ -52,10 +56,6 @@ impl Plugin {
         }
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
         Some(func)
-    }
-
-    pub fn get_systems(&self) -> Vec<&System> {
-        self.systems.iter().map(|x| x).collect()
     }
 
     pub fn get_systems_mut(&mut self) -> Vec<&mut System> {
@@ -158,7 +158,7 @@ mod tests {
 
         assert!(plugin.add_system(&mut scene, "plugin_test_system", 100));
         assert!(!plugin.add_system(&mut scene, "plugin_test_system", 100));
-        assert_eq!(plugin.get_systems().len(), 1);
+        assert_eq!(plugin.get_systems_mut().len(), 1);
     }
 
     #[test]
@@ -167,6 +167,6 @@ mod tests {
         let mut plugin = Plugin::new_static();
 
         assert!(!plugin.add_system(&mut scene, "does_not_exist", 100));
-        assert!(plugin.get_systems().is_empty());
+        assert!(plugin.get_systems_mut().is_empty());
     }
 }
