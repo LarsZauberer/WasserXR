@@ -58,6 +58,10 @@ impl Plugin {
         self.systems.iter().map(|x| x).collect()
     }
 
+    pub fn get_systems_mut(&mut self) -> Vec<&mut System> {
+        self.systems.iter_mut().collect()
+    }
+
     pub fn system_exists(&self, id: &str) -> bool {
         let res = self.systems.iter().find(|x| x.get_id() == id);
         res.is_some()
