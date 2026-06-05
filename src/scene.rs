@@ -47,13 +47,21 @@ impl Scene {
 
     pub fn unload_plugin(&mut self, path: &str) -> bool {
         if let Some(index) = self.plugins.iter().position(|plugin| {
+            // This ensures that the static linking plugin cannot be unloaded
             if let Some(p) = plugin.get_path() {
                 p == path
             } else {
                 false
             }
         }) {
-            self.plugins.remove(index);
+            let mut plugin = self.plugins.remove(index);
+            let _ = plugin.remove_all_systems(self);
+            let components = plugin.remove_all_components();
+            for component in components.iter() {
+                for entity in self.entities.iter_mut() {
+                    let _ = entity.remove_component(component);
+                }
+            }
             true
         } else {
             false
@@ -164,9 +172,18 @@ impl Default for Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::{
+        os::raw::c_void,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     static TICK_TEST_SYSTEM_RUNS: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_COMPONENT_DESTROYS: AtomicUsize = AtomicUsize::new(0);
+
+    #[repr(C)]
+    struct SceneTestComponent {
+        value: i64,
+    }
 
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_tick_test_system(
@@ -175,6 +192,19 @@ mod tests {
         _groups: *const usize,
     ) {
         TICK_TEST_SYSTEM_RUNS.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_scene_test_component() -> *mut c_void {
+        Box::into_raw(Box::new(SceneTestComponent { value: 0 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_scene_test_component(component: *mut c_void) {
+        SCENE_COMPONENT_DESTROYS.fetch_add(1, Ordering::SeqCst);
+        unsafe {
+            drop(Box::from_raw(component as *mut SceneTestComponent));
+        }
     }
 
     #[test]
@@ -199,5 +229,39 @@ mod tests {
         assert!(scene.tick());
 
         assert_eq!(TICK_TEST_SYSTEM_RUNS.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn add_component_attaches_component_to_entity() {
+        let mut scene = Scene::new();
+        let entity_id = scene.add_entity();
+
+        assert!(scene.add_component(entity_id, "scene_test_component"));
+        assert!(scene.entities[0].component_exists("scene_test_component"));
+    }
+
+    #[test]
+    fn add_component_missing_entity() {
+        let mut scene = Scene::new();
+
+        assert!(!scene.add_component(0, "scene_test_component"));
+    }
+
+    #[test]
+    fn remove_component_detaches_component_from_entity() {
+        let mut scene = Scene::new();
+        let entity_id = scene.add_entity();
+
+        assert!(scene.add_component(entity_id, "scene_test_component"));
+        assert!(scene.remove_component(entity_id, "scene_test_component"));
+        assert!(!scene.entities[0].component_exists("scene_test_component"));
+    }
+
+    #[test]
+    fn remove_component_missing_on_entity() {
+        let mut scene = Scene::new();
+        let entity_id = scene.add_entity();
+
+        assert!(!scene.remove_component(entity_id, "scene_test_component"));
     }
 }
