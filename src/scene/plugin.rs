@@ -95,6 +95,40 @@ impl Plugin {
         system.destroy(scene);
         true
     }
+
+    pub fn component_exists(&self, id: &str) -> bool {
+        let res = self.components.iter().find(|x| x.get_id() == id);
+        res.is_some()
+    }
+
+    pub fn add_component(&mut self, id: &str) -> bool {
+        if self.component_exists(id) {
+            return false;
+        }
+
+        let component = Component::new(self, id);
+
+        match component {
+            Some(component) => {
+                self.components.push(component);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn remove_component(&mut self, id: &str) -> bool {
+        let Some(index) = self
+            .components
+            .iter()
+            .position(|component| component.get_id() == id)
+        else {
+            return false;
+        };
+
+        let _ = self.components.remove(index);
+        true
+    }
 }
 
 impl Drop for Plugin {

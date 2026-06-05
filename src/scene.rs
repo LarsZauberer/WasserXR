@@ -1,13 +1,12 @@
-use crate::scene::plugin::Plugin;
+use crate::scene::{entity::Entity, plugin::Plugin};
 
 mod component;
+mod entity;
 mod plugin;
 mod system;
 
-pub type Entity = usize;
-
 pub struct Scene {
-    entity_counter: Entity,
+    entity_counter: usize,
     entities: Vec<Entity>,
     plugins: Vec<Plugin>,
 }
@@ -21,19 +20,20 @@ impl Scene {
         }
     }
 
-    pub fn add_entity(&mut self) -> Entity {
-        let entity = self.entity_counter;
+    pub fn add_entity(&mut self) -> usize {
+        let entity = Entity::new(self.entity_counter);
         self.entity_counter += 1;
+        let res = entity.get_id();
         self.entities.push(entity);
-        entity
+        res
     }
 
     pub fn get_entities_count(&self) -> usize {
         self.entities.len()
     }
 
-    pub fn get_entities(&self) -> &[Entity] {
-        &self.entities
+    pub fn get_entities(&self) -> Vec<usize> {
+        self.entities.iter().map(|entity| entity.get_id()).collect()
     }
 
     pub fn load_plugin(&mut self, path: &str) -> bool {
@@ -102,6 +102,56 @@ impl Scene {
 
         self.plugins = plugins;
         true
+    }
+
+    pub fn add_component(&mut self, entity_id: usize, component_id: &str) -> bool {
+        let Some(entity_index) = self
+            .entities
+            .iter()
+            .position(|entity| entity.get_id() == entity_id)
+        else {
+            return false;
+        };
+
+        // We iterate in reverse order because we want to have the newest plugins that have been loaded
+        // be prioritized and especially the static linked plugin be used at last
+        let mut plugins = std::mem::take(&mut self.plugins);
+        let added = plugins
+            .iter_mut()
+            .rev()
+            .any(|plugin| plugin.add_component(component_id));
+
+        self.plugins = plugins;
+        self.entities[entity_index].add_component(component_id);
+
+        added
+    }
+
+    pub fn remove_component(&mut self, entity_id: usize, component_id: &str) -> bool {
+        let Some(entity_index) = self
+            .entities
+            .iter()
+            .position(|entity| entity.get_id() == entity_id)
+        else {
+            return false;
+        };
+
+        if !self.entities[entity_index].component_exists(component_id) {
+            return false;
+        }
+
+        let mut plugins = std::mem::take(&mut self.plugins);
+        let res = if let Some(plugin) = plugins
+            .iter_mut()
+            .find(|plugin| plugin.component_exists(component_id))
+        {
+            plugin.remove_component(component_id)
+        } else {
+            false
+        };
+
+        self.entities[entity_index].remove_component(component_id);
+        res
     }
 }
 
