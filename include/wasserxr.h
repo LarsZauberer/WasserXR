@@ -6,47 +6,4 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct Scene Scene;
-
-typedef size_t Entity;
-
-#ifdef __cplusplus
-extern "C" {
-#endif // __cplusplus
-
-struct Scene *wxr_create_scene(void);
-
-/**
- * # Safety
- *
- * `scene` must be a pointer returned by `wxr_create_scene` that has not already been destroyed.
- */
-void wxr_destroy_scene(struct Scene *scene);
-
-/**
- * # Safety
- *
- * `scene` must be null or a valid, uniquely borrowed `WXRScene` pointer.
- */
-Entity wxr_add_entity(struct Scene *scene);
-
-/**
- * # Safety
- *
- * `scene` must be null or a valid `WXRScene` pointer.
- */
-size_t wxr_get_entities_count(const struct Scene *scene);
-
-/**
- * # Safety
- *
- * `scene` must be null or a valid `WXRScene` pointer. `out` must be null or point to enough
- * writable memory for `capacity` entities.
- */
-void wxr_get_entities(const struct Scene *scene, Entity *out, size_t capacity);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
-
 #endif  /* WASSERXR_H */
