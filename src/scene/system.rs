@@ -30,10 +30,9 @@ impl System {
         let groups: Option<*const usize> = plugin.get_abi_symbol(&groups_symbol);
 
         // A system cannot exist without a system function
-        if runner.is_none() {
+        let Some(runner) = runner else {
             return None;
-        }
-        let runner = runner.unwrap();
+        };
 
         let groups = match groups {
             Some(ptr) => unsafe { ptr.read() },
@@ -41,8 +40,7 @@ impl System {
         };
 
         // Run Attacher
-        if attacher.is_some() {
-            let attacher = attacher.unwrap();
+        if let Some(attacher) = attacher {
             unsafe { attacher(scene as *mut Scene) };
         }
 
@@ -61,8 +59,7 @@ impl System {
         let scene_ptr = scene as *mut Scene;
         let mut groups = vec![Vec::<*mut Entity>::new(); self.groups];
 
-        if self.selector.is_some() {
-            let selector = self.selector.unwrap();
+        if let Some(selector) = self.selector {
             for entity in scene.entities.iter_mut() {
                 let group = unsafe { selector(scene_ptr as *const Scene, entity as *const Entity) };
                 if group >= 0 {
@@ -81,9 +78,8 @@ impl System {
     pub fn destroy(&self, scene: &mut Scene) {
         let scene_ptr = scene as *mut Scene;
 
-        if self.detacher.is_some() {
+        if let Some(detacher) = self.detacher {
             unsafe {
-                let detacher = self.detacher.unwrap();
                 detacher(scene_ptr);
             }
         }

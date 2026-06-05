@@ -36,12 +36,12 @@ impl Scene {
     }
 
     pub fn load_plugin(&mut self, path: &str) -> bool {
-        let plugin = plugin::Plugin::new(path);
-        if plugin.is_none() {
-            return false;
+        if let Some(plugin) = plugin::Plugin::new(path) {
+            self.plugins.push(plugin);
+            true
+        } else {
+            false
         }
-        self.plugins.push(plugin.unwrap());
-        true
     }
 
     pub fn add_system(&mut self, id: &str, priority: usize) -> bool {

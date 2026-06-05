@@ -13,11 +13,9 @@ pub struct Plugin {
 impl Plugin {
     pub fn new(path: &str) -> Option<Self> {
         // Create the symbol
-        let convert_path = CString::new(path.to_owned());
-        if convert_path.is_err() {
+        let Ok(convert_path) = CString::new(path.to_owned()) else {
             return None;
-        }
-        let convert_path = convert_path.unwrap();
+        };
 
         // Open the library
         let fd: *mut c_void = unsafe { libc::dlopen(convert_path.as_ptr(), libc::RTLD_NOW) };
@@ -42,11 +40,10 @@ impl Plugin {
 
     pub fn get_abi_symbol<T>(&self, symbol: &str) -> Option<T> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
-        let symbol_cstring = CString::new(symbol.to_owned());
-        if symbol_cstring.is_err() {
+
+        let Ok(symbol_cstring) = CString::new(symbol.to_owned()) else {
             return None;
-        }
-        let symbol_cstring = symbol_cstring.unwrap();
+        };
 
         // Safety: Will return either null or will return the function pointer
         let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
