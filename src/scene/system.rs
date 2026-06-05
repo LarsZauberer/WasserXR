@@ -10,7 +10,6 @@ pub struct System {
     priority: usize,
     selector: Option<Selector>,
     runner: Runner,
-    attacher: Option<Attacher>,
     detacher: Option<Detacher>,
     groups: usize,
 }
@@ -50,7 +49,6 @@ impl System {
             groups,
             selector,
             runner,
-            attacher,
             detacher,
         })
     }
