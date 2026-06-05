@@ -1,5 +1,6 @@
 use crate::scene::plugin::Plugin;
 
+mod component;
 mod plugin;
 mod system;
 

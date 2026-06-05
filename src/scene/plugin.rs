@@ -1,13 +1,14 @@
 use core::{ffi::c_void, ptr::null_mut};
 use std::ffi::CString;
 
-use crate::scene::{Scene, system::System};
+use crate::scene::{Scene, component::Component, system::System};
 
 pub struct Plugin {
     path: Option<String>,
     fd: *mut c_void,
 
     systems: Vec<System>,
+    components: Vec<Component>,
 }
 
 impl Plugin {
@@ -27,6 +28,7 @@ impl Plugin {
             path: Some(path.to_owned()),
             fd: fd,
             systems: Vec::new(),
+            components: Vec::new(),
         })
     }
 
@@ -35,6 +37,7 @@ impl Plugin {
             path: None,
             fd: libc::RTLD_DEFAULT,
             systems: Vec::new(),
+            components: Vec::new(),
         }
     }
 
