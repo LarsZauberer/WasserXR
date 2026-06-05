@@ -1,4 +1,4 @@
-use std::{ffi::c_void, ptr::null_mut};
+use crate::scene::plugin::Plugin;
 
 mod plugin;
 mod system;
@@ -8,8 +8,7 @@ pub type Entity = usize;
 pub struct Scene {
     entity_counter: Entity,
     entities: Vec<Entity>,
-    plugins: Vec<plugin::Plugin>,
-    systems: Vec<system::System>,
+    plugins: Vec<Plugin>,
 }
 
 impl Scene {
@@ -17,8 +16,7 @@ impl Scene {
         Self {
             entity_counter: 0,
             entities: Vec::new(),
-            plugins: Vec::new(),
-            systems: Vec::new(),
+            plugins: vec![Plugin::new_static()],
         }
     }
 
@@ -47,24 +45,16 @@ impl Scene {
     }
 
     pub fn add_system(&mut self, id: &str, priority: usize) -> bool {
-        let mut system: Option<system::System> = None;
-        for i in self.plugins.iter() {
-            system = system::System::new(self, id, priority, Some(i));
-            if system.is_some() {
-                break;
-            }
-        }
-        if system.is_none() {
-            system = system::System::new(self, id, priority, None);
-        }
+        // We iterate in reverse order because we want to have the newest plugins that have been loaded
+        // be prioritized and especially the static linked plugin be used at last
+        let mut plugins = std::mem::take(&mut self.plugins);
+        let added = plugins
+            .iter_mut()
+            .rev()
+            .any(|plugin| plugin.add_system(self, id, priority));
 
-        if system.is_none() {
-            false
-        } else {
-            let system = system.unwrap();
-            self.systems.push(system);
-            true
-        }
+        self.plugins = plugins;
+        added
     }
 }
 

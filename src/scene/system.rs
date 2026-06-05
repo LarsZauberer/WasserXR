@@ -22,80 +22,39 @@ impl System {
         let attacher_symbol = "wxr_attach_".to_owned() + id;
         let detacher_symbol = "wxr_detach_".to_owned() + id;
         let groups_symbol = "WXR_GROUPS_".to_owned() + &id.to_uppercase();
-        match plugin {
-            Some(plugin) => {
-                let selector: Option<Selector> =
-                    plugin.get_abi_symbol_from_plugin(&selector_symbol);
-                let runner: Option<Runner> = plugin.get_abi_symbol_from_plugin(&runner_symbol);
-                let attacher: Option<Attacher> =
-                    plugin.get_abi_symbol_from_plugin(&attacher_symbol);
-                let detacher: Option<Detacher> =
-                    plugin.get_abi_symbol_from_plugin(&detacher_symbol);
-                let groups: Option<*const usize> =
-                    plugin.get_abi_symbol_from_plugin(&groups_symbol);
 
-                // A system cannot exist without a system function
-                if runner.is_none() {
-                    return None;
-                }
-                let runner = runner.unwrap();
+        let selector: Option<Selector> = plugin.get_abi_symbol(&selector_symbol);
+        let runner: Option<Runner> = plugin.get_abi_symbol(&runner_symbol);
+        let attacher: Option<Attacher> = plugin.get_abi_symbol(&attacher_symbol);
+        let detacher: Option<Detacher> = plugin.get_abi_symbol(&detacher_symbol);
+        let groups: Option<*const usize> = plugin.get_abi_symbol(&groups_symbol);
 
-                let groups = match groups {
-                    Some(ptr) => unsafe { ptr.read() },
-                    None => 0,
-                };
-
-                // Run Attacher
-                if attacher.is_some() {
-                    let attacher = attacher.unwrap();
-                    unsafe { attacher(scene as *mut Scene) };
-                }
-
-                Some(Self {
-                    id: id.to_owned(),
-                    priority,
-                    plugin: Some(plugin),
-                    groups,
-                    selector,
-                    runner,
-                    attacher,
-                    detacher,
-                })
-            }
-            None => {
-                let selector: Option<Selector> =
-                    Plugin::get_abi_symbol_from_static(&selector_symbol);
-                let runner: Option<Runner> = Plugin::get_abi_symbol_from_static(&runner_symbol);
-                let attacher: Option<Attacher> =
-                    Plugin::get_abi_symbol_from_static(&attacher_symbol);
-                let detacher: Option<Detacher> =
-                    Plugin::get_abi_symbol_from_static(&detacher_symbol);
-                let groups: Option<*const usize> =
-                    Plugin::get_abi_symbol_from_static(&groups_symbol);
-
-                // A system cannot exist without a system function
-                if runner.is_none() {
-                    return None;
-                }
-                let runner = runner.unwrap();
-
-                let groups = match groups {
-                    Some(ptr) => unsafe { ptr.read() },
-                    None => 0,
-                };
-
-                Some(Self {
-                    id: id.to_owned(),
-                    priority,
-                    plugin: None,
-                    groups,
-                    selector,
-                    runner,
-                    attacher,
-                    detacher,
-                })
-            }
+        // A system cannot exist without a system function
+        if runner.is_none() {
+            return None;
         }
+        let runner = runner.unwrap();
+
+        let groups = match groups {
+            Some(ptr) => unsafe { ptr.read() },
+            None => 0,
+        };
+
+        // Run Attacher
+        if attacher.is_some() {
+            let attacher = attacher.unwrap();
+            unsafe { attacher(scene as *mut Scene) };
+        }
+
+        Some(Self {
+            id: id.to_owned(),
+            priority,
+            groups,
+            selector,
+            runner,
+            attacher,
+            detacher,
+        })
     }
 
     pub fn run(&mut self, scene: &mut Scene) {
@@ -129,15 +88,19 @@ impl System {
             }
         }
     }
+
+    pub fn get_id(&self) -> String {
+        self.id.to_owned()
+    }
 }
 
-impl<'plugin> PartialOrd for System<'plugin> {
+impl PartialOrd for System {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.priority.partial_cmp(&other.priority)
     }
 }
 
-impl<'plugin> PartialEq for System<'plugin> {
+impl PartialEq for System {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
@@ -150,7 +113,8 @@ mod tests {
     #[test]
     fn create_system_non_existent() {
         let mut scene = Scene::new();
-        let system = System::new(&mut scene, "asdf", 100, None);
+        let plugin = Plugin::new_static();
+        let system = System::new(&mut scene, &plugin, "asdf", 100);
         assert!(system.is_none());
     }
 
@@ -165,7 +129,8 @@ mod tests {
     #[test]
     fn create_system() {
         let mut scene = Scene::new();
-        let system = System::new(&mut scene, "basic_system", 100, None);
+        let plugin = Plugin::new_static();
+        let system = System::new(&mut scene, &plugin, "basic_system", 100);
         assert!(system.is_some());
         let system = system.unwrap();
         system.destroy(&mut scene);
@@ -206,8 +171,9 @@ mod tests {
     #[test]
     fn run_system() {
         let mut scene = Scene::new();
+        let plugin = Plugin::new_static();
         let _entity = scene.add_entity();
-        let system = System::new(&mut scene, "selecting_system", 100, None);
+        let system = System::new(&mut scene, &plugin, "selecting_system", 100);
         assert!(system.is_some());
         let mut system = system.unwrap();
         system.run(&mut scene);
