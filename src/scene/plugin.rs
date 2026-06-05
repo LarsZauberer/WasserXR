@@ -96,6 +96,17 @@ impl Plugin {
         true
     }
 
+    pub fn remove_all_systems(&mut self, scene: &mut Scene) -> Vec<String> {
+        let mut systems = std::mem::take(&mut self.systems);
+        systems
+            .iter_mut()
+            .map(|system| {
+                self.remove_system(scene, &system.get_id());
+                system.get_id()
+            })
+            .collect()
+    }
+
     pub fn component_exists(&self, id: &str) -> bool {
         let res = self.components.iter().find(|x| x.get_id() == id);
         res.is_some()
@@ -128,6 +139,17 @@ impl Plugin {
 
         let _ = self.components.remove(index);
         true
+    }
+
+    pub fn remove_all_components(&mut self) -> Vec<String> {
+        let mut components = std::mem::take(&mut self.components);
+        components
+            .iter_mut()
+            .map(|component| {
+                self.remove_component(&component.get_id());
+                component.get_id()
+            })
+            .collect()
     }
 }
 

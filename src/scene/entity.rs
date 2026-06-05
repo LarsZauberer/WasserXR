@@ -33,8 +33,13 @@ impl Entity {
         self.components.iter().find(|x| *x == id).is_some()
     }
 
-    pub fn add_component(&mut self, id: &str) {
-        self.components.push(id.to_string());
+    pub fn add_component(&mut self, id: &str) -> bool {
+        if self.component_exists(id) {
+            false
+        } else {
+            self.components.push(id.to_string());
+            true
+        }
     }
 
     pub fn remove_component(&mut self, id: &str) -> bool {
@@ -59,5 +64,22 @@ impl Debug for Entity {
             .field("id", &self.id)
             .field("name", &self.name)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn component_lifecycle() {
+        let mut entity = Entity::new(0);
+
+        assert!(!entity.component_exists("hello"));
+        assert!(entity.add_component("hello"));
+        assert!(!entity.add_component("hello"));
+        assert!(entity.component_exists("hello"));
+        assert!(entity.remove_component("hello"));
+        assert!(!entity.remove_component("world"));
     }
 }
