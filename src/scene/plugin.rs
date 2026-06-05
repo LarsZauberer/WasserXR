@@ -1,11 +1,13 @@
 use core::{ffi::c_void, ptr::null_mut};
 use std::ffi::CString;
 
-use crate::scene::system::System;
+use crate::scene::{Scene, system::System};
 
 pub struct Plugin {
     path: Option<String>,
     fd: *mut c_void,
+
+    systems: Vec<System>,
 }
 
 impl Plugin {
@@ -26,6 +28,7 @@ impl Plugin {
         Some(Plugin {
             path: Some(path.to_owned()),
             fd: fd,
+            systems: Vec::new(),
         })
     }
 
@@ -33,10 +36,11 @@ impl Plugin {
         Plugin {
             path: None,
             fd: libc::RTLD_DEFAULT,
+            systems: Vec::new(),
         }
     }
 
-    fn get_abi_symbol<T>(&self, symbol: &str) -> Option<T> {
+    pub fn get_abi_symbol<T>(&self, symbol: &str) -> Option<T> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
         let symbol_cstring = CString::new(symbol.to_owned());
         if symbol_cstring.is_err() {
@@ -51,6 +55,41 @@ impl Plugin {
         }
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
         Some(func)
+    }
+
+    pub fn get_systems(&self) -> Vec<&System> {
+        self.systems.iter().map(|x| x).collect()
+    }
+
+    pub fn system_exists(&self, id: &str) -> bool {
+        let res = self.systems.iter().find(|x| x.get_id() == id);
+        res.is_some()
+    }
+
+    pub fn add_system(&mut self, scene: &mut Scene, id: &str, priority: usize) -> bool {
+        if self.system_exists(id) {
+            return false;
+        }
+
+        let system = System::new(scene, self, id, priority);
+
+        match system {
+            Some(system) => {
+                self.systems.push(system);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn remove_system(&mut self, scene: &mut Scene, id: &str) -> bool {
+        let Some(index) = self.systems.iter().position(|system| system.get_id() == id) else {
+            return false;
+        };
+
+        let system = self.systems.remove(index);
+        system.destroy(scene);
+        true
     }
 }
 
@@ -70,6 +109,7 @@ impl Drop for Plugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::Entity;
 
     #[unsafe(no_mangle)]
     unsafe extern "C" fn my_func(my_num: usize) -> usize {
@@ -88,5 +128,44 @@ mod tests {
         let res = unsafe { func(5) };
 
         assert_eq!(res, 25);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_plugin_test_system(
+        _scene: *mut Scene,
+        _entities: *const *const *mut Entity,
+        _groups: *const usize,
+    ) {
+    }
+
+    #[test]
+    fn add_and_remove_system() {
+        let mut scene = Scene::new();
+        let mut plugin = Plugin::new_static();
+
+        assert!(plugin.add_system(&mut scene, "plugin_test_system", 100));
+        assert!(plugin.system_exists("plugin_test_system"));
+
+        assert!(plugin.remove_system(&mut scene, "plugin_test_system"));
+        assert!(!plugin.system_exists("plugin_test_system"));
+    }
+
+    #[test]
+    fn add_same_system_twice() {
+        let mut scene = Scene::new();
+        let mut plugin = Plugin::new_static();
+
+        assert!(plugin.add_system(&mut scene, "plugin_test_system", 100));
+        assert!(!plugin.add_system(&mut scene, "plugin_test_system", 100));
+        assert_eq!(plugin.get_systems().len(), 1);
+    }
+
+    #[test]
+    fn add_non_existent_system() {
+        let mut scene = Scene::new();
+        let mut plugin = Plugin::new_static();
+
+        assert!(!plugin.add_system(&mut scene, "does_not_exist", 100));
+        assert!(plugin.get_systems().is_empty());
     }
 }
