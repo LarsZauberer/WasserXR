@@ -151,6 +151,16 @@ impl Plugin {
             })
             .collect()
     }
+
+    pub fn get_component(&self, component_id: &str) -> Option<&Component> {
+        self.components.iter().find(|x| x.get_id() == component_id)
+    }
+
+    pub fn get_component_mut(&mut self, component_id: &str) -> Option<&mut Component> {
+        self.components
+            .iter_mut()
+            .find(|x| x.get_id() == component_id)
+    }
 }
 
 impl Drop for Plugin {

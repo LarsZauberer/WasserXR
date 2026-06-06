@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-use crate::scene::component::Component;
-
 pub struct Entity {
     id: usize,
     name: String,
