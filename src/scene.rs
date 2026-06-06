@@ -1,3 +1,5 @@
+use std::ffi::c_void;
+
 use crate::scene::{entity::Entity, plugin::Plugin};
 
 mod component;
@@ -158,8 +160,40 @@ impl Scene {
             false
         };
 
+        self.plugins = plugins;
         self.entities[entity_index].remove_component(component_id);
         res
+    }
+
+    pub fn get(
+        &self,
+        entity_id: usize,
+        component_id: &str,
+        field_id: &str,
+    ) -> Option<*const c_void> {
+        let Some(entity_index) = self
+            .entities
+            .iter()
+            .position(|entity| entity.get_id() == entity_id)
+        else {
+            return None;
+        };
+
+        if !self.entities[entity_index].component_exists(component_id) {
+            return None;
+        }
+
+        if let Some(plugin) = self
+            .plugins
+            .iter()
+            .find(|plugin| plugin.component_exists(component_id))
+        {
+            let component = plugin.get_component(component_id).unwrap();
+            let data = component.get(field_id);
+            if data.is_null() { None } else { Some(data) }
+        } else {
+            None
+        }
     }
 }
 
