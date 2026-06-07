@@ -64,11 +64,23 @@ impl SystemFunctions {
     }
 
     pub fn attach(&self, scene: &mut Scene) {
-        todo!()
+        let Some(attacher) = self.attacher else {
+            return;
+        };
+
+        unsafe {
+            attacher(scene as *mut Scene);
+        }
     }
 
     pub fn detach(&self, scene: &mut Scene) {
-        todo!()
+        let Some(detacher) = self.detacher else {
+            return;
+        };
+
+        unsafe {
+            detacher(scene as *mut Scene);
+        }
     }
 
     pub fn run(&self, scene: &mut Scene) {
