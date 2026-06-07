@@ -1,6 +1,7 @@
 pub enum PluginError {
-    LinkingError,
+    LinkingError(String),
     MissingSymbol,
+    InvalidSymbol,
 }
 
 pub enum EntityError {
