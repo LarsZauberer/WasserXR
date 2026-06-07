@@ -137,7 +137,15 @@ pub struct System {
 
 impl System {
     pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
-        todo!()
+        let plugin_id = plugin.get_id().to_owned();
+        let functions = SystemFunctions::new(&id, plugin)?;
+
+        Ok(Self {
+            id,
+            plugin_id,
+            priority,
+            functions,
+        })
     }
 
     pub fn get_functions(&self) -> SystemFunctions {
@@ -146,6 +154,10 @@ impl System {
 
     pub fn get_plugin_id(&self) -> &str {
         &self.plugin_id
+    }
+
+    pub fn get_id(&self) -> &str {
+        &self.id
     }
 }
 

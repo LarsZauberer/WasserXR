@@ -63,6 +63,13 @@ impl Plugin {
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
         Ok(func)
     }
+
+    pub fn get_id(&self) -> &str {
+        match &self.path {
+            Some(path) => path,
+            None => "",
+        }
+    }
 }
 
 impl Drop for Plugin {
