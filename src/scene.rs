@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     component::Component,
     entity::Entity,
-    error::SceneError,
+    error::{PluginError, SceneError},
     plugin::Plugin,
     system::{System, SystemFunctions},
 };
@@ -31,16 +31,20 @@ impl Scene {
         if self.plugins.contains_key(&path) {
             Err(SceneError::PluginAlreadyLoaded)
         } else {
-            let plugin =
-                Plugin::new(path.clone()).map_err(|error| SceneError::PluginLoading(error))?;
+            let plugin = Plugin::new(path.clone()).map_err(|error| match error {
+                PluginError::LinkingError(msg) => {
+                    log::error!("Linking Error: {}", msg);
+                    SceneError::PluginLoading(PluginError::LinkingError(msg))
+                }
+                _ => SceneError::PluginLoading(error),
+            })?;
             self.plugins.insert(path, plugin);
             Ok(())
         }
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
-        if let Some(plugin) = self.plugins.remove(path) {
-            plugin.destroy();
+        if let Some(_) = self.plugins.remove(path) {
             Ok(())
         } else {
             Err(SceneError::PluginNotFound)
