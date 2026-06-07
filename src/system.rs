@@ -180,3 +180,72 @@ impl Ord for System {
 }
 
 impl Eq for System {}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
+
+    // Test Runner not found
+
+    #[test]
+    fn test_nonexistent_runner_systemfunctions() {
+        let plugin = Plugin::new_static();
+
+        let Err(err) = SystemFunctions::new("no_runner", &plugin) else {
+            panic!("SystemFunctions didn't throw an error");
+        };
+        assert_eq!(
+            err,
+            SystemError::MissingSymbol("wxr_system_no_runner".to_owned())
+        );
+    }
+
+    static WITH_RUNNER_ATOMIC: AtomicUsize = AtomicUsize::new(0);
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_with_runner(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        WITH_RUNNER_ATOMIC.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn test_with_runner_systemfunctions_load() {
+        let plugin = Plugin::new_static();
+        let functions = SystemFunctions::new("with_runner", &plugin);
+        match functions {
+            Ok(functions) => {
+                assert_eq!(functions.groups, 0);
+                assert!(functions.selector.is_none());
+                assert!(functions.attacher.is_none());
+                assert!(functions.detacher.is_none());
+            }
+            Err(err) => {
+                panic!("SystemFunctions threw an error: {:?}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn test_with_runner_sytemfunctions_run() {
+        WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
+
+        let mut scene = Scene::new();
+        let plugin = Plugin::new_static();
+        let functions = SystemFunctions::new("with_runner", &plugin);
+        match functions {
+            Ok(functions) => {
+                functions.run(&mut scene);
+
+                assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
+            }
+            Err(err) => {
+                panic!("SystemFunctions threw an error: {:?}", err);
+            }
+        }
+    }
+}
