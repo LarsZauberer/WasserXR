@@ -1,12 +1,13 @@
+use uuid::Uuid;
+
 use crate::{
-    entity::Entity,
     error::{PluginError, SystemError},
     plugin::{Plugin, create_symbol},
     scene::Scene,
 };
 
-pub type Selector = unsafe extern "C" fn(*const Scene, *const Entity) -> i32;
-pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *mut Entity, *const usize);
+pub type Selector = unsafe extern "C" fn(*const Scene, *const u8) -> i32;
+pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *const u8, *const usize);
 pub type Attacher = unsafe extern "C" fn(*mut Scene);
 pub type Detacher = unsafe extern "C" fn(*mut Scene);
 
@@ -84,7 +85,35 @@ impl SystemFunctions {
     }
 
     pub fn run(&self, scene: &mut Scene) {
-        todo!()
+        let mut entities: Vec<Vec<Uuid>> = vec![Vec::new(); self.groups];
+
+        if let Some(selector) = self.selector {
+            let full_entities = scene.get_entities();
+            for (entity, group) in full_entities.iter().map(|id| {
+                (id, unsafe {
+                    selector(scene as *const Scene, id.as_bytes() as *const u8)
+                })
+            }) {
+                if group < 0 {
+                    continue;
+                }
+                entities[group as usize].push(**entity);
+            }
+        }
+
+        let sizes: Vec<usize> = entities.iter().map(|vec| vec.len()).collect();
+
+        let entities_ptr: Vec<Vec<*const u8>> = entities
+            .iter()
+            .map(|vec| vec.iter().map(|id| id.as_bytes() as *const u8).collect())
+            .collect();
+        let group_ptr: Vec<*const *const u8> =
+            entities_ptr.iter().map(|vec| vec.as_ptr()).collect();
+        let sizes_ptr = sizes.as_ptr();
+
+        unsafe {
+            (self.runner)(scene as *mut Scene, group_ptr.as_ptr(), sizes_ptr);
+        }
     }
 
     fn map_symbol_option<T>(res: Result<T, PluginError>) -> Result<Option<T>, SystemError> {

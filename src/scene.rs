@@ -114,6 +114,10 @@ impl Scene {
         }
     }
 
+    pub fn get_entities(&self) -> Vec<&Uuid> {
+        self.entities.keys().collect()
+    }
+
     pub fn add_component(&mut self, uuid: Uuid, component_id: &str) -> Result<(), SceneError> {
         let Some(entity) = self.entities.get_mut(&uuid) else {
             return Err(SceneError::EntityNotFound);
