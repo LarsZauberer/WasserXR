@@ -44,7 +44,7 @@ impl Scene {
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
-        if let Some(_) = self.plugins.remove(path) {
+        if self.plugins.remove(path).is_some() {
             Ok(())
         } else {
             Err(SceneError::PluginNotFound)
@@ -84,7 +84,7 @@ impl Scene {
         let functions: Vec<SystemFunctions> = systems
             .iter()
             .rev()
-            .map(|system| system.get_functions().clone())
+            .map(|system| system.get_functions())
             .collect();
 
         for i in functions {
@@ -106,7 +106,7 @@ impl Scene {
     }
 
     pub fn remove_entity(&mut self, uuid: Uuid) -> Result<(), SceneError> {
-        if let Some(_) = self.entities.remove(&uuid) {
+        if self.entities.remove(&uuid).is_some() {
             // TODO: Remove all the components associated
             Ok(())
         } else {
@@ -159,7 +159,7 @@ impl Scene {
         };
         component
             .get(field_id)
-            .map_err(|error| SceneError::ComponentFieldError(error))
+            .map_err(SceneError::ComponentFieldError)
     }
 
     pub fn set<T>(
@@ -177,6 +177,6 @@ impl Scene {
         };
         component
             .set(field_id, data)
-            .map_err(|error| SceneError::ComponentFieldError(error))
+            .map_err(SceneError::ComponentFieldError)
     }
 }
