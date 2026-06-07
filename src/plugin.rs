@@ -54,7 +54,7 @@ impl Plugin {
         // Safety: Will return either null or will return the function pointer
         let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
         if ptr.is_null() {
-            return Err(PluginError::MissingSymbol);
+            return Err(PluginError::MissingSymbol(symbol.to_owned()));
         }
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
         Ok(func)
