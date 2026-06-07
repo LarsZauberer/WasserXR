@@ -30,6 +30,7 @@
               "rustfmt"
               "miri"
               "rust-analyzer"
+              "llvm-tools-preview"
             ];
           }
         );
@@ -41,10 +42,9 @@
           name = "devShell";
 
           buildInputs = [
-            # nightlyRust
-            pkgs.rustc
-            pkgs.cargo
-            pkgs.rustfmt
+            nightlyRust
+            pkgs.cargo-llvm-cov
+
             pkgs.plantuml
             pkgs.graphviz
           ];
