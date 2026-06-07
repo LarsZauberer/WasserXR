@@ -19,6 +19,7 @@ pub enum ComponentError {
     FieldNoSetter,
     NoCreator,
     NoDestroyer,
+    FieldParsing,
 }
 
 pub enum SceneError {
