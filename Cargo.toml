@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 libc = "0.2.186"
+log = "0.4.32"
+uuid = { version = "1.23.2", features = ["v7"] }
 
 [build-dependencies]
 cbindgen = "0.29"
