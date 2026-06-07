@@ -143,6 +143,10 @@ impl System {
     pub fn get_functions(&self) -> SystemFunctions {
         self.functions
     }
+
+    pub fn get_plugin_id(&self) -> &str {
+        &self.plugin_id
+    }
 }
 
 impl PartialOrd for System {
