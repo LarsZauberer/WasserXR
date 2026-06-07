@@ -1,4 +1,4 @@
-use crate::{entity::Entity, error::WXRError, plugin::Plugin, scene::Scene};
+use crate::{entity::Entity, error::SystemError, plugin::Plugin, scene::Scene};
 
 pub type Selector = unsafe extern "C" fn(*const Scene, *const Entity) -> i32;
 pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *mut Entity, *const usize);
@@ -14,7 +14,7 @@ pub struct SystemFunctions {
 }
 
 impl SystemFunctions {
-    pub fn new(id: &str, plugin: &Plugin) -> Result<Self, WXRError> {
+    pub fn new(id: &str, plugin: &Plugin) -> Result<Self, SystemError> {
         todo!()
     }
 
@@ -39,7 +39,7 @@ pub struct System {
 }
 
 impl System {
-    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, WXRError> {
+    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
         todo!()
     }
 
