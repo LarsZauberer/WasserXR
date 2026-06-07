@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     component::Component,
     entity::Entity,
-    error::{ComponentError, SceneError, WXRError},
+    error::SceneError,
     plugin::Plugin,
     system::{System, SystemFunctions},
 };
@@ -27,53 +27,49 @@ impl Scene {
         }
     }
 
-    pub fn load_plugin(&mut self, path: String) -> Result<(), WXRError> {
+    pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
-            Err(WXRError::PluginAlreadyLoaded)
+            Err(SceneError::PluginAlreadyLoaded)
         } else {
-            let plugin = Plugin::new(path.clone())?;
+            let plugin =
+                Plugin::new(path.clone()).map_err(|error| SceneError::PluginLoading(error))?;
             self.plugins.insert(path, plugin);
             Ok(())
         }
     }
 
-    pub fn unload_plugin(&mut self, path: &str) -> Result<(), WXRError> {
+    pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
         if let Some(plugin) = self.plugins.remove(path) {
             plugin.destroy();
             Ok(())
         } else {
-            Err(WXRError::PluginNotFound)
+            Err(SceneError::PluginNotFound)
         }
     }
 
-    pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), WXRError> {
+    pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
         if self.systems.contains_key(&id) {
-            Err(WXRError::SystemAlreadyLoaded)
+            Err(SceneError::SystemAlreadyExists)
         } else {
-            let mut system: Option<System> = None;
-            for (_, plugin) in self.plugins.iter() {
-                if let Ok(current_system) = System::new(id.clone(), plugin, priority) {
-                    system = Some(current_system);
-                    break;
-                }
-                // TODO: Add else case with better errors
-            }
-            if let Some(system) = system {
-                system.get_functions().attach(self);
-                self.systems.insert(id, system);
-                Ok(())
-            } else {
-                Err(WXRError::Other)
-            }
+            let Some(system) = self
+                .plugins
+                .values()
+                .find_map(|plugin| System::new(id.clone(), plugin, priority).ok())
+            else {
+                return Err(SceneError::SystemCreation);
+            };
+            system.get_functions().attach(self);
+            self.systems.insert(id, system);
+            Ok(())
         }
     }
 
-    pub fn remove_system(&mut self, id: &str) -> Result<(), WXRError> {
+    pub fn remove_system(&mut self, id: &str) -> Result<(), SceneError> {
         if let Some(system) = self.systems.remove(id) {
             system.get_functions().detach(self);
             Ok(())
         } else {
-            Err(WXRError::SystemNotFound)
+            Err(SceneError::SystemNotFound)
         }
     }
 
@@ -105,20 +101,16 @@ impl Scene {
         uuid
     }
 
-    pub fn remove_entity(&mut self, uuid: Uuid) -> Result<(), WXRError> {
-        if let Some(entity) = self.entities.remove(&uuid) {
+    pub fn remove_entity(&mut self, uuid: Uuid) -> Result<(), SceneError> {
+        if let Some(_) = self.entities.remove(&uuid) {
             // TODO: Remove all the components associated
             Ok(())
         } else {
-            Err(WXRError::Other)
+            Err(SceneError::EntityNotFound)
         }
     }
 
-    pub fn add_component(
-        &mut self,
-        uuid: Uuid,
-        component_id: &str,
-    ) -> Result<(), SceneError<ComponentError>> {
+    pub fn add_component(&mut self, uuid: Uuid, component_id: &str) -> Result<(), SceneError> {
         let Some(entity) = self.entities.get_mut(&uuid) else {
             return Err(SceneError::EntityNotFound);
         };
@@ -126,17 +118,12 @@ impl Scene {
             return Err(SceneError::ComponentAlreadyExists);
         }
 
-        let mut component: Option<Component> = None;
-        for (_, plugin) in self.plugins.iter() {
-            if let Ok(current_component) = Component::new(component_id.to_owned(), plugin) {
-                component = Some(current_component);
-                break;
-            }
-            // TODO: Provide better errors
-        }
-
-        let Some(component) = component else {
-            return Err(SceneError::Other(ComponentError::Other));
+        let Some(component) = self
+            .plugins
+            .values()
+            .find_map(|plugin| Component::new(component_id.to_owned(), plugin).ok())
+        else {
+            return Err(SceneError::ComponentCreation);
         };
 
         let res = entity.add_component(component);
@@ -145,41 +132,43 @@ impl Scene {
         Ok(())
     }
 
-    pub fn remove_component(&mut self, uuid: Uuid, component_id: &str) {
+    pub fn remove_component(&mut self, uuid: Uuid, component_id: &str) -> Result<(), SceneError> {
         if let Some(entity) = self.entities.get_mut(&uuid) {
-            entity.remove_component(component_id);
+            entity
+                .remove_component(component_id)
+                .map_err(|_| SceneError::ComponentNotFound)
+        } else {
+            Err(SceneError::EntityNotFound)
         }
     }
 
-    pub fn get<T>(&self, uuid: Uuid, component_id: &str, field_id: &str) -> Option<T> {
-        if let Some(entity) = self.entities.get(&uuid) {
-            if let Some(component) = entity.get_component(component_id) {
-                if let Ok(data) = component.get(field_id) {
-                    Some(data)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    pub fn get<T>(&self, uuid: Uuid, component_id: &str, field_id: &str) -> Result<T, SceneError> {
+        let Some(entity) = self.entities.get(&uuid) else {
+            return Err(SceneError::EntityNotFound);
+        };
+        let Some(component) = entity.get_component(component_id) else {
+            return Err(SceneError::ComponentNotFound);
+        };
+        component
+            .get(field_id)
+            .map_err(|error| SceneError::ComponentFieldError(error))
     }
 
-    pub fn set<T>(&mut self, uuid: Uuid, component_id: &str, field_id: &str, data: &T) -> bool {
-        if let Some(entity) = self.entities.get_mut(&uuid) {
-            if let Some(component) = entity.get_component_mut(component_id) {
-                if let Ok(_) = component.set(field_id, data) {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+    pub fn set<T>(
+        &mut self,
+        uuid: Uuid,
+        component_id: &str,
+        field_id: &str,
+        data: &T,
+    ) -> Result<(), SceneError> {
+        let Some(entity) = self.entities.get_mut(&uuid) else {
+            return Err(SceneError::EntityNotFound);
+        };
+        let Some(component) = entity.get_component_mut(component_id) else {
+            return Err(SceneError::ComponentNotFound);
+        };
+        component
+            .set(field_id, data)
+            .map_err(|error| SceneError::ComponentFieldError(error))
     }
 }

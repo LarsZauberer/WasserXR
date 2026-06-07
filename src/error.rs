@@ -1,15 +1,15 @@
-pub enum WXRError {
+pub enum PluginError {
     LinkingError,
     MissingSymbol,
-    PluginAlreadyLoaded,
-    SystemAlreadyLoaded,
-    PluginNotFound,
-    SystemNotFound,
-    Other,
 }
 
 pub enum EntityError {
-    ComponentExists,
+    ComponentAlreadyExists,
+    ComponentNotFound,
+}
+
+pub enum SystemError {
+    NoSystemFunction,
 }
 
 pub enum ComponentError {
@@ -18,11 +18,18 @@ pub enum ComponentError {
     FieldNoSetter,
     NoCreator,
     NoDestroyer,
-    Other,
 }
 
-pub enum SceneError<T> {
+pub enum SceneError {
     EntityNotFound,
     ComponentAlreadyExists,
-    Other(T),
+    SystemAlreadyExists,
+    PluginAlreadyLoaded,
+    SystemNotFound,
+    PluginNotFound,
+    ComponentNotFound,
+    ComponentCreation,
+    SystemCreation,
+    PluginLoading(PluginError),
+    ComponentFieldError(ComponentError),
 }

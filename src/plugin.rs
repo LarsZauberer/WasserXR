@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use crate::error::WXRError;
+use crate::error::PluginError;
 
 pub struct Plugin {
     path: Option<String>,
@@ -8,7 +8,7 @@ pub struct Plugin {
 }
 
 impl Plugin {
-    pub fn new(path: String) -> Result<Plugin, WXRError> {
+    pub fn new(path: String) -> Result<Plugin, PluginError> {
         todo!();
     }
 
@@ -19,7 +19,7 @@ impl Plugin {
         }
     }
 
-    pub fn get_symbol<T>(symbol: &str) -> Result<T, WXRError> {
+    pub fn get_symbol<T>(symbol: &str) -> Result<T, PluginError> {
         todo!();
     }
 

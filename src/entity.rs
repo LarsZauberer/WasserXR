@@ -49,7 +49,7 @@ impl Entity {
 
     pub fn add_component(&mut self, component: Component) -> Result<(), EntityError> {
         if self.components.contains_key(component.get_id()) {
-            Err(EntityError::ComponentExists)
+            Err(EntityError::ComponentAlreadyExists)
         } else {
             self.components
                 .insert(component.get_id().to_owned(), component);
@@ -57,8 +57,12 @@ impl Entity {
         }
     }
 
-    pub fn remove_component(&mut self, id: &str) {
-        let _ = self.components.remove(id);
+    pub fn remove_component(&mut self, id: &str) -> Result<(), EntityError> {
+        if self.components.remove(id).is_some() {
+            Ok(())
+        } else {
+            Err(EntityError::ComponentNotFound)
+        }
     }
 
     pub fn get_component(&self, id: &str) -> Option<&Component> {
