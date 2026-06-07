@@ -1,6 +1,6 @@
 pub enum PluginError {
     LinkingError(String),
-    MissingSymbol,
+    MissingSymbol(String),
     InvalidSymbol,
 }
 
