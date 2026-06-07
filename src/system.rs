@@ -5,7 +5,7 @@ pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *mut Entity, *c
 pub type Attacher = unsafe extern "C" fn(*mut Scene);
 pub type Detacher = unsafe extern "C" fn(*mut Scene);
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct SystemFunctions {
     runner: Runner,
     selector: Option<Selector>,
@@ -43,8 +43,8 @@ impl System {
         todo!()
     }
 
-    pub fn get_functions(&self) -> &SystemFunctions {
-        &self.functions
+    pub fn get_functions(&self) -> SystemFunctions {
+        self.functions
     }
 }
 

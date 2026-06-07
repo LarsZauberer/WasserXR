@@ -4,7 +4,7 @@ use crate::error::WXRError;
 
 pub struct Plugin {
     path: Option<String>,
-    fd: *const c_void,
+    fd: *mut c_void,
 }
 
 impl Plugin {
@@ -25,5 +25,17 @@ impl Plugin {
 
     pub fn destroy(self) {
         todo!();
+    }
+}
+
+impl Drop for Plugin {
+    fn drop(&mut self) {
+        if self.fd.is_null() {
+            return;
+        }
+
+        unsafe {
+            libc::dlclose(self.fd);
+        }
     }
 }

@@ -7,3 +7,22 @@ pub enum WXRError {
     SystemNotFound,
     Other,
 }
+
+pub enum EntityError {
+    ComponentExists,
+}
+
+pub enum ComponentError {
+    FieldNotFound,
+    FieldNoGetter,
+    FieldNoSetter,
+    NoCreator,
+    NoDestroyer,
+    Other,
+}
+
+pub enum SceneError<T> {
+    EntityNotFound,
+    ComponentAlreadyExists,
+    Other(T),
+}
