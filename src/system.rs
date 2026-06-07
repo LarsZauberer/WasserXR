@@ -1,4 +1,9 @@
-use crate::{entity::Entity, error::SystemError, plugin::Plugin, scene::Scene};
+use crate::{
+    entity::Entity,
+    error::{PluginError, SystemError},
+    plugin::{Plugin, create_symbol},
+    scene::Scene,
+};
 
 pub type Selector = unsafe extern "C" fn(*const Scene, *const Entity) -> i32;
 pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *mut Entity, *const usize);
@@ -8,6 +13,7 @@ pub type Detacher = unsafe extern "C" fn(*mut Scene);
 #[derive(Copy, Clone)]
 pub struct SystemFunctions {
     runner: Runner,
+    groups: usize,
     selector: Option<Selector>,
     attacher: Option<Attacher>,
     detacher: Option<Detacher>,
@@ -15,7 +21,46 @@ pub struct SystemFunctions {
 
 impl SystemFunctions {
     pub fn new(id: &str, plugin: &Plugin) -> Result<Self, SystemError> {
-        todo!()
+        let runner_symbol = create_symbol("wxr_system_", id);
+        let groups_symbol = create_symbol("WXRGroups", id);
+        let selector_symbol = create_symbol("wxr_select_", id);
+        let attacher_symbol = create_symbol("wxr_attach_", id);
+        let detacher_symbol = create_symbol("wxr_detach_", id);
+
+        let runner: Runner = plugin
+            .get_symbol(&runner_symbol)
+            .map_err(|error| match error {
+                PluginError::MissingSymbol(sym) => SystemError::MissingSymbol(sym),
+                _ => SystemError::FunctionError,
+            })?;
+
+        let groups: Option<*const usize> =
+            SystemFunctions::map_symbol_option(plugin.get_symbol(&groups_symbol))?;
+        let groups = match groups {
+            Some(ptr) => {
+                if ptr.is_null() {
+                    0
+                } else {
+                    unsafe { ptr.read() }
+                }
+            }
+            None => 0,
+        };
+
+        let selector: Option<Selector> =
+            SystemFunctions::map_symbol_option(plugin.get_symbol(&selector_symbol))?;
+        let attacher: Option<Attacher> =
+            SystemFunctions::map_symbol_option(plugin.get_symbol(&attacher_symbol))?;
+        let detacher: Option<Detacher> =
+            SystemFunctions::map_symbol_option(plugin.get_symbol(&detacher_symbol))?;
+
+        Ok(Self {
+            runner,
+            groups,
+            selector,
+            attacher,
+            detacher,
+        })
     }
 
     pub fn attach(&self, scene: &mut Scene) {
@@ -28,6 +73,17 @@ impl SystemFunctions {
 
     pub fn run(&self, scene: &mut Scene) {
         todo!()
+    }
+
+    fn map_symbol_option<T>(res: Result<T, PluginError>) -> Result<Option<T>, SystemError> {
+        match res {
+            Ok(obj) => Ok(Some(obj)),
+            Err(PluginError::MissingSymbol(msg)) => {
+                log::warn!("Symbol: {} not defined", msg);
+                Ok(None)
+            }
+            Err(_) => Err(SystemError::FunctionError),
+        }
     }
 }
 

@@ -5,6 +5,10 @@ use std::{
 
 use crate::error::PluginError;
 
+pub fn create_symbol(prefix: &str, id: &str) -> String {
+    prefix.to_owned() + id
+}
+
 pub struct Plugin {
     path: Option<String>,
     fd: *mut c_void,
