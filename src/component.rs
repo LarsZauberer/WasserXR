@@ -107,6 +107,7 @@ impl ComponentSchema {
 
 pub struct Component {
     id: String,
+    plugin_id: String,
     functions: ComponentFunctions,
     data: *mut c_void,
     schema: ComponentSchema,
@@ -135,6 +136,10 @@ impl Component {
 
     pub fn get_id(&self) -> &str {
         &self.id
+    }
+
+    pub fn get_plugin_id(&self) -> &str {
+        &self.plugin_id
     }
 }
 
