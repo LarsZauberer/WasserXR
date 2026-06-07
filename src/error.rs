@@ -11,6 +11,8 @@ pub enum EntityError {
 
 pub enum SystemError {
     NoSystemFunction,
+    MissingSymbol(String),
+    FunctionError,
 }
 
 pub enum ComponentError {
@@ -20,6 +22,7 @@ pub enum ComponentError {
     NoCreator,
     NoDestroyer,
     FieldParsing,
+    FunctionError,
 }
 
 pub enum SceneError {
