@@ -159,11 +159,15 @@ impl System {
     pub fn get_id(&self) -> &str {
         &self.id
     }
+
+    pub fn get_priority(&self) -> usize {
+        self.priority
+    }
 }
 
 impl PartialOrd for System {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.priority.partial_cmp(&other.priority)
+        Some(self.cmp(other))
     }
 }
 
@@ -247,5 +251,34 @@ mod tests {
                 panic!("SystemFunctions threw an error: {:?}", err);
             }
         }
+    }
+
+    #[test]
+    fn test_nonexistent_system() {
+        let plugin = Plugin::new_static();
+        match System::new("nonexistent".to_owned(), &plugin, 100) {
+            Ok(_) => {
+                panic!("System should not exist");
+            }
+            Err(err) => match err {
+                SystemError::MissingSymbol(symbol) => {
+                    assert_eq!(symbol, "wxr_system_nonexistent");
+                }
+                _ => {
+                    panic!("System creation threw an error which is not a MissingSymbol error");
+                }
+            },
+        }
+    }
+
+    #[test]
+    fn test_with_runner_system() {
+        let plugin = Plugin::new_static();
+        let system = System::new("with_runner".to_owned(), &plugin, 100)
+            .expect("System should have been correctly created");
+
+        assert_eq!(system.get_id(), "with_runner");
+        assert_eq!(system.get_priority(), 100);
+        assert_eq!(system.get_plugin_id(), plugin.get_id());
     }
 }
