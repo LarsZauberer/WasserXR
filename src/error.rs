@@ -27,6 +27,7 @@ pub enum ComponentError {
     NoDestroyer,
     FieldParsing,
     FunctionError,
+    MissingSymbol(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
