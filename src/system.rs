@@ -23,7 +23,7 @@ pub struct SystemFunctions {
 impl SystemFunctions {
     pub fn new(id: &str, plugin: &Plugin) -> Result<Self, SystemError> {
         let runner_symbol = create_symbol("wxr_system_", id);
-        let groups_symbol = create_symbol("WXRGroups", id);
+        let groups_symbol = create_symbol("WXR_GROUPS_", &id.to_uppercase());
         let selector_symbol = create_symbol("wxr_select_", id);
         let attacher_symbol = create_symbol("wxr_attach_", id);
         let detacher_symbol = create_symbol("wxr_detach_", id);
@@ -280,5 +280,51 @@ mod tests {
         assert_eq!(system.get_id(), "with_runner");
         assert_eq!(system.get_priority(), 100);
         assert_eq!(system.get_plugin_id(), plugin.get_id());
+    }
+
+    // Entity tests
+    #[unsafe(no_mangle)]
+    static WXR_GROUPS_ENTITY_SYSTEM: usize = 1;
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_select_entity_system(scene: *const Scene, entity: *const u8) -> i32 {
+        let scene = unsafe { &*scene };
+        let entity: *const [u8; 16] = entity as *const [u8; 16];
+        let uuid: Uuid = Uuid::from_bytes(unsafe { entity.read() });
+
+        let entities = scene.get_entities();
+        assert!(entities.contains(&&uuid));
+        0
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_entity_system(
+        scene: *mut Scene,
+        entities: *const *const *const u8,
+        groups: *const usize,
+    ) {
+        let scene = unsafe { &*scene };
+
+        let group = unsafe { groups.read() };
+        assert_eq!(group, 1);
+
+        let entity: *const [u8; 16] = unsafe {
+            let entity = entities.read().read();
+            entity as *const [u8; 16]
+        };
+        let uuid: Uuid = Uuid::from_bytes(unsafe { entity.read() });
+
+        let scene_entities = scene.get_entities();
+        assert!(scene_entities.contains(&&uuid));
+    }
+
+    #[test]
+    fn test_entity_system_system() {
+        let mut scene = Scene::new();
+        let _ = scene.add_entity(None);
+        let plugin = Plugin::new_static();
+        let system = System::new("entity_system".to_owned(), &plugin, 100)
+            .expect("System should have been correctly created");
+        system.get_functions().run(&mut scene);
     }
 }
