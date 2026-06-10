@@ -83,3 +83,42 @@ impl Drop for Plugin {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[unsafe(no_mangle)]
+    static TEST_DATA: usize = 5;
+
+    #[test]
+    fn test_static_plugin() {
+        let plugin = Plugin::new_static();
+
+        assert_eq!(plugin.get_id(), "");
+
+        match plugin.get_symbol::<*const usize>("nonexistent") {
+            Ok(_) => {
+                panic!("Nonexistent symbol should have not been able to be found");
+            }
+            Err(PluginError::MissingSymbol(symbol)) => {
+                assert_eq!(symbol, "nonexistent");
+            }
+            Err(_) => {
+                panic!("Nonexistent symbol had an error that was not a MissingSymbol error");
+            }
+        }
+
+        match plugin.get_symbol::<*const usize>("TEST_DATA") {
+            Ok(value) => {
+                assert!(!value.is_null());
+                unsafe {
+                    assert_eq!(value.read(), 5);
+                }
+            }
+            Err(_) => {
+                panic!("TEST_DATA symbol had an error");
+            }
+        }
+    }
+}
