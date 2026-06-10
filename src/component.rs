@@ -162,3 +162,190 @@ impl Drop for Component {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        ffi::c_void,
+        ptr::{null, null_mut},
+        sync::atomic::AtomicUsize,
+    };
+
+    use crate::scene::Scene;
+
+    use super::*;
+
+    // Non existent test
+    #[test]
+    fn test_nonexistent_component_functions() {
+        let plugin = Plugin::new_static();
+        let functions = ComponentFunctions::new("nonexistent", &plugin);
+        match functions {
+            Ok(_) => {
+                panic!("Creation of nonexistent component should not succeed");
+            }
+            Err(ComponentError::MissingSymbol(symbol)) => {
+                assert_eq!(symbol, "wxr_create_nonexistent");
+            }
+            _ => {
+                panic!("Creation of nonexistent failed with different error");
+            }
+        }
+    }
+
+    // Destroyer nonexistent
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_nonexistent_destroyer() -> *mut c_void {
+        null_mut()
+    }
+
+    #[test]
+    fn test_nonexistent_destroyer_component_functions() {
+        let plugin = Plugin::new_static();
+        let functions = ComponentFunctions::new("nonexistent_destroyer", &plugin);
+        match functions {
+            Ok(_) => {
+                panic!("Creation of nonexistent_destroyer component should not succeed");
+            }
+            Err(ComponentError::MissingSymbol(symbol)) => {
+                assert_eq!(symbol, "wxr_destroy_nonexistent_destroyer");
+            }
+            _ => {
+                panic!("Creation of nonexistent_destroyer failed with different error");
+            }
+        }
+    }
+
+    // Basic Component
+    static DESTROY_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_basic_component() -> *mut c_void {
+        null_mut()
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_basic_component(ptr: *mut c_void) {
+        assert!(ptr.is_null());
+        DESTROY_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn test_basic_component_component_functions() {
+        let plugin = Plugin::new_static();
+        let functions = ComponentFunctions::new("basic_component", &plugin)
+            .expect("Failed to create basic_compnent");
+
+        assert!(functions.schema_creator.is_some());
+    }
+
+    #[test]
+    fn test_basic_component_component() {
+        DESTROY_COUNTER.store(0, std::sync::atomic::Ordering::SeqCst);
+        let plugin = Plugin::new_static();
+        let component = Component::new("basic_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+
+        assert_eq!(component.get_id(), "basic_component");
+        assert_eq!(component.schema.get_fields().len(), 0);
+
+        // Test destruction
+        drop(component);
+        assert_eq!(DESTROY_COUNTER.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    // Schema Component
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_schema_component() -> *mut c_void {
+        null_mut()
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_schema_component(ptr: *mut c_void) {
+        assert!(ptr.is_null());
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_schema_schema_component(schema: *mut ComponentSchema) {
+        assert!(!schema.is_null());
+
+        let schema = unsafe { &mut *schema };
+
+        schema.add_field(
+            "x".to_owned(),
+            FieldType::Long,
+            Some(wxr_get_schema_component_x),
+            Some(wxr_set_schema_component_x),
+        );
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_get_schema_component_x(ptr: *const c_void) -> *const c_void {
+        assert!(ptr.is_null());
+        null()
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_set_schema_component_x(ptr: *mut c_void, data: *const c_void) {
+        assert!(ptr.is_null());
+        let data: usize = unsafe { *(data as *const usize) };
+        assert_eq!(data, 5);
+    }
+
+    #[test]
+    fn test_schema_component_component_schema() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("schema_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+        assert_eq!(component.schema.get_fields().len(), 1);
+        assert_eq!(component.schema.get_fields()[0], "x");
+        assert!(component.schema.fields["x"].getter.is_some());
+        assert!(component.schema.fields["x"].setter.is_some());
+        assert_eq!(component.schema.fields["x"].type_hint, FieldType::Long);
+    }
+
+    #[test]
+    fn test_schema_component_component_get() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("schema_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+
+        let data: *const c_void = component.get("x").expect("Failed to get field x");
+        assert!(data.is_null());
+    }
+
+    #[test]
+    fn test_schema_component_component_get_nonexistent() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("schema_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+
+        let _ = component
+            .get::<*const c_void>("a")
+            .expect_err("Got a non existing field a");
+    }
+
+    #[test]
+    fn test_schema_component_component_set_nonexistent() {
+        let plugin = Plugin::new_static();
+        let mut component = Component::new("schema_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+
+        let value = 5;
+        let _ = component
+            .set::<usize>("a", &value)
+            .expect_err("Got a non existing field a");
+    }
+
+    #[test]
+    fn test_schema_component_component_set() {
+        let plugin = Plugin::new_static();
+        let mut component = Component::new("schema_component".to_owned(), &plugin)
+            .expect("Component creation should have succeeded");
+
+        let value = 5;
+        component
+            .set::<usize>("x", &value)
+            .expect("Failed to set field x");
+    }
+}
