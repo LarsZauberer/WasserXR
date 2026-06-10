@@ -8,7 +8,7 @@ pub type SchemaCreator = unsafe extern "C" fn(*mut ComponentSchema);
 pub type Getter = unsafe extern "C" fn(*const c_void) -> *const c_void;
 pub type Setter = unsafe extern "C" fn(*mut c_void, *const c_void);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum FieldType {
     Long,
     Float,
@@ -30,7 +30,7 @@ pub struct ComponentFunctions {
 }
 
 impl ComponentFunctions {
-    pub fn new(id: &str, plugin: &Plugin) -> Self {
+    pub fn new(id: &str, plugin: &Plugin) -> Result<Self, ComponentError> {
         todo!()
     }
 
@@ -82,17 +82,12 @@ impl Display for ComponentField {
     }
 }
 
+#[derive(Default)]
 pub struct ComponentSchema {
     fields: HashMap<String, ComponentField>,
 }
 
 impl ComponentSchema {
-    pub fn new() -> Self {
-        Self {
-            fields: HashMap::new(),
-        }
-    }
-
     pub fn add_field(
         &mut self,
         id: String,
@@ -102,6 +97,23 @@ impl ComponentSchema {
     ) {
         let field = ComponentField::new(type_hint, getter, setter);
         self.fields.insert(id, field);
+    }
+
+    pub fn get<T>(&self, component: &Component, id: &str) -> Result<T, ComponentError> {
+        todo!()
+    }
+
+    pub fn set<T>(
+        &self,
+        component: &mut Component,
+        id: &str,
+        data: &T,
+    ) -> Result<T, ComponentError> {
+        todo!()
+    }
+
+    pub fn get_fields(&self) -> Vec<&String> {
+        self.fields.keys().collect()
     }
 }
 
