@@ -247,59 +247,6 @@ mod tests {
         assert!(scene_entities.contains(&&uuid));
     }
 
-    // -- SystemFunctions: missing symbols ------------------------------------
-
-    #[test]
-    fn test_nonexistent_runner_systemfunctions() {
-        let plugin = Plugin::new_static();
-
-        let Err(err) = SystemFunctions::new("no_runner", &plugin) else {
-            panic!("SystemFunctions didn't throw an error");
-        };
-        assert_eq!(
-            err,
-            SystemError::MissingSymbol("wxr_system_no_runner".to_owned())
-        );
-    }
-
-    // -- SystemFunctions: loading and running --------------------------------
-
-    #[test]
-    fn test_systemfunctions_with_runner_load() {
-        let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                assert_eq!(functions.groups, 0);
-                assert!(functions.selector.is_none());
-                assert!(functions.attacher.is_none());
-                assert!(functions.detacher.is_none());
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
-    }
-
-    #[test]
-    fn test_systemfunctions_with_runner_run() {
-        WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
-
-        let mut scene = Scene::new();
-        let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                functions.run(&mut scene);
-
-                assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
-    }
-
     // -- System: creation and identity ---------------------------------------
 
     #[test]
@@ -322,6 +269,9 @@ mod tests {
 
     #[test]
     fn test_system_with_runner_creation() {
+        WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
+
+        let mut scene = Scene::new();
         let plugin = Rc::new(Plugin::new_static());
         let system = System::new("with_runner".to_owned(), plugin.clone(), 100)
             .expect("System should have been correctly created");
@@ -329,6 +279,10 @@ mod tests {
         assert_eq!(system.get_id(), "with_runner");
         assert_eq!(system.get_priority(), 100);
         assert_eq!(system.get_plugin_id(), plugin.get_id());
+
+        system.get_functions().run(&mut scene);
+
+        assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
     }
 
     // -- System: entity selection and routing --------------------------------
