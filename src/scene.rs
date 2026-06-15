@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
+use log::error;
 use uuid::Uuid;
 
 use crate::{
@@ -12,43 +13,63 @@ use crate::{
 
 pub struct Scene {
     entities: HashMap<Uuid, Entity>,
-    plugins: HashMap<String, Plugin>,
+    plugins: HashMap<String, Rc<Plugin>>,
     systems: HashMap<String, System>,
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        let mut plugins = HashMap::new();
+        plugins.insert("".to_owned(), Rc::new(Plugin::new_static()));
+        Self {
+            entities: HashMap::new(),
+            plugins,
+            systems: HashMap::new(),
+        }
+    }
 }
 
 impl Scene {
     pub fn new() -> Self {
-        let mut plugins = HashMap::new();
-        plugins.insert("".to_owned(), Plugin::new_static());
-        Self {
-            entities: HashMap::new(),
-            plugins: plugins,
-            systems: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
             Err(SceneError::PluginAlreadyLoaded)
         } else {
-            let plugin = Plugin::new(path.clone()).map_err(|error| match error {
+            let plugin = Rc::new(Plugin::new(path.clone()).map_err(|error| match error {
                 PluginError::LinkingError(msg) => {
                     log::error!("Linking Error: {}", msg);
                     SceneError::PluginLoading(PluginError::LinkingError(msg))
                 }
                 _ => SceneError::PluginLoading(error),
-            })?;
+            })?);
             self.plugins.insert(path, plugin);
             Ok(())
         }
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
-        if self.plugins.remove(path).is_some() {
-            Ok(())
-        } else {
-            Err(SceneError::PluginNotFound)
-        }
+        let Some(plugin) = self.plugins.remove(path) else {
+            return Err(SceneError::PluginNotFound);
+        };
+
+        // Check if no references are still alive
+        let Ok(_) = Rc::try_unwrap(plugin) else {
+            error!(
+                "There are still reference counted references to the plugin `{}` that should be unloaded.",
+                path
+            );
+            error!(
+                "There are dead references to the plugin that has been unloaded. Corrupted ECS state. Terminating Program!"
+            );
+            panic!(
+                "There are dead references to the plugin that has been unloaded. Corrupted ECS state"
+            );
+        };
+
+        Ok(())
     }
 
     pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
@@ -58,7 +79,7 @@ impl Scene {
             let Some(system) = self
                 .plugins
                 .values()
-                .find_map(|plugin| System::new(id.clone(), plugin, priority).ok())
+                .find_map(|plugin| System::new(id.clone(), plugin.clone(), priority).ok())
             else {
                 return Err(SceneError::SystemCreation);
             };

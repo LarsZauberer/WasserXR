@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use uuid::Uuid;
 
 use crate::{
@@ -130,19 +132,18 @@ impl SystemFunctions {
 
 pub struct System {
     id: String,
-    plugin_id: String,
+    plugin: Rc<Plugin>,
     priority: usize,
     functions: SystemFunctions,
 }
 
 impl System {
-    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
-        let plugin_id = plugin.get_id().to_owned();
-        let functions = SystemFunctions::new(&id, plugin)?;
+    pub fn new(id: String, plugin: Rc<Plugin>, priority: usize) -> Result<Self, SystemError> {
+        let functions = SystemFunctions::new(&id, &plugin)?;
 
         Ok(Self {
             id,
-            plugin_id,
+            plugin,
             priority,
             functions,
         })
@@ -153,7 +154,7 @@ impl System {
     }
 
     pub fn get_plugin_id(&self) -> &str {
-        &self.plugin_id
+        &self.plugin.get_id()
     }
 
     pub fn get_id(&self) -> &str {
@@ -187,7 +188,10 @@ impl Eq for System {}
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::{
+        rc::Rc,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     use super::*;
 
@@ -255,8 +259,8 @@ mod tests {
 
     #[test]
     fn test_nonexistent_system() {
-        let plugin = Plugin::new_static();
-        match System::new("nonexistent".to_owned(), &plugin, 100) {
+        let plugin = Rc::new(Plugin::new_static());
+        match System::new("nonexistent".to_owned(), plugin.clone(), 100) {
             Ok(_) => {
                 panic!("System should not exist");
             }
@@ -273,8 +277,8 @@ mod tests {
 
     #[test]
     fn test_with_runner_system() {
-        let plugin = Plugin::new_static();
-        let system = System::new("with_runner".to_owned(), &plugin, 100)
+        let plugin = Rc::new(Plugin::new_static());
+        let system = System::new("with_runner".to_owned(), plugin.clone(), 100)
             .expect("System should have been correctly created");
 
         assert_eq!(system.get_id(), "with_runner");
@@ -322,8 +326,8 @@ mod tests {
     fn test_entity_system_system() {
         let mut scene = Scene::new();
         let _ = scene.add_entity(None);
-        let plugin = Plugin::new_static();
-        let system = System::new("entity_system".to_owned(), &plugin, 100)
+        let plugin = Rc::new(Plugin::new_static());
+        let system = System::new("entity_system".to_owned(), plugin.clone(), 100)
             .expect("System should have been correctly created");
         system.get_functions().run(&mut scene);
     }
