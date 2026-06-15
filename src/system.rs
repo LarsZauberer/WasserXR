@@ -195,21 +195,11 @@ mod tests {
 
     use super::*;
 
-    // Test Runner not found
+    // -- Test doubles (C-FFI symbols) ----------------------------------------
 
-    #[test]
-    fn test_nonexistent_runner_systemfunctions() {
-        let plugin = Plugin::new_static();
+    // Missing runner — no symbols defined
 
-        let Err(err) = SystemFunctions::new("no_runner", &plugin) else {
-            panic!("SystemFunctions didn't throw an error");
-        };
-        assert_eq!(
-            err,
-            SystemError::MissingSymbol("wxr_system_no_runner".to_owned())
-        );
-    }
-
+    // With runner — basic runner function
     static WITH_RUNNER_ATOMIC: AtomicUsize = AtomicUsize::new(0);
 
     #[unsafe(no_mangle)]
@@ -221,72 +211,7 @@ mod tests {
         WITH_RUNNER_ATOMIC.fetch_add(1, Ordering::SeqCst);
     }
 
-    #[test]
-    fn test_with_runner_systemfunctions_load() {
-        let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                assert_eq!(functions.groups, 0);
-                assert!(functions.selector.is_none());
-                assert!(functions.attacher.is_none());
-                assert!(functions.detacher.is_none());
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
-    }
-
-    #[test]
-    fn test_with_runner_sytemfunctions_run() {
-        WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
-
-        let mut scene = Scene::new();
-        let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                functions.run(&mut scene);
-
-                assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
-    }
-
-    #[test]
-    fn test_nonexistent_system() {
-        let plugin = Rc::new(Plugin::new_static());
-        match System::new("nonexistent".to_owned(), plugin.clone(), 100) {
-            Ok(_) => {
-                panic!("System should not exist");
-            }
-            Err(err) => match err {
-                SystemError::MissingSymbol(symbol) => {
-                    assert_eq!(symbol, "wxr_system_nonexistent");
-                }
-                _ => {
-                    panic!("System creation threw an error which is not a MissingSymbol error");
-                }
-            },
-        }
-    }
-
-    #[test]
-    fn test_with_runner_system() {
-        let plugin = Rc::new(Plugin::new_static());
-        let system = System::new("with_runner".to_owned(), plugin.clone(), 100)
-            .expect("System should have been correctly created");
-
-        assert_eq!(system.get_id(), "with_runner");
-        assert_eq!(system.get_priority(), 100);
-        assert_eq!(system.get_plugin_id(), plugin.get_id());
-    }
-
-    // Entity tests
+    // Entity system — selector and runner with entity routing
     #[unsafe(no_mangle)]
     static WXR_GROUPS_ENTITY_SYSTEM: usize = 1;
 
@@ -322,8 +247,94 @@ mod tests {
         assert!(scene_entities.contains(&&uuid));
     }
 
+    // -- SystemFunctions: missing symbols ------------------------------------
+
     #[test]
-    fn test_entity_system_system() {
+    fn test_nonexistent_runner_systemfunctions() {
+        let plugin = Plugin::new_static();
+
+        let Err(err) = SystemFunctions::new("no_runner", &plugin) else {
+            panic!("SystemFunctions didn't throw an error");
+        };
+        assert_eq!(
+            err,
+            SystemError::MissingSymbol("wxr_system_no_runner".to_owned())
+        );
+    }
+
+    // -- SystemFunctions: loading and running --------------------------------
+
+    #[test]
+    fn test_systemfunctions_with_runner_load() {
+        let plugin = Plugin::new_static();
+        let functions = SystemFunctions::new("with_runner", &plugin);
+        match functions {
+            Ok(functions) => {
+                assert_eq!(functions.groups, 0);
+                assert!(functions.selector.is_none());
+                assert!(functions.attacher.is_none());
+                assert!(functions.detacher.is_none());
+            }
+            Err(err) => {
+                panic!("SystemFunctions threw an error: {:?}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn test_systemfunctions_with_runner_run() {
+        WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
+
+        let mut scene = Scene::new();
+        let plugin = Plugin::new_static();
+        let functions = SystemFunctions::new("with_runner", &plugin);
+        match functions {
+            Ok(functions) => {
+                functions.run(&mut scene);
+
+                assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
+            }
+            Err(err) => {
+                panic!("SystemFunctions threw an error: {:?}", err);
+            }
+        }
+    }
+
+    // -- System: creation and identity ---------------------------------------
+
+    #[test]
+    fn test_nonexistent_system_creation() {
+        let plugin = Rc::new(Plugin::new_static());
+        match System::new("nonexistent".to_owned(), plugin.clone(), 100) {
+            Ok(_) => {
+                panic!("System should not exist");
+            }
+            Err(err) => match err {
+                SystemError::MissingSymbol(symbol) => {
+                    assert_eq!(symbol, "wxr_system_nonexistent");
+                }
+                _ => {
+                    panic!("System creation threw an error which is not a MissingSymbol error");
+                }
+            },
+        }
+    }
+
+    #[test]
+    fn test_system_with_runner_creation() {
+        let plugin = Rc::new(Plugin::new_static());
+        let system = System::new("with_runner".to_owned(), plugin.clone(), 100)
+            .expect("System should have been correctly created");
+
+        assert_eq!(system.get_id(), "with_runner");
+        assert_eq!(system.get_priority(), 100);
+        assert_eq!(system.get_plugin_id(), plugin.get_id());
+    }
+
+    // -- System: entity selection and routing --------------------------------
+
+    #[test]
+    fn test_entity_system_routing() {
         let mut scene = Scene::new();
         let _ = scene.add_entity(None);
         let plugin = Rc::new(Plugin::new_static());
