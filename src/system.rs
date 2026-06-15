@@ -154,7 +154,7 @@ impl System {
     }
 
     pub fn get_plugin_id(&self) -> &str {
-        &self.plugin.get_id()
+        self.plugin.get_id()
     }
 
     pub fn get_id(&self) -> &str {
