@@ -11,8 +11,10 @@ pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *const u8, *con
 pub type Attacher = unsafe extern "C" fn(*mut Scene);
 pub type Detacher = unsafe extern "C" fn(*mut Scene);
 
-#[derive(Copy, Clone)]
-pub struct SystemFunctions {
+pub struct System {
+    id: String,
+    plugin_id: String,
+    priority: usize,
     runner: Runner,
     groups: usize,
     selector: Option<Selector>,
@@ -20,13 +22,15 @@ pub struct SystemFunctions {
     detacher: Option<Detacher>,
 }
 
-impl SystemFunctions {
-    pub fn new(id: &str, plugin: &Plugin) -> Result<Self, SystemError> {
-        let runner_symbol = create_symbol("wxr_system_", id);
+impl System {
+    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
+        let plugin_id = plugin.get_id().to_owned();
+        
+        let runner_symbol = create_symbol("wxr_system_", &id);
         let groups_symbol = create_symbol("WXR_GROUPS_", &id.to_uppercase());
-        let selector_symbol = create_symbol("wxr_select_", id);
-        let attacher_symbol = create_symbol("wxr_attach_", id);
-        let detacher_symbol = create_symbol("wxr_detach_", id);
+        let selector_symbol = create_symbol("wxr_select_", &id);
+        let attacher_symbol = create_symbol("wxr_attach_", &id);
+        let detacher_symbol = create_symbol("wxr_detach_", &id);
 
         let runner: Runner = plugin
             .get_symbol(&runner_symbol)
@@ -36,7 +40,7 @@ impl SystemFunctions {
             })?;
 
         let groups: Option<*const usize> =
-            SystemFunctions::map_symbol_option(plugin.get_symbol(&groups_symbol))?;
+            System::map_symbol_option(plugin.get_symbol(&groups_symbol))?;
         let groups = match groups {
             Some(ptr) => {
                 if ptr.is_null() {
@@ -49,13 +53,16 @@ impl SystemFunctions {
         };
 
         let selector: Option<Selector> =
-            SystemFunctions::map_symbol_option(plugin.get_symbol(&selector_symbol))?;
+            System::map_symbol_option(plugin.get_symbol(&selector_symbol))?;
         let attacher: Option<Attacher> =
-            SystemFunctions::map_symbol_option(plugin.get_symbol(&attacher_symbol))?;
+            System::map_symbol_option(plugin.get_symbol(&attacher_symbol))?;
         let detacher: Option<Detacher> =
-            SystemFunctions::map_symbol_option(plugin.get_symbol(&detacher_symbol))?;
+            System::map_symbol_option(plugin.get_symbol(&detacher_symbol))?;
 
         Ok(Self {
+            id,
+            plugin_id,
+            priority,
             runner,
             groups,
             selector,
@@ -65,22 +72,18 @@ impl SystemFunctions {
     }
 
     pub fn attach(&self, scene: &mut Scene) {
-        let Some(attacher) = self.attacher else {
-            return;
-        };
-
-        unsafe {
-            attacher(scene as *mut Scene);
+        if let Some(attacher) = self.attacher {
+            unsafe {
+                attacher(scene as *mut Scene);
+            }
         }
     }
 
     pub fn detach(&self, scene: &mut Scene) {
-        let Some(detacher) = self.detacher else {
-            return;
-        };
-
-        unsafe {
-            detacher(scene as *mut Scene);
+        if let Some(detacher) = self.detacher {
+            unsafe {
+                detacher(scene as *mut Scene);
+            }
         }
     }
 
@@ -126,31 +129,6 @@ impl SystemFunctions {
             Err(_) => Err(SystemError::FunctionError),
         }
     }
-}
-
-pub struct System {
-    id: String,
-    plugin_id: String,
-    priority: usize,
-    functions: SystemFunctions,
-}
-
-impl System {
-    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
-        let plugin_id = plugin.get_id().to_owned();
-        let functions = SystemFunctions::new(&id, plugin)?;
-
-        Ok(Self {
-            id,
-            plugin_id,
-            priority,
-            functions,
-        })
-    }
-
-    pub fn get_functions(&self) -> SystemFunctions {
-        self.functions
-    }
 
     pub fn get_plugin_id(&self) -> &str {
         &self.plugin_id
@@ -188,17 +166,13 @@ impl Eq for System {}
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
-
     use super::*;
 
-    // Test Runner not found
-
     #[test]
-    fn test_nonexistent_runner_systemfunctions() {
+    fn test_nonexistent_runner_system() {
         let plugin = Plugin::new_static();
-
-        let Err(err) = SystemFunctions::new("no_runner", &plugin) else {
-            panic!("SystemFunctions didn't throw an error");
+        let Err(err) = System::new("no_runner".to_owned(), &plugin, 0) else {
+            panic!("System::new didn't throw an error");
         };
         assert_eq!(
             err,
@@ -218,39 +192,23 @@ mod tests {
     }
 
     #[test]
-    fn test_with_runner_systemfunctions_load() {
+    fn test_with_runner_system_load() {
         let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                assert_eq!(functions.groups, 0);
-                assert!(functions.selector.is_none());
-                assert!(functions.attacher.is_none());
-                assert!(functions.detacher.is_none());
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
+        let system = System::new("with_runner".to_owned(), &plugin, 0).unwrap();
+        assert_eq!(system.groups, 0);
+        assert!(system.selector.is_none());
+        assert!(system.attacher.is_none());
+        assert!(system.detacher.is_none());
     }
 
     #[test]
-    fn test_with_runner_sytemfunctions_run() {
+    fn test_with_runner_system_run() {
         WITH_RUNNER_ATOMIC.store(0, Ordering::SeqCst);
-
         let mut scene = Scene::new();
         let plugin = Plugin::new_static();
-        let functions = SystemFunctions::new("with_runner", &plugin);
-        match functions {
-            Ok(functions) => {
-                functions.run(&mut scene);
-
-                assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
-            }
-            Err(err) => {
-                panic!("SystemFunctions threw an error: {:?}", err);
-            }
-        }
+        let system = System::new("with_runner".to_owned(), &plugin, 0).unwrap();
+        system.run(&mut scene);
+        assert_eq!(WITH_RUNNER_ATOMIC.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -325,6 +283,6 @@ mod tests {
         let plugin = Plugin::new_static();
         let system = System::new("entity_system".to_owned(), &plugin, 100)
             .expect("System should have been correctly created");
-        system.get_functions().run(&mut scene);
+        system.run(&mut scene);
     }
 }

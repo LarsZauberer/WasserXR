@@ -7,7 +7,7 @@ use crate::{
     entity::Entity,
     error::{PluginError, SceneError},
     plugin::Plugin,
-    system::{System, SystemFunctions},
+    system::System,
 };
 
 pub struct Scene {
@@ -62,7 +62,7 @@ impl Scene {
             else {
                 return Err(SceneError::SystemCreation);
             };
-            system.get_functions().attach(self);
+            system.attach(self);
             self.systems.insert(id, system);
             Ok(())
         }
@@ -70,7 +70,7 @@ impl Scene {
 
     pub fn remove_system(&mut self, id: &str) -> Result<(), SceneError> {
         if let Some(system) = self.systems.remove(id) {
-            system.get_functions().detach(self);
+            system.detach(self);
             Ok(())
         } else {
             Err(SceneError::SystemNotFound)
@@ -81,14 +81,8 @@ impl Scene {
         let mut systems: Vec<&System> = self.systems.values().collect();
         systems.sort();
 
-        let functions: Vec<SystemFunctions> = systems
-            .iter()
-            .rev()
-            .map(|system| system.get_functions())
-            .collect();
-
-        for i in functions {
-            i.run(self);
+        for system in systems.iter().rev() {
+            system.run(self);
         }
     }
 
@@ -162,7 +156,7 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
-    pub fn set<T>(
+    pub fn set(
         &mut self,
         uuid: Uuid,
         component_id: &str,
