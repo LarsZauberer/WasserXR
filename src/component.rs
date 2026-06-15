@@ -174,48 +174,17 @@ mod tests {
 
     use super::*;
 
-    // Non existent test
-    #[test]
-    fn test_nonexistent_component_functions() {
-        let plugin = Plugin::new_static();
-        let functions = ComponentFunctions::new("nonexistent", &plugin);
-        match functions {
-            Ok(_) => {
-                panic!("Creation of nonexistent component should not succeed");
-            }
-            Err(ComponentError::MissingSymbol(symbol)) => {
-                assert_eq!(symbol, "wxr_create_nonexistent");
-            }
-            _ => {
-                panic!("Creation of nonexistent failed with different error");
-            }
-        }
-    }
+    // -- Test doubles (C-FFI symbols) ----------------------------------------
 
-    // Destroyer nonexistent
+    // Nonexistent component (no creator symbol exists)
+
+    // Nonexistent destroyer (creator exists, destroyer does not)
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_nonexistent_destroyer() -> *mut c_void {
         null_mut()
     }
 
-    #[test]
-    fn test_nonexistent_destroyer_component_functions() {
-        let plugin = Plugin::new_static();
-        let functions = ComponentFunctions::new("nonexistent_destroyer", &plugin);
-        match functions {
-            Ok(_) => {
-                panic!("Creation of nonexistent_destroyer component should not succeed");
-            }
-            Err(ComponentError::MissingSymbol(symbol)) => {
-                assert_eq!(symbol, "wxr_destroy_nonexistent_destroyer");
-            }
-            _ => {
-                panic!("Creation of nonexistent_destroyer failed with different error");
-            }
-        }
-    }
-
-    // Basic Component
+    // Basic component
     static DESTROY_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     #[unsafe(no_mangle)]
@@ -229,31 +198,7 @@ mod tests {
         DESTROY_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
-    #[test]
-    fn test_basic_component_component_functions() {
-        let plugin = Plugin::new_static();
-        let functions = ComponentFunctions::new("basic_component", &plugin)
-            .expect("Failed to create basic_compnent");
-
-        assert!(functions.schema_creator.is_some());
-    }
-
-    #[test]
-    fn test_basic_component_component() {
-        DESTROY_COUNTER.store(0, std::sync::atomic::Ordering::SeqCst);
-        let plugin = Rc::new(Plugin::new_static());
-        let component = Component::new("basic_component".to_owned(), plugin.clone())
-            .expect("Component creation should have succeeded");
-
-        assert_eq!(component.get_id(), "basic_component");
-        assert_eq!(component.schema.get_fields().len(), 0);
-
-        // Test destruction
-        drop(component);
-        assert_eq!(DESTROY_COUNTER.load(std::sync::atomic::Ordering::SeqCst), 1);
-    }
-
-    // Schema Component
+    // Schema component
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_schema_component() -> *mut c_void {
         null_mut()
@@ -291,58 +236,96 @@ mod tests {
         assert_eq!(data, 5);
     }
 
+    // -- ComponentFunctions error paths -------------------------------------
+
     #[test]
-    fn test_schema_component_component_schema() {
+    fn test_component_functions_missing_symbols() {
+        // Missing creator symbol
+        let plugin = Plugin::new_static();
+        match ComponentFunctions::new("nonexistent", &plugin) {
+            Ok(_) => {
+                panic!("Creation of nonexistent component should not succeed");
+            }
+            Err(ComponentError::MissingSymbol(symbol)) => {
+                assert_eq!(symbol, "wxr_create_nonexistent");
+            }
+            _ => {
+                panic!("Creation of nonexistent failed with different error");
+            }
+        }
+
+        // Creator exists but destroyer symbol is missing
+        match ComponentFunctions::new("nonexistent_destroyer", &plugin) {
+            Ok(_) => {
+                panic!("Creation of nonexistent_destroyer component should not succeed");
+            }
+            Err(ComponentError::MissingSymbol(symbol)) => {
+                assert_eq!(symbol, "wxr_destroy_nonexistent_destroyer");
+            }
+            _ => {
+                panic!("Creation of nonexistent_destroyer failed with different error");
+            }
+        }
+    }
+
+    // -- Basic component lifecycle -------------------------------------------
+
+    #[test]
+    fn test_basic_component_lifecycle() {
+        DESTROY_COUNTER.store(0, std::sync::atomic::Ordering::SeqCst);
+        let plugin = Plugin::new_static();
+
+        // ComponentFunctions creation
+        let functions = ComponentFunctions::new("basic_component", &plugin)
+            .expect("Failed to create basic_component");
+        assert!(functions.schema_creator.is_some());
+
+        // Component creation and identity
+        let plugin = Rc::new(Plugin::new_static());
+        let component = Component::new("basic_component".to_owned(), plugin.clone())
+            .expect("Component creation should have succeeded");
+
+        assert_eq!(component.get_id(), "basic_component");
+        assert_eq!(component.schema.get_fields().len(), 0);
+
+        // Drop invokes destroyer
+        drop(component);
+        assert_eq!(DESTROY_COUNTER.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    // -- Schema component: all operations ------------------------------------
+
+    #[test]
+    fn test_schema_component() {
         let plugin = Rc::new(Plugin::new_static());
         let component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
+
+        // Schema metadata
         assert_eq!(component.schema.get_fields().len(), 1);
         assert_eq!(component.schema.get_fields()[0], "x");
         assert!(component.schema.fields["x"].getter.is_some());
         assert!(component.schema.fields["x"].setter.is_some());
         assert_eq!(component.schema.fields["x"].type_hint, FieldType::Long);
-    }
 
-    #[test]
-    fn test_schema_component_component_get() {
-        let plugin = Rc::new(Plugin::new_static());
-        let component = Component::new("schema_component".to_owned(), plugin.clone())
-            .expect("Component creation should have succeeded");
-
+        // Get existing field
         let data: *const c_void = component.get("x").expect("Failed to get field x");
         assert!(data.is_null());
-    }
 
-    #[test]
-    fn test_schema_component_component_get_nonexistent() {
-        let plugin = Rc::new(Plugin::new_static());
-        let component = Component::new("schema_component".to_owned(), plugin.clone())
-            .expect("Component creation should have succeeded");
-
+        // Get nonexistent field
         let _ = component
             .get::<*const c_void>("a")
             .expect_err("Got a non existing field a");
-    }
 
-    #[test]
-    fn test_schema_component_component_set_nonexistent() {
-        let plugin = Rc::new(Plugin::new_static());
+        // Set nonexistent field
         let mut component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
-
         let value = 5;
         let _ = component
             .set::<usize>("a", &value)
-            .expect_err("Got a non existing field a");
-    }
+            .expect_err("Set nonexistent field should have failed");
 
-    #[test]
-    fn test_schema_component_component_set() {
-        let plugin = Rc::new(Plugin::new_static());
-        let mut component = Component::new("schema_component".to_owned(), plugin.clone())
-            .expect("Component creation should have succeeded");
-
-        let value = 5;
+        // Set existing field
         component
             .set::<usize>("x", &value)
             .expect("Failed to set field x");
