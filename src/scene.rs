@@ -150,7 +150,7 @@ impl Scene {
         let Some(component) = self
             .plugins
             .values()
-            .find_map(|plugin| Component::new(component_id.to_owned(), plugin).ok())
+            .find_map(|plugin| Component::new(component_id.to_owned(), plugin.clone()).ok())
         else {
             return Err(SceneError::ComponentCreation);
         };

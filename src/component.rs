@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, os::raw::c_void, str::FromStr};
+use std::{collections::HashMap, fmt::Display, os::raw::c_void, rc::Rc, str::FromStr};
 
 use crate::{error::ComponentError, plugin::Plugin};
 
@@ -119,14 +119,14 @@ impl ComponentSchema {
 
 pub struct Component {
     id: String,
-    plugin_id: String,
+    plugin: Rc<Plugin>,
     functions: ComponentFunctions,
     data: *mut c_void,
     schema: ComponentSchema,
 }
 
 impl Component {
-    pub fn new(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
+    pub fn new(id: String, plugin: Rc<Plugin>) -> Result<Self, ComponentError> {
         todo!()
     }
 
@@ -151,7 +151,7 @@ impl Component {
     }
 
     pub fn get_plugin_id(&self) -> &str {
-        &self.plugin_id
+        &self.plugin.get_id()
     }
 }
 
@@ -168,10 +168,9 @@ mod tests {
     use std::{
         ffi::c_void,
         ptr::{null, null_mut},
+        rc::Rc,
         sync::atomic::AtomicUsize,
     };
-
-    use crate::scene::Scene;
 
     use super::*;
 
@@ -242,8 +241,8 @@ mod tests {
     #[test]
     fn test_basic_component_component() {
         DESTROY_COUNTER.store(0, std::sync::atomic::Ordering::SeqCst);
-        let plugin = Plugin::new_static();
-        let component = Component::new("basic_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let component = Component::new("basic_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
 
         assert_eq!(component.get_id(), "basic_component");
@@ -294,8 +293,8 @@ mod tests {
 
     #[test]
     fn test_schema_component_component_schema() {
-        let plugin = Plugin::new_static();
-        let component = Component::new("schema_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
         assert_eq!(component.schema.get_fields().len(), 1);
         assert_eq!(component.schema.get_fields()[0], "x");
@@ -306,8 +305,8 @@ mod tests {
 
     #[test]
     fn test_schema_component_component_get() {
-        let plugin = Plugin::new_static();
-        let component = Component::new("schema_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
 
         let data: *const c_void = component.get("x").expect("Failed to get field x");
@@ -316,8 +315,8 @@ mod tests {
 
     #[test]
     fn test_schema_component_component_get_nonexistent() {
-        let plugin = Plugin::new_static();
-        let component = Component::new("schema_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
 
         let _ = component
@@ -327,8 +326,8 @@ mod tests {
 
     #[test]
     fn test_schema_component_component_set_nonexistent() {
-        let plugin = Plugin::new_static();
-        let mut component = Component::new("schema_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let mut component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
 
         let value = 5;
@@ -339,8 +338,8 @@ mod tests {
 
     #[test]
     fn test_schema_component_component_set() {
-        let plugin = Plugin::new_static();
-        let mut component = Component::new("schema_component".to_owned(), &plugin)
+        let plugin = Rc::new(Plugin::new_static());
+        let mut component = Component::new("schema_component".to_owned(), plugin.clone())
             .expect("Component creation should have succeeded");
 
         let value = 5;
