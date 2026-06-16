@@ -1,4 +1,5 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::{HashMap, hash_map::Entry};
+use std::rc::Rc;
 
 use log::error;
 use uuid::Uuid;
@@ -35,8 +36,6 @@ impl Scene {
     }
 
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
-        use std::collections::hash_map::Entry;
-
         match self.plugins.entry(path) {
             Entry::Occupied(_) => Err(SceneError::PluginAlreadyLoaded),
             Entry::Vacant(entry) => {
