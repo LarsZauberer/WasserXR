@@ -35,18 +35,23 @@ impl Scene {
     }
 
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
-        if self.plugins.contains_key(&path) {
-            Err(SceneError::PluginAlreadyLoaded)
-        } else {
-            let plugin = Rc::new(Plugin::new(path.clone()).map_err(|error| match error {
-                PluginError::LinkingError(msg) => {
-                    log::error!("Linking Error: {}", msg);
-                    SceneError::PluginLoading(PluginError::LinkingError(msg))
-                }
-                _ => SceneError::PluginLoading(error),
-            })?);
-            self.plugins.insert(path, plugin);
-            Ok(())
+        use std::collections::hash_map::Entry;
+
+        match self.plugins.entry(path) {
+            Entry::Occupied(_) => Err(SceneError::PluginAlreadyLoaded),
+            Entry::Vacant(entry) => {
+                let plugin = Rc::new(Plugin::new(entry.key().clone()).map_err(
+                    |error| match error {
+                        PluginError::LinkingError(msg) => {
+                            log::error!("Linking Error: {}", msg);
+                            SceneError::PluginLoading(PluginError::LinkingError(msg))
+                        }
+                        _ => SceneError::PluginLoading(error),
+                    },
+                )?);
+                entry.insert(plugin);
+                Ok(())
+            }
         }
     }
 
