@@ -155,7 +155,7 @@ impl Scene {
             return Err(SceneError::ComponentCreation);
         };
 
-        let res = entity.add_component(component);
+        let res = entity.add_component(Rc::new(component));
         assert!(res.is_ok());
 
         Ok(())
@@ -163,8 +163,11 @@ impl Scene {
 
     pub fn remove_component(&mut self, uuid: Uuid, component_id: &str) -> Result<(), SceneError> {
         if let Some(entity) = self.entities.get_mut(&uuid) {
+            let component_rc = entity
+                .get_component_rc(component_id)
+                .ok_or(SceneError::ComponentNotFound)?;
             entity
-                .remove_component(component_id)
+                .remove_component(&component_rc)
                 .map_err(|_| SceneError::ComponentNotFound)
         } else {
             Err(SceneError::EntityNotFound)
