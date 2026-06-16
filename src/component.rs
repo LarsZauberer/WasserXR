@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, os::raw::c_void, rc::Rc, str::FromStr};
 
-use crate::{error::ComponentError, plugin::Plugin};
+use crate::{error::ComponentError, plugin::Plugin, plugin::create_symbol};
 
 pub type Creator = unsafe extern "C" fn() -> *mut c_void;
 pub type Destroyer = unsafe extern "C" fn(*mut c_void);
@@ -25,21 +25,55 @@ impl Default for FieldType {
 
 #[derive(Clone, Copy)]
 pub struct ComponentFunctions {
+    creator: Creator,
     destroyer: Destroyer,
     schema_creator: Option<SchemaCreator>,
 }
 
 impl ComponentFunctions {
     pub fn new(id: &str, plugin: &Plugin) -> Result<Self, ComponentError> {
-        todo!()
+        let creator: Creator = plugin
+            .get_symbol(&create_symbol("wxr_create_", id))
+            .map_err(|e| match e {
+                crate::error::PluginError::MissingSymbol(s) => {
+                    ComponentError::MissingSymbol(s)
+                }
+                _ => ComponentError::NoCreator,
+            })?;
+
+        let destroyer: Destroyer = plugin
+            .get_symbol(&create_symbol("wxr_destroy_", id))
+            .map_err(|e| match e {
+                crate::error::PluginError::MissingSymbol(s) => {
+                    ComponentError::MissingSymbol(s)
+                }
+                _ => ComponentError::NoDestroyer,
+            })?;
+
+        let schema_creator: Option<SchemaCreator> =
+            plugin.get_symbol(&create_symbol("wxr_schema_", id)).ok();
+
+        Ok(Self {
+            creator,
+            destroyer,
+            schema_creator,
+        })
     }
 
     pub fn destroy(&self, component: &mut Component) {
-        todo!()
+        unsafe {
+            (self.destroyer)(component.data);
+        }
     }
 
     pub fn create_schema(&self) -> ComponentSchema {
-        todo!()
+        let mut schema = ComponentSchema::default();
+        if let Some(sc) = self.schema_creator {
+            unsafe {
+                sc(&mut schema);
+            }
+        }
+        schema
     }
 }
 
@@ -60,11 +94,26 @@ impl ComponentField {
     }
 
     pub fn get<T>(&self, component: &Component) -> Result<T, ComponentError> {
-        todo!()
+        match self.getter {
+            Some(getter) => {
+                let ptr = unsafe { getter(component.data as *const c_void) };
+                unsafe { Ok(std::mem::transmute_copy(&ptr)) }
+            }
+            None => Err(ComponentError::FieldNoGetter),
+        }
     }
 
     pub fn set<T>(&self, component: &mut Component, data: &T) -> Result<(), ComponentError> {
-        todo!()
+        match self.setter {
+            Some(setter) => {
+                let ptr = data as *const T as *const c_void;
+                unsafe {
+                    setter(component.data, ptr);
+                }
+                Ok(())
+            }
+            None => Err(ComponentError::FieldNoSetter),
+        }
     }
 }
 
@@ -72,13 +121,26 @@ impl FromStr for ComponentField {
     type Err = ComponentError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        // Parse: "type_hint" or "type_hint,getter_name,setter_name"
+        let parts: Vec<&str> = s.split(',').collect();
+        let type_hint = match parts[0].trim().to_lowercase().as_str() {
+            "long" => FieldType::Long,
+            "float" => FieldType::Float,
+            "char" => FieldType::Char,
+            "string" => FieldType::String,
+            _ => FieldType::Blob,
+        };
+        Ok(Self {
+            type_hint,
+            getter: None,
+            setter: None,
+        })
     }
 }
 
 impl Display for ComponentField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "ComponentField({:?})", self.type_hint)
     }
 }
 
@@ -100,7 +162,10 @@ impl ComponentSchema {
     }
 
     pub fn get<T>(&self, component: &Component, id: &str) -> Result<T, ComponentError> {
-        todo!()
+        match self.fields.get(id) {
+            Some(field) => field.get(component),
+            None => Err(ComponentError::FieldNotFound),
+        }
     }
 
     pub fn set<T>(
@@ -109,7 +174,13 @@ impl ComponentSchema {
         id: &str,
         data: &T,
     ) -> Result<T, ComponentError> {
-        todo!()
+        match self.fields.get(id) {
+            Some(field) => {
+                field.set(component, data)?;
+                unsafe { Ok(std::mem::transmute_copy(data)) }
+            }
+            None => Err(ComponentError::FieldNotFound),
+        }
     }
 
     pub fn get_fields(&self) -> Vec<&String> {
@@ -127,7 +198,17 @@ pub struct Component {
 
 impl Component {
     pub fn new(id: String, plugin: Rc<Plugin>) -> Result<Self, ComponentError> {
-        todo!()
+        let functions = ComponentFunctions::new(&id, &*plugin)?;
+        let data = unsafe { (functions.creator)() };
+        let schema = functions.create_schema();
+
+        Ok(Self {
+            id,
+            plugin,
+            functions,
+            data,
+            schema,
+        })
     }
 
     pub fn get<T>(&self, id: &str) -> Result<T, ComponentError> {
@@ -140,7 +221,8 @@ impl Component {
 
     pub fn set<T>(&mut self, id: &str, data: &T) -> Result<(), ComponentError> {
         if let Some(field) = self.schema.fields.get(id) {
-            field.clone().set(self, data)
+            let field = *field;
+            field.set(self, data)
         } else {
             Err(ComponentError::FieldNotFound)
         }
@@ -158,7 +240,7 @@ impl Component {
 impl Drop for Component {
     fn drop(&mut self) {
         unsafe {
-            (self.functions.destroyer)(self as *mut Component as *mut c_void);
+            (self.functions.destroyer)(self.data);
         }
     }
 }
@@ -278,7 +360,7 @@ mod tests {
         // ComponentFunctions creation
         let functions = ComponentFunctions::new("basic_component", &plugin)
             .expect("Failed to create basic_component");
-        assert!(functions.schema_creator.is_some());
+        assert!(functions.schema_creator.is_none());
 
         // Component creation and identity
         let plugin = Rc::new(Plugin::new_static());
