@@ -8,6 +8,12 @@ A **dynamic XR Engine** to help you stay in the **flow**
 
 ---
 
+> [!WARNING]
+>
+> This repository is undergoing a huge rewrite. Please use the
+> [latest tagged version](https://github.com/LarsZauberer/WasserXR/releases/tag/Pre-0.1.0)
+> at the moment.
+
 WasserXR is a game engine that works with an ECS that handles quick **hot
 reloading** and easy to **iterate code**. It is specialized for VR/MR/AR
 applications.
