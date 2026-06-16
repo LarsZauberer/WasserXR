@@ -39,7 +39,7 @@ pub enum SceneError {
     SystemNotFound,
     PluginNotFound,
     ComponentNotFound,
-    ComponentCreation,
+    ComponentCreation(ComponentError),
     SystemCreation,
     PluginLoading(PluginError),
     ComponentFieldError(ComponentError),

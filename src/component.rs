@@ -35,18 +35,14 @@ impl ComponentFunctions {
         let creator: Creator = plugin
             .get_symbol(&create_symbol("wxr_create_", id))
             .map_err(|e| match e {
-                crate::error::PluginError::MissingSymbol(s) => {
-                    ComponentError::MissingSymbol(s)
-                }
+                crate::error::PluginError::MissingSymbol(s) => ComponentError::MissingSymbol(s),
                 _ => ComponentError::NoCreator,
             })?;
 
         let destroyer: Destroyer = plugin
             .get_symbol(&create_symbol("wxr_destroy_", id))
             .map_err(|e| match e {
-                crate::error::PluginError::MissingSymbol(s) => {
-                    ComponentError::MissingSymbol(s)
-                }
+                crate::error::PluginError::MissingSymbol(s) => ComponentError::MissingSymbol(s),
                 _ => ComponentError::NoDestroyer,
             })?;
 

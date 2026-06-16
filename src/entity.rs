@@ -240,4 +240,3 @@ mod tests {
         assert!(entity.get_component("nonexistent").is_none());
     }
 }
-
