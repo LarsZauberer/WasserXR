@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use log::warn;
 use uuid::Uuid;
 
 use crate::{component::Component, error::EntityError};
@@ -87,7 +88,9 @@ impl Entity {
 impl Drop for Entity {
     fn drop(&mut self) {
         // Ensure that all owned components have been removed from the entity
-        assert!(self.components.len() == 0);
+        if !self.components.is_empty() {
+            warn!("Entity dropped which still had some components attached to it. (This is a bug)");
+        }
     }
 }
 
