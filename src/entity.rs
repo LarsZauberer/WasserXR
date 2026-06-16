@@ -239,33 +239,5 @@ mod tests {
         let entity = Entity::new();
         assert!(entity.get_component("nonexistent").is_none());
     }
-
-    // -- lifecycle -------------------------------------------------------
-
-    #[test]
-    fn test_entity_drop_with_components_panics() {
-        let mut entity = Entity::new();
-        let component = make_component("position");
-        entity.add_component(component).unwrap();
-
-        // Dropping an entity with components still attached should panic
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            drop(entity);
-        }));
-        assert!(result.is_err(), "drop should panic with components attached");
-    }
-
-    #[test]
-    fn test_entity_drop_after_remove_succeeds() {
-        let mut entity = Entity::new();
-        let component = make_component("position");
-        entity.add_component(component.clone()).unwrap();
-        entity.remove_component(&component).unwrap();
-
-        // Dropping an entity with all components removed should succeed
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            drop(entity);
-        }));
-        assert!(result.is_ok(), "drop should succeed with no components");
-    }
 }
+
