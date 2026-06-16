@@ -1,11 +1,20 @@
+# C/C++
 .cache/
 build/
-.direnv/
-result
 vgcore*
 compile_commands.json
 Testing/*
-.envrc
 .gdb_history
 
+# AI
 AGENTS.md
+.codex
+CLAUDE.md
+
+# Nix
+.direnv/
+result
+.envrc
+
+# Rust
+target/
