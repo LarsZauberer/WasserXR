@@ -114,11 +114,13 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
+    // Testing Struct that will be turned into a Component
     #[repr(C)]
     struct TestCounter {
         value: i64,
     }
 
+    // Getter and Setter
     unsafe extern "C" fn unit_counter_getter(data: *const c_void) -> *const c_void {
         unsafe { &(*(data as *const TestCounter)).value as *const i64 as *const c_void }
     }
@@ -129,6 +131,7 @@ mod tests {
         }
     }
 
+    // Basic working component => `unit_counter`
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_unit_counter() -> *mut c_void {
         Box::into_raw(Box::new(TestCounter { value: 5 })) as *mut c_void
@@ -153,11 +156,13 @@ mod tests {
         }
     }
 
+    // Faulty component, that doesn't define a destroyer
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_missing_destroyer() -> *mut c_void {
         Box::into_raw(Box::new(TestCounter { value: 0 })) as *mut c_void
     }
 
+    // Component that doesn't define a schema => `schema_less_counter`
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_schema_less_counter() -> *mut c_void {
         Box::into_raw(Box::new(TestCounter { value: 0 })) as *mut c_void
@@ -170,6 +175,7 @@ mod tests {
         }
     }
 
+    // Component that checks clean destruction => `drop_counter`
     static DROP_COUNTER_DESTROYED: AtomicUsize = AtomicUsize::new(0);
 
     #[unsafe(no_mangle)]
