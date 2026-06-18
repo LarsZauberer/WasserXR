@@ -3,9 +3,14 @@ name = "wasserxr"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [".", "wasserxr-macros"]
+resolver = "3"
+
 [dependencies]
 libc = "0.2.186"
 log = "0.4.32"
+wasserxr-macros = { path = "wasserxr-macros" }
 uuid = { version = "1.23.2", features = ["v7"] }
 
 [build-dependencies]
