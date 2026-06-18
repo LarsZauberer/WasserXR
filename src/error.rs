@@ -6,16 +6,8 @@ pub enum PluginError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum EntityError {
-    ComponentAlreadyExists,
-    ComponentNotFound,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SystemError {
-    NoSystemFunction,
-    MissingSymbol(String),
-    FunctionError,
+    NoSystemFunction(PluginError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,11 +15,9 @@ pub enum ComponentError {
     FieldNotFound,
     FieldNoGetter,
     FieldNoSetter,
-    NoCreator,
-    NoDestroyer,
+    NoCreator(PluginError),
+    NoDestroyer(PluginError),
     FieldParsing,
-    FunctionError,
-    MissingSymbol(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,8 +29,8 @@ pub enum SceneError {
     SystemNotFound,
     PluginNotFound,
     ComponentNotFound,
-    ComponentCreation(ComponentError),
-    SystemCreation,
-    PluginLoading(PluginError),
     ComponentFieldError(ComponentError),
+    PluginLoading(PluginError),
+    SystemCreation,
+    ComponentCreation,
 }
