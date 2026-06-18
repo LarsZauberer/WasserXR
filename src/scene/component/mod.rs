@@ -75,7 +75,7 @@ impl Component {
 
         unsafe {
             let data = getter(self.data as *const c_void);
-            std::mem::transmute_copy(&data)
+            Ok(&*(data as *const T))
         }
     }
 
