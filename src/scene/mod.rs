@@ -1,7 +1,7 @@
 pub mod component;
-mod entity;
-mod plugin;
-mod system;
+pub(crate) mod entity;
+pub(crate) mod plugin;
+pub(crate) mod system;
 
 use component::Component;
 use entity::Entity;
@@ -272,9 +272,12 @@ impl Scene {
     }
 
     pub fn tick(&mut self) -> bool {
-        let functions: Vec<(usize, Selector, Runner)> = self
-            .systems
-            .values()
+        let mut systems_sorted: Vec<&System> = self.systems.values().collect();
+        systems_sorted.sort_by_key(|a| a.get_priority());
+
+        let functions: Vec<(usize, Selector, Runner)> = systems_sorted
+            .iter()
+            .rev()
             .map(|system| {
                 (
                     system.get_groups(),
