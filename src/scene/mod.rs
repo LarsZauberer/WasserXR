@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_add_entity_creates_entity_with_empty_name() {
+    fn scene_add_entity() {
         let mut scene = Scene::new();
 
         let entity = scene.add_entity();
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_set_entity_name_for_existing_entity_updates_name() {
+    fn scene_set_entity_name_for_existing_entity() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
 
@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_remove_entity_for_existing_entity_removes_entity() {
+    fn scene_remove_entity_for_existing_entity() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
 
@@ -473,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_add_component_for_existing_entity_adds_component() {
+    fn scene_add_component_for_existing_entity() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
 
@@ -484,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_set_component_field_for_existing_component_updates_value() {
+    fn scene_set_component_field_for_existing_component() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_add_component_for_duplicate_component_returns_component_already_exists() {
+    fn scene_add_component_for_duplicate_component() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -514,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_remove_component_for_existing_component_removes_component() {
+    fn scene_remove_component_for_existing_component() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_add_system_for_existing_symbol_calls_attacher() {
+    fn scene_add_system_for_existing_symbol() {
         SCENE_ATTACH_COUNT.store(0, Ordering::SeqCst);
         let mut scene = Scene::new();
 
@@ -542,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_remove_system_for_existing_system_calls_detacher() {
+    fn scene_remove_system_for_existing_system() {
         SCENE_DETACH_COUNT.store(0, Ordering::SeqCst);
         let mut scene = Scene::new();
         scene
@@ -555,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_reset_with_runtime_state_clears_entities_components_and_systems() {
+    fn scene_reset_with_runtime_state() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_unload_plugin_for_static_plugin_removes_owned_systems_and_components() {
+    fn scene_unload_plugin_for_static_plugin() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -601,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_tick_with_multiple_systems_runs_higher_priority_first() {
+    fn scene_tick_with_multiple_systems() {
         SCENE_TICK_ORDER.lock().unwrap().clear();
         let mut scene = Scene::new();
         scene.add_entity();

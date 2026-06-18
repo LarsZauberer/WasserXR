@@ -60,7 +60,7 @@ mod tests {
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
     #[test]
-    fn schema_add_field_registers_field_id() {
+    fn schema_add_field() {
         let mut schema = Schema::new();
 
         schema.add_field(
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_get_getter_for_existing_field_returns_getter() {
+    fn schema_get_getter_for_existing_field() {
         let mut schema = Schema::new();
 
         schema.add_field(
@@ -93,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_get_getter_for_missing_field_returns_field_not_found() {
+    fn schema_get_getter_for_missing_field() {
         let schema = Schema::new();
 
         assert_eq!(
@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_get_setter_for_existing_field_returns_setter() {
+    fn schema_get_setter_for_existing_field() {
         let mut schema = Schema::new();
 
         schema.add_field(
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_get_setter_for_missing_field_returns_field_not_found() {
+    fn schema_get_setter_for_missing_field() {
         let schema = Schema::new();
 
         assert_eq!(

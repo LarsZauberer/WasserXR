@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn component_new_with_static_symbols_creates_component() {
+    fn component_new_with_static_symbols() {
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn component_get_existing_field_returns_value() {
+    fn component_get_existing_field() {
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn component_set_existing_field_updates_value() {
+    fn component_set_existing_field() {
         let plugin = Plugin::new_static();
         let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn component_get_missing_field_returns_field_not_found() {
+    fn component_get_missing_field() {
         let plugin = Plugin::new_static();
         let component = Component::new("schema_less_counter".to_owned(), &plugin).unwrap();
 
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn component_new_without_creator_returns_no_creator() {
+    fn component_new_without_creator() {
         let plugin = Plugin::new_static();
 
         assert!(matches!(
@@ -241,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn component_new_without_destroyer_returns_no_destroyer() {
+    fn component_new_without_destroyer() {
         let plugin = Plugin::new_static();
 
         assert!(matches!(
@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn component_drop_existing_component_calls_destroyer() {
+    fn component_drop_existing_component() {
         DROP_COUNTER_DESTROYED.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
 

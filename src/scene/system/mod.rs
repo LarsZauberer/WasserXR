@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn system_new_with_all_symbols_creates_system() {
+    fn system_new_with_all_symbols() {
         let plugin = Plugin::new_static();
         let system = System::new("system_with_groups".to_owned(), &plugin, 7).unwrap();
 
@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn system_new_without_optional_symbols_uses_defaults() {
+    fn system_new_without_optional_symbols() {
         let plugin = Plugin::new_static();
         let system = System::new("system_with_defaults".to_owned(), &plugin, 1).unwrap();
 
@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn system_new_without_runner_returns_no_system_function() {
+    fn system_new_without_runner() {
         let plugin = Plugin::new_static();
 
         assert!(matches!(
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn system_get_attacher_when_called_invokes_attacher() {
+    fn system_get_attacher_when_called() {
         SYSTEM_ATTACH_COUNT.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
         let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();
@@ -215,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn system_get_detacher_when_called_invokes_detacher() {
+    fn system_get_detacher_when_called() {
         SYSTEM_DETACH_COUNT.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
         let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();

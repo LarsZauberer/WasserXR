@@ -38,14 +38,14 @@ mod tests {
     use uuid::Uuid;
 
     #[test]
-    fn entity_new_assigns_non_nil_id() {
+    fn entity_new() {
         let entity = Entity::new();
 
         assert_ne!(entity.get_id(), Uuid::nil());
     }
 
     #[test]
-    fn entity_get_id_after_name_change_stays_same() {
+    fn entity_get_id_after_name_change() {
         let mut entity = Entity::new();
         let id = entity.get_id();
 
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn entity_set_name_updates_name() {
+    fn entity_set_name() {
         let mut entity = Entity::new();
 
         assert_eq!(entity.get_name(), "");
