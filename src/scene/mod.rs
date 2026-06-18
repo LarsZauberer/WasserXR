@@ -390,12 +390,6 @@ mod tests {
     static SCENE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
 
-    unsafe extern "C" fn scene_select_all(_scene: *const Scene, _entity: *const u8) -> i32 {
-        0
-    }
-
-    unsafe extern "C" fn scene_noop_attacher_detacher(_scene: *mut Scene) {}
-
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_attach_system(
         _scene: *mut Scene,
@@ -551,18 +545,9 @@ mod tests {
     fn scene_remove_system_for_existing_system_calls_detacher() {
         SCENE_DETACH_COUNT.store(0, Ordering::SeqCst);
         let mut scene = Scene::new();
-        scene.systems.insert(
-            "scene_attach_system".to_owned(),
-            System::new_test(
-                "scene_attach_system".to_owned(),
-                1,
-                0,
-                scene_select_all,
-                wxr_system_scene_attach_system,
-                scene_noop_attacher_detacher,
-                wxr_detach_scene_attach_system,
-            ),
-        );
+        scene
+            .add_system("scene_attach_system".to_owned(), 1)
+            .unwrap();
 
         scene.remove_system("scene_attach_system").unwrap();
 
@@ -576,18 +561,9 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene.systems.insert(
-            "scene_cleanup_system".to_owned(),
-            System::new_test(
-                "scene_cleanup_system".to_owned(),
-                1,
-                0,
-                scene_select_all,
-                wxr_system_scene_cleanup_system,
-                scene_noop_attacher_detacher,
-                scene_noop_attacher_detacher,
-            ),
-        );
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 1)
+            .unwrap();
 
         scene.reset().unwrap();
 
@@ -608,18 +584,9 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene.systems.insert(
-            "scene_cleanup_system".to_owned(),
-            System::new_test(
-                "scene_cleanup_system".to_owned(),
-                1,
-                0,
-                scene_select_all,
-                wxr_system_scene_cleanup_system,
-                scene_noop_attacher_detacher,
-                scene_noop_attacher_detacher,
-            ),
-        );
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 1)
+            .unwrap();
 
         scene.unload_plugin("").unwrap();
 
@@ -638,30 +605,12 @@ mod tests {
         SCENE_TICK_ORDER.lock().unwrap().clear();
         let mut scene = Scene::new();
         scene.add_entity();
-        scene.systems.insert(
-            "scene_high_priority".to_owned(),
-            System::new_test(
-                "scene_high_priority".to_owned(),
-                2,
-                1,
-                scene_select_all,
-                wxr_system_scene_high_priority,
-                scene_noop_attacher_detacher,
-                scene_noop_attacher_detacher,
-            ),
-        );
-        scene.systems.insert(
-            "scene_low_priority".to_owned(),
-            System::new_test(
-                "scene_low_priority".to_owned(),
-                1,
-                1,
-                scene_select_all,
-                wxr_system_scene_low_priority,
-                scene_noop_attacher_detacher,
-                scene_noop_attacher_detacher,
-            ),
-        );
+        scene
+            .add_system("scene_high_priority".to_owned(), 2)
+            .unwrap();
+        scene
+            .add_system("scene_low_priority".to_owned(), 1)
+            .unwrap();
 
         scene.tick();
 

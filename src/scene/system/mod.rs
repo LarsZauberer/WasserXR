@@ -76,28 +76,6 @@ impl System {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn new_test(
-        id: String,
-        priority: usize,
-        groups: usize,
-        selector: Selector,
-        runner: Runner,
-        attacher: Attacher,
-        detacher: Detacher,
-    ) -> Self {
-        Self {
-            id,
-            plugin_id: "".to_owned(),
-            priority,
-            runner,
-            groups,
-            selector,
-            attacher,
-            detacher,
-        }
-    }
-
     pub(crate) fn get_plugin_id(&self) -> &str {
         &self.plugin_id
     }
@@ -226,15 +204,8 @@ mod tests {
     #[test]
     fn system_get_attacher_when_called_invokes_attacher() {
         SYSTEM_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        let system = System::new_test(
-            "system_with_groups".to_owned(),
-            1,
-            3,
-            wxr_select_system_with_groups,
-            wxr_system_system_with_groups,
-            wxr_attach_system_with_groups,
-            wxr_detach_system_with_groups,
-        );
+        let plugin = Plugin::new_static();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();
 
         unsafe {
             (system.get_attacher())(std::ptr::null_mut());
@@ -246,15 +217,8 @@ mod tests {
     #[test]
     fn system_get_detacher_when_called_invokes_detacher() {
         SYSTEM_DETACH_COUNT.store(0, Ordering::SeqCst);
-        let system = System::new_test(
-            "system_with_groups".to_owned(),
-            1,
-            3,
-            wxr_select_system_with_groups,
-            wxr_system_system_with_groups,
-            wxr_attach_system_with_groups,
-            wxr_detach_system_with_groups,
-        );
+        let plugin = Plugin::new_static();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();
 
         unsafe {
             (system.get_detacher())(std::ptr::null_mut());
