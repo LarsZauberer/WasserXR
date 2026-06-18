@@ -40,29 +40,35 @@ impl System {
         let attacher_symbol = "wxr_attach_".to_owned() + &id;
         let detacher_symbol = "wxr_detach_".to_owned() + &id;
 
-        let runner = plugin
-            .get_symbol(&runner_symbol)
+        let runner: Runner = plugin
+            .get_symbol::<Runner>(&runner_symbol)
             .map_err(SystemError::NoSystemFunction)?;
 
-        let groups = if let Ok(ptr) = plugin.get_symbol::<*const usize>(&groups_symbol) {
+        let groups: usize = if let Ok(ptr) = plugin.get_symbol::<*const usize>(&groups_symbol) {
             unsafe { ptr.read() }
         } else {
             log::debug!("No group amount was specified for system: {}", id);
             0
         };
 
-        let selector = plugin.get_symbol(&selector_symbol).unwrap_or_else(|_| {
-            log::debug!("No selector was specified for system: {}", id);
-            default_selector
-        });
-        let attacher = plugin.get_symbol(&attacher_symbol).unwrap_or_else(|_| {
-            log::debug!("No attacher was specified for system: {}", id);
-            noop_attacher_detacher
-        });
-        let detacher = plugin.get_symbol(&detacher_symbol).unwrap_or_else(|_| {
-            log::debug!("No detacher was specified for system: {}", id);
-            noop_attacher_detacher
-        });
+        let selector: Selector = plugin
+            .get_symbol::<Selector>(&selector_symbol)
+            .unwrap_or_else(|_| {
+                log::debug!("No selector was specified for system: {}", id);
+                default_selector
+            });
+        let attacher: Attacher = plugin
+            .get_symbol::<Attacher>(&attacher_symbol)
+            .unwrap_or_else(|_| {
+                log::debug!("No attacher was specified for system: {}", id);
+                noop_attacher_detacher
+            });
+        let detacher: Detacher = plugin
+            .get_symbol::<Detacher>(&detacher_symbol)
+            .unwrap_or_else(|_| {
+                log::debug!("No detacher was specified for system: {}", id);
+                noop_attacher_detacher
+            });
 
         Ok(Self {
             id,

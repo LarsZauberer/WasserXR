@@ -38,15 +38,15 @@ impl Component {
         let destroyer_symbol = "wxr_destroy_".to_owned() + &id;
         let schema_symbol = "wxr_schema_".to_owned() + &id;
 
-        let creator = plugin
+        let creator: Creator = plugin
             .get_symbol::<Creator>(&creator_symbol)
             .map_err(ComponentError::NoCreator)?;
 
-        let destroyer = plugin
+        let destroyer: Destroyer = plugin
             .get_symbol(&destroyer_symbol)
             .map_err(ComponentError::NoDestroyer)?;
 
-        let schema_creator = plugin
+        let schema_creator: SchemaCreator = plugin
             .get_symbol::<SchemaCreator>(&schema_symbol)
             .unwrap_or_else(|_| {
                 log::debug!("Component `{}` has no schema creator defined", id);
