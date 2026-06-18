@@ -265,6 +265,12 @@ impl Scene {
         Ok(())
     }
 
+    pub fn has_component(&self, entity_id: Uuid, component_id: &str) -> bool {
+        self.components
+            .get(&entity_id)
+            .is_some_and(|components| components.contains_key(component_id))
+    }
+
     fn run_system(&mut self, groups: usize, selector: Selector, runner: Runner) {
         let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
 
