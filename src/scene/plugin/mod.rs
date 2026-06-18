@@ -44,6 +44,14 @@ impl Plugin {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn new_test_dynamic(path: String) -> Self {
+        Self {
+            path: Some(path),
+            fd: std::ptr::null_mut(),
+        }
+    }
+
     pub(crate) fn get_symbol<T>(&self, symbol: &str) -> Result<T, PluginError> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
 

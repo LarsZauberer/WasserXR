@@ -57,6 +57,17 @@ impl Scene {
         Ok(())
     }
 
+    fn plugins_dynamic_first(&self) -> impl Iterator<Item = &Plugin> {
+        self.plugins
+            .values()
+            .filter(|plugin| !plugin.get_id().is_empty())
+            .chain(
+                self.plugins
+                    .values()
+                    .filter(|plugin| plugin.get_id().is_empty()),
+            )
+    }
+
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
             return Err(SceneError::PluginAlreadyLoaded);
@@ -172,8 +183,7 @@ impl Scene {
         }
 
         let system: Option<System> = self
-            .plugins
-            .values()
+            .plugins_dynamic_first()
             .find_map(|plugin| System::new(id.clone(), plugin, priority).ok());
 
         match system {
@@ -207,7 +217,7 @@ impl Scene {
         component_id: String,
     ) -> Result<(), SceneError> {
         // Check if entity exists
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+        let Some(entity_components) = self.components.get(&entity_id) else {
             return Err(SceneError::EntityNotFound);
         };
 
@@ -217,15 +227,18 @@ impl Scene {
         }
 
         // Build the plugin
-        let Some(plugin) = self
-            .plugins
-            .values()
+        let Some(component) = self
+            .plugins_dynamic_first()
             .find_map(|plugin| Component::new(component_id.clone(), plugin).ok())
         else {
             return Err(SceneError::ComponentCreation);
         };
 
-        entity_components.insert(component_id, plugin);
+        let entity_components = self
+            .components
+            .get_mut(&entity_id)
+            .expect("entity was checked before creating the component");
+        entity_components.insert(component_id, component);
 
         Ok(())
     }
@@ -539,6 +552,41 @@ mod tests {
             .unwrap();
 
         assert_eq!(SCENE_ATTACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn scene_plugin_lookup_prioritizes_dynamic_plugins_before_static() {
+        let mut scene = Scene::new();
+        scene.plugins.insert(
+            "dynamic_a".to_owned(),
+            Plugin::new_test_dynamic("dynamic_a".to_owned()),
+        );
+        scene.plugins.insert(
+            "dynamic_b".to_owned(),
+            Plugin::new_test_dynamic("dynamic_b".to_owned()),
+        );
+
+        let plugin_ids: Vec<&str> = scene
+            .plugins_dynamic_first()
+            .map(|plugin| plugin.get_id())
+            .collect();
+
+        assert_eq!(plugin_ids.len(), 3);
+        assert!(plugin_ids[..2].contains(&"dynamic_a"));
+        assert!(plugin_ids[..2].contains(&"dynamic_b"));
+        assert_eq!(plugin_ids[2], "");
+    }
+
+    #[test]
+    fn scene_plugin_lookup_uses_static_when_no_dynamic_plugins_exist() {
+        let scene = Scene::new();
+
+        let plugin_ids: Vec<&str> = scene
+            .plugins_dynamic_first()
+            .map(|plugin| plugin.get_id())
+            .collect();
+
+        assert_eq!(plugin_ids, vec![""]);
     }
 
     #[test]
