@@ -104,3 +104,156 @@ impl Drop for Component {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::PluginError;
+    use std::{
+        ffi::c_void,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    #[repr(C)]
+    struct TestCounter {
+        value: i64,
+    }
+
+    unsafe extern "C" fn unit_counter_getter(data: *const c_void) -> *const c_void {
+        unsafe { &(*(data as *const TestCounter)).value as *const i64 as *const c_void }
+    }
+
+    unsafe extern "C" fn unit_counter_setter(data: *mut c_void, value: *const c_void) {
+        unsafe {
+            (*(data as *mut TestCounter)).value = *(value as *const i64);
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_unit_counter() -> *mut c_void {
+        Box::into_raw(Box::new(TestCounter { value: 5 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_unit_counter(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut TestCounter));
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_schema_unit_counter(schema: *mut Schema) {
+        unsafe {
+            (*schema).add_field(
+                "value".to_owned(),
+                FieldType::Long,
+                Some(unit_counter_getter),
+                Some(unit_counter_setter),
+            );
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_missing_destroyer() -> *mut c_void {
+        Box::into_raw(Box::new(TestCounter { value: 0 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_schema_less_counter() -> *mut c_void {
+        Box::into_raw(Box::new(TestCounter { value: 0 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_schema_less_counter(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut TestCounter));
+        }
+    }
+
+    static DROP_COUNTER_DESTROYED: AtomicUsize = AtomicUsize::new(0);
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_drop_counter() -> *mut c_void {
+        Box::into_raw(Box::new(TestCounter { value: 0 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_drop_counter(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut TestCounter));
+        }
+        DROP_COUNTER_DESTROYED.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn component_new_with_static_symbols_creates_component() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+
+        assert_eq!(component.get_id(), "unit_counter");
+        assert_eq!(component.get_plugin_id(), "");
+    }
+
+    #[test]
+    fn component_get_existing_field_returns_value() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+
+        assert_eq!(*component.get::<i64>("value").unwrap(), 5);
+    }
+
+    #[test]
+    fn component_set_existing_field_updates_value() {
+        let plugin = Plugin::new_static();
+        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+
+        component.set("value", &12_i64).unwrap();
+
+        assert_eq!(*component.get::<i64>("value").unwrap(), 12);
+    }
+
+    #[test]
+    fn component_get_missing_field_returns_field_not_found() {
+        let plugin = Plugin::new_static();
+        let component = Component::new("schema_less_counter".to_owned(), &plugin).unwrap();
+
+        assert_eq!(
+            component.get::<i64>("value"),
+            Err(ComponentError::FieldNotFound)
+        );
+    }
+
+    #[test]
+    fn component_new_without_creator_returns_no_creator() {
+        let plugin = Plugin::new_static();
+
+        assert!(matches!(
+            Component::new("missing_creator".to_owned(), &plugin),
+            Err(ComponentError::NoCreator(PluginError::MissingSymbol(symbol)))
+                if symbol == "wxr_create_missing_creator"
+        ));
+    }
+
+    #[test]
+    fn component_new_without_destroyer_returns_no_destroyer() {
+        let plugin = Plugin::new_static();
+
+        assert!(matches!(
+            Component::new("missing_destroyer".to_owned(), &plugin),
+            Err(ComponentError::NoDestroyer(PluginError::MissingSymbol(symbol)))
+                if symbol == "wxr_destroy_missing_destroyer"
+        ));
+    }
+
+    #[test]
+    fn component_drop_existing_component_calls_destroyer() {
+        DROP_COUNTER_DESTROYED.store(0, Ordering::SeqCst);
+        let plugin = Plugin::new_static();
+
+        {
+            let _component = Component::new("drop_counter".to_owned(), &plugin).unwrap();
+        }
+
+        assert_eq!(DROP_COUNTER_DESTROYED.load(Ordering::SeqCst), 1);
+    }
+}

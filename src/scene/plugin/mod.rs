@@ -88,10 +88,27 @@ mod tests {
     static TEST_DATA: usize = 5;
 
     #[test]
-    fn test_static_plugin() {
+    fn plugin_new_static_uses_empty_plugin_id() {
         let plugin = Plugin::new_static();
 
         assert_eq!(plugin.get_id(), "");
+    }
+
+    #[test]
+    fn plugin_get_symbol_for_existing_symbol_returns_symbol() {
+        let plugin = Plugin::new_static();
+
+        let value = plugin.get_symbol::<*const usize>("TEST_DATA").unwrap();
+
+        assert!(!value.is_null());
+        unsafe {
+            assert_eq!(value.read(), 5);
+        }
+    }
+
+    #[test]
+    fn plugin_get_symbol_for_missing_symbol_returns_missing_symbol() {
+        let plugin = Plugin::new_static();
 
         match plugin.get_symbol::<*const usize>("nonexistent") {
             Ok(_) => {
@@ -104,17 +121,22 @@ mod tests {
                 panic!("Nonexistent symbol had an error that was not a MissingSymbol error");
             }
         }
+    }
 
-        match plugin.get_symbol::<*const usize>("TEST_DATA") {
-            Ok(value) => {
-                assert!(!value.is_null());
-                unsafe {
-                    assert_eq!(value.read(), 5);
-                }
-            }
-            Err(_) => {
-                panic!("TEST_DATA symbol had an error");
-            }
-        }
+    #[test]
+    fn plugin_get_symbol_for_invalid_symbol_returns_invalid_symbol() {
+        let plugin = Plugin::new_static();
+
+        assert_eq!(
+            plugin.get_symbol::<*const usize>("invalid\0symbol"),
+            Err(PluginError::InvalidSymbol)
+        );
+    }
+
+    #[test]
+    fn plugin_new_for_missing_path_returns_linking_error() {
+        let result = Plugin::new("/definitely/missing/wasserxr/test/plugin.so".to_owned());
+
+        assert!(matches!(result, Err(PluginError::LinkingError(_))));
     }
 }

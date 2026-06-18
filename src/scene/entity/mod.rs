@@ -35,9 +35,27 @@ impl Entity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[test]
-    fn entity_naming_correct() {
+    fn entity_new_assigns_non_nil_id() {
+        let entity = Entity::new();
+
+        assert_ne!(entity.get_id(), Uuid::nil());
+    }
+
+    #[test]
+    fn entity_get_id_after_name_change_stays_same() {
+        let mut entity = Entity::new();
+        let id = entity.get_id();
+
+        entity.set_name("Player".to_owned());
+
+        assert_eq!(entity.get_id(), id);
+    }
+
+    #[test]
+    fn entity_set_name_updates_name() {
         let mut entity = Entity::new();
 
         assert_eq!(entity.get_name(), "");

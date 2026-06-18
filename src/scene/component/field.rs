@@ -39,3 +39,56 @@ impl Field {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::c_void;
+
+    unsafe extern "C" fn test_getter(_data: *const c_void) -> *const c_void {
+        std::ptr::null()
+    }
+
+    unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
+
+    #[test]
+    fn field_new_stores_type_hint() {
+        let field = Field::new(FieldType::Long, Some(test_getter), Some(test_setter));
+
+        assert_eq!(field.get_type(), FieldType::Long);
+    }
+
+    #[test]
+    fn field_get_getter_when_present_returns_getter() {
+        let field = Field::new(FieldType::Blob, Some(test_getter), None);
+
+        assert_eq!(
+            field.get_getter().unwrap() as usize,
+            test_getter as *const () as usize
+        );
+    }
+
+    #[test]
+    fn field_get_getter_when_missing_returns_field_no_getter() {
+        let field = Field::new(FieldType::Blob, None, Some(test_setter));
+
+        assert_eq!(field.get_getter(), Err(ComponentError::FieldNoGetter));
+    }
+
+    #[test]
+    fn field_get_setter_when_present_returns_setter() {
+        let field = Field::new(FieldType::Blob, None, Some(test_setter));
+
+        assert_eq!(
+            field.get_setter().unwrap() as usize,
+            test_setter as *const () as usize
+        );
+    }
+
+    #[test]
+    fn field_get_setter_when_missing_returns_field_no_setter() {
+        let field = Field::new(FieldType::Blob, Some(test_getter), None);
+
+        assert_eq!(field.get_setter(), Err(ComponentError::FieldNoSetter));
+    }
+}

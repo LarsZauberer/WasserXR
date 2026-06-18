@@ -76,6 +76,28 @@ impl System {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn new_test(
+        id: String,
+        priority: usize,
+        groups: usize,
+        selector: Selector,
+        runner: Runner,
+        attacher: Attacher,
+        detacher: Detacher,
+    ) -> Self {
+        Self {
+            id,
+            plugin_id: "".to_owned(),
+            priority,
+            runner,
+            groups,
+            selector,
+            attacher,
+            detacher,
+        }
+    }
+
     pub(crate) fn get_plugin_id(&self) -> &str {
         &self.plugin_id
     }
@@ -110,4 +132,134 @@ impl System {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::error::PluginError;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static SYSTEM_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SYSTEM_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    #[unsafe(no_mangle)]
+    static WXR_GROUPS_SYSTEM_WITH_GROUPS: usize = 3;
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_system_with_groups(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_select_system_with_groups(
+        _scene: *const Scene,
+        _entity: *const u8,
+    ) -> i32 {
+        2
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_attach_system_with_groups(_scene: *mut Scene) {
+        SYSTEM_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_detach_system_with_groups(_scene: *mut Scene) {
+        SYSTEM_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_system_with_defaults(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+    }
+
+    #[test]
+    fn system_new_with_all_symbols_creates_system() {
+        let plugin = Plugin::new_static();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 7).unwrap();
+
+        assert_eq!(system.get_id(), "system_with_groups");
+        assert_eq!(system.get_plugin_id(), "");
+        assert_eq!(system.get_priority(), 7);
+        assert_eq!(system.get_groups(), 3);
+        assert_eq!(
+            system.get_selector() as usize,
+            wxr_select_system_with_groups as *const () as usize
+        );
+        assert_eq!(
+            system.get_attacher() as usize,
+            wxr_attach_system_with_groups as *const () as usize
+        );
+        assert_eq!(
+            system.get_detacher() as usize,
+            wxr_detach_system_with_groups as *const () as usize
+        );
+    }
+
+    #[test]
+    fn system_new_without_optional_symbols_uses_defaults() {
+        let plugin = Plugin::new_static();
+        let system = System::new("system_with_defaults".to_owned(), &plugin, 1).unwrap();
+
+        assert_eq!(system.get_groups(), 0);
+        assert_eq!(
+            unsafe { (system.get_selector())(std::ptr::null(), std::ptr::null()) },
+            0
+        );
+    }
+
+    #[test]
+    fn system_new_without_runner_returns_no_system_function() {
+        let plugin = Plugin::new_static();
+
+        assert!(matches!(
+            System::new("missing_runner".to_owned(), &plugin, 1),
+            Err(SystemError::NoSystemFunction(PluginError::MissingSymbol(symbol)))
+                if symbol == "wxr_system_missing_runner"
+        ));
+    }
+
+    #[test]
+    fn system_get_attacher_when_called_invokes_attacher() {
+        SYSTEM_ATTACH_COUNT.store(0, Ordering::SeqCst);
+        let system = System::new_test(
+            "system_with_groups".to_owned(),
+            1,
+            3,
+            wxr_select_system_with_groups,
+            wxr_system_system_with_groups,
+            wxr_attach_system_with_groups,
+            wxr_detach_system_with_groups,
+        );
+
+        unsafe {
+            (system.get_attacher())(std::ptr::null_mut());
+        }
+
+        assert_eq!(SYSTEM_ATTACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn system_get_detacher_when_called_invokes_detacher() {
+        SYSTEM_DETACH_COUNT.store(0, Ordering::SeqCst);
+        let system = System::new_test(
+            "system_with_groups".to_owned(),
+            1,
+            3,
+            wxr_select_system_with_groups,
+            wxr_system_system_with_groups,
+            wxr_attach_system_with_groups,
+            wxr_detach_system_with_groups,
+        );
+
+        unsafe {
+            (system.get_detacher())(std::ptr::null_mut());
+        }
+
+        assert_eq!(SYSTEM_DETACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+}
