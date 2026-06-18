@@ -80,10 +80,6 @@ impl System {
         &self.plugin_id
     }
 
-    pub(crate) fn is_from_plugin(&self, plugin: &Plugin) -> bool {
-        self.get_plugin_id() == plugin.get_id()
-    }
-
     pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
@@ -101,7 +97,7 @@ impl System {
     }
 
     pub(crate) fn get_selector(&self) -> Selector {
-        default_selector
+        self.selector
     }
 
     pub(crate) fn get_runner(&self) -> Runner {

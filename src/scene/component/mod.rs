@@ -40,16 +40,18 @@ impl Component {
 
         let creator = plugin
             .get_symbol::<Creator>(&creator_symbol)
-            .map_err(|error| ComponentError::NoCreator(error))?;
+            .map_err(ComponentError::NoCreator)?;
 
         let destroyer = plugin
             .get_symbol(&destroyer_symbol)
-            .map_err(|error| ComponentError::NoDestroyer(error))?;
+            .map_err(ComponentError::NoDestroyer)?;
 
-        let schema_creator = plugin.get_symbol(&schema_symbol).unwrap_or_else(|_| {
-            log::debug!("Component `{}` has no schema creator defined", id);
-            default_schema
-        });
+        let schema_creator = plugin
+            .get_symbol::<SchemaCreator>(&schema_symbol)
+            .unwrap_or_else(|_| {
+                log::debug!("Component `{}` has no schema creator defined", id);
+                default_schema
+            });
 
         let data = unsafe { (creator)() };
         let mut schema = Schema::new();
@@ -92,10 +94,6 @@ impl Component {
 
     pub(crate) fn get_plugin_id(&self) -> &str {
         &self.plugin_id
-    }
-
-    pub(crate) fn get_fields(&self) -> Vec<&String> {
-        self.schema.get_fields()
     }
 }
 

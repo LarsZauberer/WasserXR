@@ -1,14 +1,10 @@
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
 pub enum FieldType {
     Long,
     Float,
     Char,
     String,
-    Blob,
-}
 
-impl Default for FieldType {
-    fn default() -> Self {
-        FieldType::Blob
-    }
+    #[default]
+    Blob,
 }
