@@ -1,5 +1,5 @@
 mod field;
-mod field_type;
+pub mod field_type;
 pub mod schema;
 
 use std::ffi::c_void;
