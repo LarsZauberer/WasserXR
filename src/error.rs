@@ -28,6 +28,7 @@ pub enum SceneError {
     PluginAlreadyLoaded,
     SystemNotFound,
     PluginNotFound,
+    StaticPluginUnload,
     ComponentNotFound,
     ComponentFieldError(ComponentError),
     PluginLoading(PluginError),

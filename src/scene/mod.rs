@@ -82,6 +82,10 @@ impl Scene {
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
+        if path.is_empty() {
+            return Err(SceneError::StaticPluginUnload);
+        }
+
         if !self.plugins.contains_key(path) {
             return Err(SceneError::PluginNotFound);
         }
@@ -626,6 +630,13 @@ mod tests {
     }
 
     #[test]
+    fn scene_unload_plugin_rejects_static_plugin() {
+        let mut scene = Scene::new();
+
+        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
+    }
+
+    #[test]
     fn scene_unload_plugin_for_static_plugin() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
@@ -636,16 +647,13 @@ mod tests {
             .add_system("scene_cleanup_system".to_owned(), 1)
             .unwrap();
 
-        scene.unload_plugin("").unwrap();
+        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
 
         assert_eq!(
-            scene.get::<i64>(entity, "scene_counter", "value"),
-            Err(SceneError::ComponentNotFound)
+            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            1
         );
-        assert_eq!(
-            scene.remove_system("scene_cleanup_system"),
-            Err(SceneError::SystemNotFound)
-        );
+        scene.remove_system("scene_cleanup_system").unwrap();
     }
 
     #[test]
