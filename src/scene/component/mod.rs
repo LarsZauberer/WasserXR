@@ -1,23 +1,23 @@
 mod field;
 mod field_type;
-mod schema;
+pub mod schema;
 
 use std::ffi::c_void;
 
-use field::Field;
-use field_type::FieldType;
-use schema::Schema;
-
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
-pub type Creator = unsafe extern "C" fn() -> *mut c_void;
-pub type Destroyer = unsafe extern "C" fn(*mut c_void);
-pub type SchemaCreator = unsafe extern "C" fn(*mut Schema);
+pub use field::{Getter, Setter};
+pub use field_type::FieldType;
+pub use schema::Schema;
+
+pub(crate) type Creator = unsafe extern "C" fn() -> *mut c_void;
+pub(crate) type Destroyer = unsafe extern "C" fn(*mut c_void);
+pub(crate) type SchemaCreator = unsafe extern "C" fn(*mut Schema);
 
 // Default Schema creator
 unsafe extern "C" fn default_schema(_schema: *mut Schema) {}
 
-pub struct Component {
+pub(crate) struct Component {
     // Metadata
     id: String,
     plugin_id: String,
@@ -31,7 +31,7 @@ pub struct Component {
 }
 
 impl Component {
-    pub fn new(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
+    pub(crate) fn new(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
         let plugin_id = plugin.get_id().to_owned();
 
         let creator_symbol = "wxr_create_".to_owned() + &id;
@@ -68,7 +68,7 @@ impl Component {
         })
     }
 
-    pub fn get<T>(&self, id: &str) -> Result<&T, ComponentError> {
+    pub(crate) fn get<T>(&self, id: &str) -> Result<&T, ComponentError> {
         let getter = self.schema.get_getter(id)?;
 
         unsafe {
@@ -77,7 +77,7 @@ impl Component {
         }
     }
 
-    pub fn set<T>(&mut self, id: &str, data: &T) -> Result<(), ComponentError> {
+    pub(crate) fn set<T>(&mut self, id: &str, data: &T) -> Result<(), ComponentError> {
         let setter = self.schema.get_setter(id)?;
 
         unsafe {
@@ -86,15 +86,15 @@ impl Component {
         Ok(())
     }
 
-    pub fn get_id(&self) -> &str {
+    pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
 
-    pub fn get_plugin_id(&self) -> &str {
+    pub(crate) fn get_plugin_id(&self) -> &str {
         &self.plugin_id
     }
 
-    pub fn get_fields(&self) -> Vec<&String> {
+    pub(crate) fn get_fields(&self) -> Vec<&String> {
         self.schema.get_fields()
     }
 }

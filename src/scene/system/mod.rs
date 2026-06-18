@@ -3,10 +3,10 @@ use crate::{
     scene::{Scene, plugin::Plugin},
 };
 
-pub type Selector = unsafe extern "C" fn(*const Scene, *const u8) -> i32;
-pub type Runner = unsafe extern "C" fn(*mut Scene, *const *const *const u8, *const usize);
-pub type Attacher = unsafe extern "C" fn(*mut Scene);
-pub type Detacher = unsafe extern "C" fn(*mut Scene);
+pub(crate) type Selector = unsafe extern "C" fn(*const Scene, *const u8) -> i32;
+pub(crate) type Runner = unsafe extern "C" fn(*mut Scene, *const *const *const u8, *const usize);
+pub(crate) type Attacher = unsafe extern "C" fn(*mut Scene);
+pub(crate) type Detacher = unsafe extern "C" fn(*mut Scene);
 
 // Default Selector
 
@@ -16,7 +16,7 @@ unsafe extern "C" fn default_selector(_scene: *const Scene, _entity: *const u8) 
 
 unsafe extern "C" fn noop_attacher_detacher(_scene: *mut Scene) {}
 
-pub struct System {
+pub(crate) struct System {
     // Metadata
     id: String,
     plugin_id: String,
@@ -31,7 +31,7 @@ pub struct System {
 }
 
 impl System {
-    pub fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
+    pub(crate) fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
         let plugin_id = plugin.get_id().to_owned();
 
         let runner_symbol = "wxr_system_".to_owned() + &id;
@@ -76,39 +76,39 @@ impl System {
         })
     }
 
-    pub fn get_plugin_id(&self) -> &str {
+    pub(crate) fn get_plugin_id(&self) -> &str {
         &self.plugin_id
     }
 
-    pub fn is_from_plugin(&self, plugin: &Plugin) -> bool {
+    pub(crate) fn is_from_plugin(&self, plugin: &Plugin) -> bool {
         self.get_plugin_id() == plugin.get_id()
     }
 
-    pub fn get_id(&self) -> &str {
+    pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
 
-    pub fn get_priority(&self) -> usize {
+    pub(crate) fn get_priority(&self) -> usize {
         self.priority
     }
 
-    pub fn get_attacher(&self) -> Attacher {
+    pub(crate) fn get_attacher(&self) -> Attacher {
         self.attacher
     }
 
-    pub fn get_detacher(&self) -> Detacher {
+    pub(crate) fn get_detacher(&self) -> Detacher {
         self.detacher
     }
 
-    pub fn get_selector(&self) -> Selector {
+    pub(crate) fn get_selector(&self) -> Selector {
         default_selector
     }
 
-    pub fn get_runner(&self) -> Runner {
+    pub(crate) fn get_runner(&self) -> Runner {
         self.runner
     }
 
-    pub fn get_groups(&self) -> usize {
+    pub(crate) fn get_groups(&self) -> usize {
         self.groups
     }
 }

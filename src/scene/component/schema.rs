@@ -14,7 +14,7 @@ pub struct Schema {
 }
 
 impl Schema {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Schema::default()
     }
 
@@ -29,21 +29,21 @@ impl Schema {
         self.fields.insert(id, field);
     }
 
-    pub fn get_getter(&self, id: &str) -> Result<Getter, ComponentError> {
+    pub(crate) fn get_getter(&self, id: &str) -> Result<Getter, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_getter(),
             None => Err(ComponentError::FieldNotFound),
         }
     }
 
-    pub fn get_setter(&self, id: &str) -> Result<Setter, ComponentError> {
+    pub(crate) fn get_setter(&self, id: &str) -> Result<Setter, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_setter(),
             None => Err(ComponentError::FieldNotFound),
         }
     }
 
-    pub fn get_fields(&self) -> Vec<&String> {
+    pub(crate) fn get_fields(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }
 }

@@ -1,4 +1,4 @@
-mod component;
+pub mod component;
 mod entity;
 mod plugin;
 mod system;
@@ -8,13 +8,11 @@ use entity::Entity;
 use plugin::Plugin;
 use system::System;
 
-use crate::error::{PluginError, SceneError};
+use crate::error::SceneError;
 use crate::scene::system::{Runner, Selector};
 
-use std::collections::{HashMap, hash_map::Entry};
-use std::rc::Rc;
+use std::collections::HashMap;
 
-use log::error;
 use uuid::Uuid;
 
 pub struct Scene {

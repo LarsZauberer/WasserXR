@@ -5,13 +5,13 @@ use std::{
 
 use crate::error::PluginError;
 
-pub struct Plugin {
+pub(crate) struct Plugin {
     path: Option<String>,
     fd: *mut c_void,
 }
 
 impl Plugin {
-    pub fn new(path: String) -> Result<Plugin, PluginError> {
+    pub(crate) fn new(path: String) -> Result<Plugin, PluginError> {
         // Create the symbol
         let Ok(convert_path) = CString::new(path.to_owned()) else {
             return Err(PluginError::InvalidSymbol);
@@ -37,14 +37,14 @@ impl Plugin {
         })
     }
 
-    pub fn new_static() -> Self {
+    pub(crate) fn new_static() -> Self {
         Self {
             path: None,
             fd: libc::RTLD_DEFAULT,
         }
     }
 
-    pub fn get_symbol<T>(&self, symbol: &str) -> Result<T, PluginError> {
+    pub(crate) fn get_symbol<T>(&self, symbol: &str) -> Result<T, PluginError> {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
 
         let Ok(symbol_cstring) = CString::new(symbol.to_owned()) else {
@@ -60,7 +60,7 @@ impl Plugin {
         Ok(func)
     }
 
-    pub fn get_id(&self) -> &str {
+    pub(crate) fn get_id(&self) -> &str {
         match &self.path {
             Some(path) => path,
             None => "",
