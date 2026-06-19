@@ -1,6 +1,6 @@
 use crate::{
     error::SystemError,
-    scene::{Scene, plugin::Plugin},
+    scene::{Scene, plugin::Plugin, serialization::SystemData},
 };
 
 pub(crate) type Selector = unsafe extern "C" fn(*const Scene, *const u8) -> i32;
@@ -84,6 +84,17 @@ impl System {
             attacher,
             detacher,
         })
+    }
+
+    pub(crate) fn serialize(&self) -> SystemData {
+        SystemData {
+            id: self.id.clone(),
+            priority: self.priority,
+        }
+    }
+
+    pub(crate) fn deserialize(data: SystemData, plugin: &Plugin) -> Result<Self, SystemError> {
+        Self::new(data.id, plugin, data.priority)
     }
 
     pub(crate) fn get_plugin_id(&self) -> &str {
@@ -209,6 +220,17 @@ mod tests {
             Err(SystemError::NoSystemFunction(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_system_missing_runner"
         ));
+    }
+
+    #[test]
+    fn system_serialize_round_trip() {
+        let plugin = Plugin::new_static();
+        let system = System::new("system_with_defaults".to_owned(), &plugin, 7).unwrap();
+
+        let deserialized = System::deserialize(system.serialize(), &plugin).unwrap();
+
+        assert_eq!(deserialized.get_id(), "system_with_defaults");
+        assert_eq!(deserialized.get_priority(), 7);
     }
 
     #[test]
