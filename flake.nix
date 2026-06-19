@@ -60,6 +60,7 @@
           buildInputs = [
             nightlyRust
             pkgs.cargo-llvm-cov
+            pkgs.cargo-expand
 
             pkgs.plantuml
             pkgs.graphviz
