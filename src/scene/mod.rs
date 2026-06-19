@@ -1,6 +1,7 @@
 pub mod component;
 pub(crate) mod entity;
 pub(crate) mod plugin;
+pub(crate) mod serialization;
 pub(crate) mod system;
 
 use component::Component;
@@ -9,9 +10,10 @@ use plugin::Plugin;
 use system::System;
 
 use crate::error::SceneError;
+use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::Path};
 
 use uuid::Uuid;
 
@@ -56,6 +58,93 @@ impl Scene {
         // Plugins will stay as they are
         log::info!("Scene reset");
         Ok(())
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>, SceneError> {
+        let mut entities: Vec<_> = self.entities.values().map(Entity::serialize).collect();
+        entities.sort_by(|left, right| left.id.as_bytes().cmp(right.id.as_bytes()));
+
+        let mut systems: Vec<_> = self.systems.values().map(System::serialize).collect();
+        systems.sort_by(|left, right| left.id.cmp(&right.id));
+
+        let mut components: Vec<_> = self
+            .components
+            .iter()
+            .flat_map(|(entity_id, components)| {
+                components
+                    .values()
+                    .map(|component| component.serialize(*entity_id))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        components.sort_by(|left, right| {
+            left.entity_id
+                .as_bytes()
+                .cmp(right.entity_id.as_bytes())
+                .then(left.id.cmp(&right.id))
+        });
+
+        Ok(SceneData {
+            entities,
+            systems,
+            components,
+        }
+        .encode())
+    }
+
+    pub fn deserialize(&mut self, data: &[u8]) -> Result<(), SceneError> {
+        self.reset()?;
+
+        let scene_data = SceneData::decode(data).map_err(SceneError::Deserialization)?;
+
+        for entity_data in scene_data.entities {
+            let entity_id = entity_data.id;
+            if self.entities.contains_key(&entity_id) {
+                log::warn!("Entity `{}` is duplicated in serialized scene", entity_id);
+                continue;
+            }
+
+            self.entities
+                .insert(entity_id, Entity::deserialize(entity_data));
+            self.components.insert(entity_id, HashMap::new());
+        }
+
+        for system_data in scene_data.systems {
+            let system_id = system_data.id.clone();
+            if let Err(error) = self.add_system_from_data(system_data) {
+                log::warn!(
+                    "System `{}` could not be deserialized: {:?}",
+                    system_id,
+                    error
+                );
+            }
+        }
+
+        for component_data in scene_data.components {
+            let component_id = component_data.id.clone();
+            let entity_id = component_data.entity_id;
+
+            if let Err(error) = self.add_component_from_data(component_data) {
+                log::warn!(
+                    "Component `{}` on entity `{}` could not be deserialized: {:?}",
+                    component_id,
+                    entity_id,
+                    error
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), SceneError> {
+        let data = self.serialize()?;
+        fs::write(path, data).map_err(|error| SceneError::FileIo(error.to_string()))
+    }
+
+    pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SceneError> {
+        let data = fs::read(path).map_err(|error| SceneError::FileIo(error.to_string()))?;
+        self.deserialize(&data)
     }
 
     fn plugins_dynamic_first(&self) -> impl Iterator<Item = &Plugin> {
@@ -193,6 +282,11 @@ impl Scene {
     }
 
     pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
+        self.add_system_from_data(SystemData { id, priority })
+    }
+
+    fn add_system_from_data(&mut self, data: SystemData) -> Result<(), SceneError> {
+        let id = data.id.clone();
         if self.systems.contains_key(&id) {
             log::warn!("System `{}` already exists", id);
             return Err(SceneError::SystemAlreadyExists);
@@ -200,7 +294,7 @@ impl Scene {
 
         let system: Option<System> = self
             .plugins_dynamic_first()
-            .find_map(|plugin| System::new(id.clone(), plugin, priority).ok());
+            .find_map(|plugin| System::deserialize(data.clone(), plugin).ok());
 
         match system {
             Some(system) => {
@@ -238,6 +332,17 @@ impl Scene {
         entity_id: Uuid,
         component_id: String,
     ) -> Result<(), SceneError> {
+        self.add_component_from_data(ComponentData {
+            id: component_id,
+            entity_id,
+            fields: Vec::new(),
+        })
+    }
+
+    fn add_component_from_data(&mut self, data: ComponentData) -> Result<(), SceneError> {
+        let component_id = data.id.clone();
+        let entity_id = data.entity_id;
+
         // Check if entity exists
         let Some(entity_components) = self.components.get(&entity_id) else {
             log::debug!(
@@ -260,7 +365,7 @@ impl Scene {
         // Build the plugin
         let Some(component) = self
             .plugins_dynamic_first()
-            .find_map(|plugin| Component::new(component_id.clone(), plugin).ok())
+            .find_map(|plugin| Component::deserialize(component_id.clone(), plugin).ok())
         else {
             log::warn!("Component `{}` could not be created", component_id);
             return Err(SceneError::ComponentCreation);
@@ -272,6 +377,10 @@ impl Scene {
             .expect("entity was checked before creating the component");
         let component_id_for_log = component_id.clone();
         entity_components.insert(component_id, component);
+
+        if let Some(component) = entity_components.get_mut(&component_id_for_log) {
+            component.deserialize_fields(data.fields);
+        }
 
         log::info!(
             "Component `{}` added to entity `{}`",
@@ -423,7 +532,10 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::component::{FieldType, Schema};
+    use crate::scene::{
+        component::{FieldType, Schema, SerializedBytes},
+        serialization::{ComponentData, FieldData, SceneData},
+    };
     use std::{
         ffi::c_void,
         sync::{
@@ -447,6 +559,26 @@ mod tests {
         }
     }
 
+    unsafe extern "C" fn scene_counter_serializer(data: *const c_void) -> SerializedBytes {
+        unsafe {
+            SerializedBytes::from_vec(
+                (*(data as *const SceneCounter))
+                    .value
+                    .to_le_bytes()
+                    .to_vec(),
+            )
+        }
+    }
+
+    unsafe extern "C" fn scene_counter_deserializer(data: *mut c_void, value: SerializedBytes) {
+        unsafe {
+            let bytes = value.into_vec();
+            if let Ok(bytes) = <[u8; 8]>::try_from(bytes.as_slice()) {
+                (*(data as *mut SceneCounter)).value = i64::from_le_bytes(bytes);
+            }
+        }
+    }
+
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_scene_counter() -> *mut c_void {
         Box::into_raw(Box::new(SceneCounter { value: 1 })) as *mut c_void
@@ -467,6 +599,8 @@ mod tests {
                 FieldType::Long,
                 Some(scene_counter_getter),
                 Some(scene_counter_setter),
+                Some(scene_counter_serializer),
+                Some(scene_counter_deserializer),
             );
         }
     }
@@ -740,5 +874,136 @@ mod tests {
         scene.tick();
 
         assert_eq!(*SCENE_TICK_ORDER.lock().unwrap(), vec!["high", "low"]);
+    }
+
+    #[test]
+    fn scene_serialize_is_deterministic() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene.set_entity_name(entity, "Player".to_owned()).unwrap();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+        scene
+            .set(entity, "scene_counter", "value", &42_i64)
+            .unwrap();
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 3)
+            .unwrap();
+
+        assert_eq!(scene.serialize().unwrap(), scene.serialize().unwrap());
+    }
+
+    #[test]
+    fn scene_deserialize_round_trip() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene.set_entity_name(entity, "Player".to_owned()).unwrap();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+        scene
+            .set(entity, "scene_counter", "value", &42_i64)
+            .unwrap();
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 3)
+            .unwrap();
+
+        let serialized = scene.serialize().unwrap();
+        let mut loaded = Scene::new();
+        loaded.deserialize(&serialized).unwrap();
+
+        assert_eq!(loaded.get_entity_name(entity).unwrap(), "Player");
+        assert_eq!(
+            *loaded.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            42
+        );
+        assert_eq!(loaded.remove_system("scene_cleanup_system"), Ok(()));
+    }
+
+    #[test]
+    fn scene_deserialize_missing_and_extra_component_fields() {
+        let entity = Entity::new();
+        let entity_data = entity.serialize();
+        let data = SceneData {
+            entities: vec![entity_data.clone()],
+            systems: Vec::new(),
+            components: vec![ComponentData {
+                id: "scene_counter".to_owned(),
+                entity_id: entity_data.id,
+                fields: vec![FieldData {
+                    name: "extra".to_owned(),
+                    value: vec![1, 2, 3],
+                }],
+            }],
+        };
+
+        let mut scene = Scene::new();
+        scene.deserialize(&data.encode()).unwrap();
+
+        assert_eq!(
+            *scene
+                .get::<i64>(entity_data.id, "scene_counter", "value")
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn scene_deserialize_skips_missing_systems_and_components() {
+        let entity = Entity::new();
+        let entity_data = entity.serialize();
+        let data = SceneData {
+            entities: vec![entity_data.clone()],
+            systems: vec![SystemData {
+                id: "missing_system".to_owned(),
+                priority: 1,
+            }],
+            components: vec![ComponentData {
+                id: "missing_component".to_owned(),
+                entity_id: entity_data.id,
+                fields: Vec::new(),
+            }],
+        };
+
+        let mut scene = Scene::new();
+        scene.deserialize(&data.encode()).unwrap();
+
+        assert_eq!(scene.get_entity_name(entity_data.id).unwrap(), "");
+        assert!(!scene.has_component(entity_data.id, "missing_component"));
+    }
+
+    #[test]
+    fn scene_save_and_load_round_trip() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene.set_entity_name(entity, "Saved".to_owned()).unwrap();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+        scene
+            .set(entity, "scene_counter", "value", &11_i64)
+            .unwrap();
+
+        let path = std::env::temp_dir().join(format!("wasserxr-{}.scene", Uuid::now_v7()));
+        scene.save(&path).unwrap();
+
+        let mut loaded = Scene::new();
+        loaded.load(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(loaded.get_entity_name(entity).unwrap(), "Saved");
+        assert_eq!(
+            *loaded.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            11
+        );
+    }
+
+    #[test]
+    fn scene_load_missing_file() {
+        let path = std::env::temp_dir().join(format!("wasserxr-missing-{}.scene", Uuid::now_v7()));
+        let mut scene = Scene::new();
+
+        assert!(matches!(scene.load(path), Err(SceneError::FileIo(_))));
     }
 }
