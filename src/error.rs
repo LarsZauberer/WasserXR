@@ -15,6 +15,8 @@ pub enum ComponentError {
     FieldNotFound,
     FieldNoGetter,
     FieldNoSetter,
+    FieldNoSerializer,
+    FieldNoDeserializer,
     NoCreator(PluginError),
     NoDestroyer(PluginError),
     FieldParsing,
@@ -34,4 +36,7 @@ pub enum SceneError {
     PluginLoading(PluginError),
     SystemCreation,
     ComponentCreation,
+    Serialization(String),
+    Deserialization(String),
+    FileIo(String),
 }
