@@ -8,4 +8,4 @@ mod r#macro;
 
 pub use scene::Scene;
 pub use uuid::Uuid;
-pub use wasserxr_macros::System;
+pub use wasserxr_macros::{Component, System};
