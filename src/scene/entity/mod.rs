@@ -1,5 +1,7 @@
 use uuid::Uuid;
 
+use crate::scene::serialization::EntityData;
+
 pub struct Entity {
     id: Uuid,
     name: String,
@@ -29,6 +31,20 @@ impl Entity {
 
     pub fn set_name(&mut self, name: String) {
         self.name = name;
+    }
+
+    pub(crate) fn serialize(&self) -> EntityData {
+        EntityData {
+            id: self.id,
+            name: self.name.clone(),
+        }
+    }
+
+    pub(crate) fn deserialize(data: EntityData) -> Self {
+        Self {
+            id: data.id,
+            name: data.name,
+        }
     }
 }
 
@@ -62,5 +78,17 @@ mod tests {
 
         entity.set_name("Player".to_owned());
         assert_eq!(entity.get_name(), "Player");
+    }
+
+    #[test]
+    fn entity_serialize_round_trip() {
+        let mut entity = Entity::new();
+        entity.set_name("Player".to_owned());
+        let id = entity.get_id();
+
+        let deserialized = Entity::deserialize(entity.serialize());
+
+        assert_eq!(deserialized.get_id(), id);
+        assert_eq!(deserialized.get_name(), "Player");
     }
 }
