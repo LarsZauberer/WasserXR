@@ -26,20 +26,27 @@ impl Schema {
         setter: Option<Setter>,
     ) {
         let field = Field::new(type_hint, getter, setter);
+        log::debug!("Schema field `{}` added", id);
         self.fields.insert(id, field);
     }
 
     pub(crate) fn get_getter(&self, id: &str) -> Result<Getter, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_getter(),
-            None => Err(ComponentError::FieldNotFound),
+            None => {
+                log::debug!("Schema field `{}` was not found for read", id);
+                Err(ComponentError::FieldNotFound)
+            }
         }
     }
 
     pub(crate) fn get_setter(&self, id: &str) -> Result<Setter, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_setter(),
-            None => Err(ComponentError::FieldNotFound),
+            None => {
+                log::debug!("Schema field `{}` was not found for update", id);
+                Err(ComponentError::FieldNotFound)
+            }
         }
     }
 

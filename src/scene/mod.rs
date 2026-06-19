@@ -54,6 +54,7 @@ impl Scene {
         }
 
         // Plugins will stay as they are
+        log::info!("Scene reset");
         Ok(())
     }
 
@@ -70,23 +71,25 @@ impl Scene {
 
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
+            log::warn!("Plugin `{}` is already loaded", path);
             return Err(SceneError::PluginAlreadyLoaded);
         }
 
-        self.plugins.insert(
-            path.to_owned(),
-            Plugin::new(path).map_err(SceneError::PluginLoading)?,
-        );
+        let plugin = Plugin::new(path.to_owned()).map_err(SceneError::PluginLoading)?;
+        self.plugins.insert(path.to_owned(), plugin);
 
+        log::info!("Plugin `{}` loaded", path);
         Ok(())
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
         if path.is_empty() {
+            log::warn!("Static plugin cannot be unloaded");
             return Err(SceneError::StaticPluginUnload);
         }
 
         if !self.plugins.contains_key(path) {
+            log::warn!("Plugin `{}` is not loaded", path);
             return Err(SceneError::PluginNotFound);
         }
 
@@ -122,6 +125,7 @@ impl Scene {
         // Remove the plugin itself
         self.plugins.remove(path);
 
+        log::info!("Plugin `{}` unloaded", path);
         Ok(())
     }
 
@@ -130,14 +134,15 @@ impl Scene {
         let uuid = entity.get_id();
         self.entities.insert(uuid, entity);
         self.components.insert(uuid, HashMap::new());
+        log::info!("Entity `{}` added", uuid);
         uuid
     }
 
     pub fn remove_entity(&mut self, id: Uuid) -> Result<(), SceneError> {
         let Some(_) = self.entities.remove(&id) else {
+            log::warn!("Entity `{}` was not found for removal", id);
             return Err(SceneError::EntityNotFound);
         };
-        self.components.remove(&id);
 
         let Some(components) = self.components.remove(&id) else {
             log::error!(
@@ -147,26 +152,31 @@ impl Scene {
             return Ok(());
         };
 
-        let components: Vec<&String> = components.keys().collect();
-
-        for i in components {
-            self.remove_component(id, i)?;
+        for component_id in components.keys() {
+            log::info!("Component `{}` removed from entity `{}`", component_id, id);
         }
 
+        log::info!("Entity `{}` removed", id);
         Ok(())
     }
 
     fn get_entity(&self, id: Uuid) -> Result<&Entity, SceneError> {
         match self.entities.get(&id) {
             Some(entity) => Ok(entity),
-            None => Err(SceneError::EntityNotFound),
+            None => {
+                log::warn!("Entity `{}` was not found", id);
+                Err(SceneError::EntityNotFound)
+            }
         }
     }
 
     fn get_entity_mut(&mut self, id: Uuid) -> Result<&mut Entity, SceneError> {
         match self.entities.get_mut(&id) {
             Some(entity) => Ok(entity),
-            None => Err(SceneError::EntityNotFound),
+            None => {
+                log::warn!("Entity `{}` was not found", id);
+                Err(SceneError::EntityNotFound)
+            }
         }
     }
 
@@ -178,11 +188,13 @@ impl Scene {
     pub fn set_entity_name(&mut self, id: Uuid, name: String) -> Result<(), SceneError> {
         let entity = self.get_entity_mut(id)?;
         entity.set_name(name);
+        log::info!("Entity `{}` renamed", id);
         Ok(())
     }
 
     pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
         if self.systems.contains_key(&id) {
+            log::warn!("System `{}` already exists", id);
             return Err(SceneError::SystemAlreadyExists);
         }
 
@@ -196,15 +208,20 @@ impl Scene {
                 unsafe {
                     attacher(self as *mut Scene);
                 }
+                log::info!("System `{}` added", system.get_id());
                 self.systems.insert(id, system);
                 Ok(())
             }
-            None => Err(SceneError::SystemCreation),
+            None => {
+                log::warn!("System `{}` could not be created", id);
+                Err(SceneError::SystemCreation)
+            }
         }
     }
 
     pub fn remove_system(&mut self, id: &str) -> Result<(), SceneError> {
         let Some(system) = self.systems.remove(id) else {
+            log::warn!("System `{}` was not found for removal", id);
             return Err(SceneError::SystemNotFound);
         };
 
@@ -212,6 +229,7 @@ impl Scene {
         unsafe {
             detacher(self as *mut Scene);
         }
+        log::info!("System `{}` removed", id);
         Ok(())
     }
 
@@ -222,11 +240,20 @@ impl Scene {
     ) -> Result<(), SceneError> {
         // Check if entity exists
         let Some(entity_components) = self.components.get(&entity_id) else {
+            log::debug!(
+                "Entity `{}` was not found for component addition",
+                entity_id
+            );
             return Err(SceneError::EntityNotFound);
         };
 
         // Check if this component already exists
         if entity_components.contains_key(&component_id) {
+            log::debug!(
+                "Component `{}` already exists on entity `{}`",
+                component_id,
+                entity_id
+            );
             return Err(SceneError::ComponentAlreadyExists);
         }
 
@@ -235,6 +262,7 @@ impl Scene {
             .plugins_dynamic_first()
             .find_map(|plugin| Component::new(component_id.clone(), plugin).ok())
         else {
+            log::warn!("Component `{}` could not be created", component_id);
             return Err(SceneError::ComponentCreation);
         };
 
@@ -242,8 +270,14 @@ impl Scene {
             .components
             .get_mut(&entity_id)
             .expect("entity was checked before creating the component");
+        let component_id_for_log = component_id.clone();
         entity_components.insert(component_id, component);
 
+        log::info!(
+            "Component `{}` added to entity `{}`",
+            component_id_for_log,
+            entity_id
+        );
         Ok(())
     }
 
@@ -254,14 +288,25 @@ impl Scene {
     ) -> Result<(), SceneError> {
         // Check if entity exists
         let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!("Entity `{}` was not found for component removal", entity_id);
             return Err(SceneError::EntityNotFound);
         };
 
         // Check if this component already exists
         let Some(_) = entity_components.remove(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for removal",
+                component_id,
+                entity_id
+            );
             return Err(SceneError::ComponentAlreadyExists);
         };
 
+        log::info!(
+            "Component `{}` removed from entity `{}`",
+            component_id,
+            entity_id
+        );
         Ok(())
     }
 
@@ -324,10 +369,19 @@ impl Scene {
         field_id: &str,
     ) -> Result<&T, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field read",
+                entity_id
+            );
             return Err(SceneError::EntityNotFound);
         };
 
         let Some(component) = entity_components.get(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field read",
+                component_id,
+                entity_id
+            );
             return Err(SceneError::ComponentNotFound);
         };
 
@@ -344,10 +398,19 @@ impl Scene {
         data: &T,
     ) -> Result<(), SceneError> {
         let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field update",
+                entity_id
+            );
             return Err(SceneError::EntityNotFound);
         };
 
         let Some(component) = entity_components.get_mut(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field update",
+                component_id,
+                entity_id
+            );
             return Err(SceneError::ComponentNotFound);
         };
 

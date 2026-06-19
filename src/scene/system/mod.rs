@@ -42,34 +42,38 @@ impl System {
 
         let runner: Runner = plugin
             .get_symbol::<Runner>(&runner_symbol)
-            .map_err(SystemError::NoSystemFunction)?;
+            .map_err(|error| {
+                log::debug!("System `{}` has no runner function", id);
+                SystemError::NoSystemFunction(error)
+            })?;
 
         let groups: usize = if let Ok(ptr) = plugin.get_symbol::<*const usize>(&groups_symbol) {
             unsafe { ptr.read() }
         } else {
-            log::debug!("No group amount was specified for system: {}", id);
+            log::debug!("System `{}` has no group amount", id);
             0
         };
 
         let selector: Selector = plugin
             .get_symbol::<Selector>(&selector_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("No selector was specified for system: {}", id);
+                log::debug!("System `{}` has no selector function", id);
                 default_selector
             });
         let attacher: Attacher = plugin
             .get_symbol::<Attacher>(&attacher_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("No attacher was specified for system: {}", id);
+                log::debug!("System `{}` has no attacher function", id);
                 noop_attacher_detacher
             });
         let detacher: Detacher = plugin
             .get_symbol::<Detacher>(&detacher_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("No detacher was specified for system: {}", id);
+                log::debug!("System `{}` has no detacher function", id);
                 noop_attacher_detacher
             });
 
+        log::info!("System `{}` created", id);
         Ok(Self {
             id,
             plugin_id,

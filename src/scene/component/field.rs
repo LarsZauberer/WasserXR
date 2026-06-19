@@ -28,14 +28,20 @@ impl Field {
     pub fn get_getter(&self) -> Result<Getter, ComponentError> {
         match self.getter {
             Some(getter) => Ok(getter),
-            None => Err(ComponentError::FieldNoGetter),
+            None => {
+                log::debug!("Schema field has no getter function");
+                Err(ComponentError::FieldNoGetter)
+            }
         }
     }
 
     pub fn get_setter(&self) -> Result<Setter, ComponentError> {
         match self.setter {
             Some(setter) => Ok(setter),
-            None => Err(ComponentError::FieldNoSetter),
+            None => {
+                log::debug!("Schema field has no setter function");
+                Err(ComponentError::FieldNoSetter)
+            }
         }
     }
 }

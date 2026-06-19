@@ -14,6 +14,7 @@ impl Plugin {
     pub(crate) fn new(path: String) -> Result<Plugin, PluginError> {
         // Create the symbol
         let Ok(convert_path) = CString::new(path.to_owned()) else {
+            log::error!("Plugin path contains a null byte");
             return Err(PluginError::InvalidSymbol);
         };
 
@@ -28,9 +29,11 @@ impl Plugin {
                     CStr::from_ptr(error).to_string_lossy().into_owned()
                 }
             };
+            log::error!("Plugin `{}` could not be loaded: {}", path, error);
             return Err(PluginError::LinkingError(error));
         }
 
+        log::info!("Plugin `{}` opened", path);
         Ok(Self {
             path: Some(path),
             fd,
@@ -38,6 +41,7 @@ impl Plugin {
     }
 
     pub(crate) fn new_static() -> Self {
+        log::info!("Static plugin initialized");
         Self {
             path: None,
             fd: libc::RTLD_DEFAULT,
@@ -56,15 +60,18 @@ impl Plugin {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
 
         let Ok(symbol_cstring) = CString::new(symbol.to_owned()) else {
+            log::error!("Symbol name contains a null byte");
             return Err(PluginError::InvalidSymbol);
         };
 
         // Safety: Will return either null or will return the function pointer
         let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
         if ptr.is_null() {
+            log::debug!("Symbol `{}` was not found", symbol);
             return Err(PluginError::MissingSymbol(symbol.to_owned()));
         }
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
+        log::debug!("Symbol `{}` resolved", symbol);
         Ok(func)
     }
 
@@ -85,6 +92,7 @@ impl Drop for Plugin {
         unsafe {
             libc::dlclose(self.fd);
         }
+        log::info!("Plugin `{}` closed", self.get_id());
     }
 }
 

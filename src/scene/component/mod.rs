@@ -40,16 +40,20 @@ impl Component {
 
         let creator: Creator = plugin
             .get_symbol::<Creator>(&creator_symbol)
-            .map_err(ComponentError::NoCreator)?;
+            .map_err(|error| {
+                log::debug!("Component `{}` has no creator function", id);
+                ComponentError::NoCreator(error)
+            })?;
 
-        let destroyer: Destroyer = plugin
-            .get_symbol(&destroyer_symbol)
-            .map_err(ComponentError::NoDestroyer)?;
+        let destroyer: Destroyer = plugin.get_symbol(&destroyer_symbol).map_err(|error| {
+            log::debug!("Component `{}` has no destroyer function", id);
+            ComponentError::NoDestroyer(error)
+        })?;
 
         let schema_creator: SchemaCreator = plugin
             .get_symbol::<SchemaCreator>(&schema_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("Component `{}` has no schema creator defined", id);
+                log::debug!("Component `{}` has no schema function", id);
                 default_schema
             });
 
@@ -59,6 +63,7 @@ impl Component {
             schema_creator(&mut schema as *mut Schema);
         }
 
+        log::info!("Component `{}` created", id);
         Ok(Self {
             id,
             plugin_id,
@@ -102,6 +107,7 @@ impl Drop for Component {
         unsafe {
             (self.destroyer)(self.data);
         }
+        log::info!("Component `{}` destroyed", self.id);
     }
 }
 
