@@ -94,6 +94,37 @@ fn component_macro_registers_and_accesses_static_component() {
 }
 
 #[test]
+fn component_macro_serializes_static_component_fields() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroComponent".to_owned())
+        .unwrap();
+
+    let updated = "serialized through macro".to_owned();
+    scene
+        .set(entity, "MacroComponent", "my_string", &updated)
+        .unwrap();
+
+    let serialized = scene.serialize().unwrap();
+    let mut loaded = Scene::new();
+    loaded.deserialize(&serialized).unwrap();
+
+    assert_eq!(
+        *loaded
+            .get::<i32>(entity, "MacroComponent", "my_int")
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        loaded
+            .get::<String>(entity, "MacroComponent", "my_string")
+            .unwrap(),
+        "serialized through macro"
+    );
+}
+
+#[test]
 fn system_macro_registers_and_runs_static_system() {
     MACRO_SYSTEM_ENTITIES.lock().unwrap().clear();
     MACRO_SYSTEM_GROUPS.lock().unwrap().clear();
