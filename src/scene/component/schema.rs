@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     error::ComponentError,
     scene::component::{
-        field::{Field, Getter, Setter},
+        field::{Deserializer, Field, Getter, Serializer, Setter},
         field_type::FieldType,
     },
 };
@@ -24,8 +24,10 @@ impl Schema {
         type_hint: FieldType,
         getter: Option<Getter>,
         setter: Option<Setter>,
+        serializer: Option<Serializer>,
+        deserializer: Option<Deserializer>,
     ) {
-        let field = Field::new(type_hint, getter, setter);
+        let field = Field::new(type_hint, getter, setter, serializer, deserializer);
         log::debug!("Schema field `{}` added", id);
         self.fields.insert(id, field);
     }
@@ -50,6 +52,26 @@ impl Schema {
         }
     }
 
+    pub(crate) fn get_serializer(&self, id: &str) -> Result<Serializer, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => field.get_serializer(),
+            None => {
+                log::debug!("Schema field `{}` was not found for serialization", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
+    pub(crate) fn get_deserializer(&self, id: &str) -> Result<Deserializer, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => field.get_deserializer(),
+            None => {
+                log::debug!("Schema field `{}` was not found for deserialization", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
     pub(crate) fn get_fields(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }
@@ -66,6 +88,18 @@ mod tests {
 
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
+    unsafe extern "C" fn test_serializer(
+        _data: *const c_void,
+    ) -> crate::scene::component::SerializedBytes {
+        crate::scene::component::SerializedBytes::from_vec(vec![1])
+    }
+
+    unsafe extern "C" fn test_deserializer(
+        _data: *mut c_void,
+        _value: crate::scene::component::SerializedBytes,
+    ) {
+    }
+
     #[test]
     fn schema_add_field() {
         let mut schema = Schema::new();
@@ -75,6 +109,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            Some(test_serializer),
+            Some(test_deserializer),
         );
 
         let fields = schema.get_fields();
@@ -91,6 +127,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            None,
+            None,
         );
 
         assert_eq!(
@@ -118,6 +156,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            None,
+            None,
         );
 
         assert_eq!(
@@ -133,6 +173,44 @@ mod tests {
         assert_eq!(
             schema.get_setter("health"),
             Err(ComponentError::FieldNotFound)
+        );
+    }
+
+    #[test]
+    fn schema_get_serializer_for_existing_field() {
+        let mut schema = Schema::new();
+
+        schema.add_field(
+            "health".to_owned(),
+            FieldType::Long,
+            Some(test_getter),
+            Some(test_setter),
+            Some(test_serializer),
+            Some(test_deserializer),
+        );
+
+        assert_eq!(
+            schema.get_serializer("health").unwrap() as usize,
+            test_serializer as *const () as usize
+        );
+    }
+
+    #[test]
+    fn schema_get_deserializer_for_existing_field() {
+        let mut schema = Schema::new();
+
+        schema.add_field(
+            "health".to_owned(),
+            FieldType::Long,
+            Some(test_getter),
+            Some(test_setter),
+            Some(test_serializer),
+            Some(test_deserializer),
+        );
+
+        assert_eq!(
+            schema.get_deserializer("health").unwrap() as usize,
+            test_deserializer as *const () as usize
         );
     }
 }
