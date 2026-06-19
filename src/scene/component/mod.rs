@@ -6,9 +6,12 @@ use std::ffi::c_void;
 
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
+pub use field::{Deserializer, SerializedBytes, Serializer};
 pub use field::{Getter, Setter};
 pub use field_type::FieldType;
 pub use schema::Schema;
+
+use crate::scene::serialization::{ComponentData, FieldData};
 
 pub(crate) type Creator = unsafe extern "C" fn() -> *mut c_void;
 pub(crate) type Destroyer = unsafe extern "C" fn(*mut c_void);
@@ -93,6 +96,45 @@ impl Component {
         Ok(())
     }
 
+    pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
+        let mut field_ids = self.schema.get_fields();
+        field_ids.sort();
+
+        let fields = field_ids
+            .into_iter()
+            .filter_map(|field_id| {
+                let serializer = self.schema.get_serializer(field_id).ok()?;
+                let value = unsafe { serializer(self.data as *const c_void).into_vec() };
+                Some(FieldData {
+                    name: field_id.to_owned(),
+                    value,
+                })
+            })
+            .collect();
+
+        ComponentData {
+            id: self.id.clone(),
+            entity_id,
+            fields,
+        }
+    }
+
+    pub(crate) fn deserialize(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
+        Self::new(id, plugin)
+    }
+
+    pub(crate) fn deserialize_fields(&mut self, fields: Vec<FieldData>) {
+        for field in fields {
+            let Ok(deserializer) = self.schema.get_deserializer(&field.name) else {
+                continue;
+            };
+
+            unsafe {
+                deserializer(self.data, SerializedBytes::from_vec(field.value));
+            }
+        }
+    }
+
     pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
@@ -137,6 +179,21 @@ mod tests {
         }
     }
 
+    unsafe extern "C" fn unit_counter_serializer(data: *const c_void) -> SerializedBytes {
+        unsafe {
+            SerializedBytes::from_vec((*(data as *const TestCounter)).value.to_le_bytes().to_vec())
+        }
+    }
+
+    unsafe extern "C" fn unit_counter_deserializer(data: *mut c_void, value: SerializedBytes) {
+        unsafe {
+            let bytes = value.into_vec();
+            if let Ok(bytes) = <[u8; 8]>::try_from(bytes.as_slice()) {
+                (*(data as *mut TestCounter)).value = i64::from_le_bytes(bytes);
+            }
+        }
+    }
+
     // Basic working component => `unit_counter`
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_unit_counter() -> *mut c_void {
@@ -158,6 +215,8 @@ mod tests {
                 FieldType::Long,
                 Some(unit_counter_getter),
                 Some(unit_counter_setter),
+                Some(unit_counter_serializer),
+                Some(unit_counter_deserializer),
             );
         }
     }
@@ -222,6 +281,19 @@ mod tests {
         component.set("value", &12_i64).unwrap();
 
         assert_eq!(*component.get::<i64>("value").unwrap(), 12);
+    }
+
+    #[test]
+    fn component_serialize_round_trip() {
+        let plugin = Plugin::new_static();
+        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        component.set("value", &12_i64).unwrap();
+
+        let data = component.serialize(uuid::Uuid::now_v7());
+        let mut deserialized = Component::deserialize("unit_counter".to_owned(), &plugin).unwrap();
+        deserialized.deserialize_fields(data.fields);
+
+        assert_eq!(*deserialized.get::<i64>("value").unwrap(), 12);
     }
 
     #[test]
