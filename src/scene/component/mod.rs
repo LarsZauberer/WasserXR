@@ -7,10 +7,11 @@ use std::ffi::c_void;
 
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
-pub use field::{Deserializer, SerializedBytes, Serializer};
+pub use field::{Deserializer, Serializer};
 pub use field::{Getter, Setter};
 pub use field_type::FieldType;
 pub use schema::Schema;
+pub use serialized_bytes::SerializedBytes;
 
 use crate::scene::serialization::{ComponentData, FieldData};
 
@@ -98,10 +99,9 @@ impl Component {
     }
 
     pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
-        let mut field_ids = self.schema.get_fields();
-        field_ids.sort();
-
-        let fields = field_ids
+        let fields = self
+            .schema
+            .get_fields()
             .into_iter()
             .filter_map(|field_id| {
                 let serializer = self.schema.get_serializer(field_id).ok()?;
