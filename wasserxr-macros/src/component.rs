@@ -60,6 +60,7 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         let mut has_setter = false;
         let mut has_serializer = false;
         let mut has_deserializer = false;
+        let mut has_none = false;
         let mut kept_attrs = Vec::new();
 
         for attr in field.attrs.drain(..) {
@@ -71,12 +72,30 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
                 has_serializer = true;
             } else if attr.path().is_ident("deserializer") {
                 has_deserializer = true;
+            } else if attr.path().is_ident("none") {
+                has_none = true;
             } else {
                 kept_attrs.push(attr);
             }
         }
 
         field.attrs = kept_attrs;
+
+        let has_explicit_field_function =
+            has_getter || has_setter || has_serializer || has_deserializer;
+        if has_none && has_explicit_field_function {
+            return Err(Error::new_spanned(
+                field,
+                "`none` cannot be combined with field function attributes",
+            ));
+        }
+
+        if !has_none && !has_explicit_field_function {
+            has_getter = true;
+            has_setter = true;
+            has_serializer = true;
+            has_deserializer = true;
+        }
 
         component_fields.push(Field {
             ident: field_ident,

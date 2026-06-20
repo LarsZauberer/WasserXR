@@ -35,16 +35,20 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[component]
 /// #[derive(Default)]
 /// struct MyComponent {
-///     #[getter]
 ///     value: i32,
 ///     #[getter]
 ///     #[setter]
 ///     name: String,
+///     #[none]
+///     internal: i32,
 /// }
 /// ```
 ///
 /// The macro exports create, destroy, and schema functions for the component.
-/// Fields marked with `#[getter]` and/or `#[setter]` also get exported accessors.
+/// Fields without field function attributes get generated getter, setter,
+/// serializer, and deserializer functions by default. If at least one field
+/// function attribute is present, only the requested functions are generated.
+/// Use `#[none]` to register a field without generated field functions.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     if !args.is_empty() {

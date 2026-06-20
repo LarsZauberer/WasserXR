@@ -14,12 +14,17 @@ pub struct MacroComponent {
     #[getter]
     my_int: i32,
 
+    default_int: i32,
+
     #[getter]
     #[setter]
     #[serializer]
     #[deserializer]
     my_string: String,
 
+    default_string: String,
+
+    #[none]
     #[allow(dead_code)]
     hidden: i32,
 }
@@ -141,10 +146,26 @@ fn component_macro_registers_and_accesses_static_component() {
             .unwrap(),
         ""
     );
+    assert_eq!(
+        *scene
+            .get::<i32>(entity, "MacroComponent", "default_int")
+            .unwrap(),
+        0
+    );
+
+    assert_eq!(
+        scene.set(entity, "MacroComponent", "my_int", &7_i32),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoSetter
+        ))
+    );
 
     let updated = "updated through setter".to_owned();
     scene
         .set(entity, "MacroComponent", "my_string", &updated)
+        .unwrap();
+    scene
+        .set(entity, "MacroComponent", "default_int", &41_i32)
         .unwrap();
 
     assert_eq!(
@@ -152,6 +173,12 @@ fn component_macro_registers_and_accesses_static_component() {
             .get::<String>(entity, "MacroComponent", "my_string")
             .unwrap(),
         "updated through setter"
+    );
+    assert_eq!(
+        *scene
+            .get::<i32>(entity, "MacroComponent", "default_int")
+            .unwrap(),
+        41
     );
     assert_eq!(
         scene.get::<i32>(entity, "MacroComponent", "hidden"),
@@ -179,6 +206,13 @@ fn component_macro_serializes_static_component_fields() {
     scene
         .set(entity, "MacroComponent", "my_string", &updated)
         .unwrap();
+    scene
+        .set(entity, "MacroComponent", "default_int", &12_i32)
+        .unwrap();
+    let default_string = "default serialization".to_owned();
+    scene
+        .set(entity, "MacroComponent", "default_string", &default_string)
+        .unwrap();
 
     let serialized = scene.serialize().unwrap();
     let mut loaded = Scene::new();
@@ -191,10 +225,22 @@ fn component_macro_serializes_static_component_fields() {
         0
     );
     assert_eq!(
+        *loaded
+            .get::<i32>(entity, "MacroComponent", "default_int")
+            .unwrap(),
+        12
+    );
+    assert_eq!(
         loaded
             .get::<String>(entity, "MacroComponent", "my_string")
             .unwrap(),
         "serialized through macro"
+    );
+    assert_eq!(
+        loaded
+            .get::<String>(entity, "MacroComponent", "default_string")
+            .unwrap(),
+        "default serialization"
     );
 }
 
