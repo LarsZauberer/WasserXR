@@ -4,7 +4,7 @@ pub(crate) mod plugin;
 pub(crate) mod serialization;
 pub(crate) mod system;
 
-use component::Component;
+use component::{Component, FieldType};
 use entity::Entity;
 use log::{error, warn};
 use plugin::Plugin;
@@ -144,6 +144,17 @@ impl Scene {
         self.deserialize(&data)
     }
 
+    pub fn get_plugins(&self) -> Vec<String> {
+        let mut plugins: Vec<String> = self
+            .plugins
+            .keys()
+            .filter(|id| !id.is_empty())
+            .cloned()
+            .collect();
+        plugins.sort();
+        plugins
+    }
+
     fn plugins_dynamic_first(&self) -> impl Iterator<Item = &Plugin> {
         self.plugins
             .values()
@@ -222,6 +233,12 @@ impl Scene {
         self.components.insert(uuid, HashMap::new());
         log::info!("Entity `{}` added", uuid);
         uuid
+    }
+
+    pub fn get_entities(&self) -> Vec<Uuid> {
+        let mut entities: Vec<Uuid> = self.entities.keys().copied().collect();
+        entities.sort();
+        entities
     }
 
     pub fn remove_entity(&mut self, id: Uuid) -> Result<(), SceneError> {
@@ -324,6 +341,22 @@ impl Scene {
         Ok(())
     }
 
+    pub fn get_systems(&self) -> Vec<String> {
+        let mut systems: Vec<String> = self.systems.keys().cloned().collect();
+        systems.sort();
+        systems
+    }
+
+    pub fn get_system_priority(&self, system_id: &str) -> Result<usize, SceneError> {
+        match self.systems.get(system_id) {
+            Some(system) => Ok(system.get_priority()),
+            None => {
+                log::warn!("System `{}` was not found for priority lookup", system_id);
+                Err(SceneError::SystemNotFound)
+            }
+        }
+    }
+
     pub fn add_component(
         &mut self,
         entity_id: Uuid,
@@ -414,6 +447,20 @@ impl Scene {
             entity_id
         );
         Ok(())
+    }
+
+    pub fn get_entity_components(&self, entity_id: Uuid) -> Result<Vec<String>, SceneError> {
+        let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component list lookup",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let mut components: Vec<String> = entity_components.keys().cloned().collect();
+        components.sort();
+        Ok(components)
     }
 
     pub fn has_component(&self, entity_id: Uuid, component_id: &str) -> bool {
@@ -583,6 +630,61 @@ impl Scene {
 
         component
             .set(field_id, data)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
+    pub fn get_component_fields(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+    ) -> Result<Vec<String>, SceneError> {
+        let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field list lookup",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field list lookup",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        let mut fields = component.get_fields();
+        fields.sort();
+        Ok(fields)
+    }
+
+    pub fn get_component_field_type(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<FieldType, SceneError> {
+        let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field type lookup",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field type lookup",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        component
+            .get_field_type(field_id)
             .map_err(SceneError::ComponentFieldError)
     }
 }
@@ -804,6 +906,18 @@ mod tests {
     }
 
     #[test]
+    fn scene_get_entities() {
+        let mut scene = Scene::new();
+        let first_entity = scene.add_entity();
+        let second_entity = scene.add_entity();
+
+        let mut entities = vec![first_entity, second_entity];
+        entities.sort();
+
+        assert_eq!(scene.get_entities(), entities);
+    }
+
+    #[test]
     fn scene_remove_entity_for_existing_entity() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
@@ -824,6 +938,20 @@ mod tests {
         assert_eq!(
             scene.add_component(entity, "scene_counter".to_owned()),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn scene_get_entity_components() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.get_entity_components(entity).unwrap(),
+            vec!["scene_counter"]
         );
     }
 
@@ -874,6 +1002,36 @@ mod tests {
     }
 
     #[test]
+    fn scene_get_component_fields() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.get_component_fields(entity, "scene_counter").unwrap(),
+            vec!["value"]
+        );
+    }
+
+    #[test]
+    fn scene_get_component_field_type() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene
+                .get_component_field_type(entity, "scene_counter", "value")
+                .unwrap(),
+            FieldType::Long
+        );
+    }
+
+    #[test]
     fn scene_add_system_for_existing_symbol() {
         SCENE_ATTACH_COUNT.store(0, Ordering::SeqCst);
         let mut scene = Scene::new();
@@ -883,6 +1041,37 @@ mod tests {
             .unwrap();
 
         assert_eq!(SCENE_ATTACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn scene_get_systems() {
+        let mut scene = Scene::new();
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 1)
+            .unwrap();
+
+        assert_eq!(scene.get_systems(), vec!["scene_cleanup_system"]);
+    }
+
+    #[test]
+    fn scene_get_system_priority() {
+        let mut scene = Scene::new();
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 7)
+            .unwrap();
+
+        assert_eq!(scene.get_system_priority("scene_cleanup_system"), Ok(7));
+    }
+
+    #[test]
+    fn scene_get_plugins() {
+        let mut scene = Scene::new();
+        scene.plugins.insert(
+            "dynamic_a".to_owned(),
+            Plugin::new_test_dynamic("dynamic_a".to_owned()),
+        );
+
+        assert_eq!(scene.get_plugins(), vec!["dynamic_a"]);
     }
 
     #[test]

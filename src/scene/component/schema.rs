@@ -72,6 +72,16 @@ impl Schema {
         }
     }
 
+    pub(crate) fn get_field_type(&self, id: &str) -> Result<FieldType, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => Ok(field.get_type()),
+            None => {
+                log::debug!("Schema field `{}` was not found for type lookup", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
     pub(crate) fn get_fields(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }

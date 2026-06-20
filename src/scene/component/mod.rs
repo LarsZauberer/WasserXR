@@ -136,6 +136,18 @@ impl Component {
         }
     }
 
+    pub(crate) fn get_fields(&self) -> Vec<String> {
+        self.schema
+            .get_fields()
+            .into_iter()
+            .map(String::to_owned)
+            .collect()
+    }
+
+    pub(crate) fn get_field_type(&self, id: &str) -> Result<FieldType, ComponentError> {
+        self.schema.get_field_type(id)
+    }
+
     pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
