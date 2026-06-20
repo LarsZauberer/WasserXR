@@ -1,6 +1,7 @@
 mod field;
 pub mod field_type;
 pub mod schema;
+pub mod serialized_bytes;
 
 use std::ffi::c_void;
 
