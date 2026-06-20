@@ -4,4 +4,4 @@ pub mod error;
 pub mod scene;
 
 pub use uuid::Uuid;
-pub use wasserxr_macros::{component, system};
+pub use wasserxr_macros::{attacher, component, detacher, system};

@@ -8,6 +8,10 @@ pub(crate) struct Args {
     entities: Vec<Vec<LitStr>>,
 }
 
+pub(crate) struct LifecycleArgs {
+    system_id: Ident,
+}
+
 impl Parse for Args {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         if input.is_empty() {
@@ -63,6 +67,22 @@ impl Parse for Args {
     }
 }
 
+impl Parse for LifecycleArgs {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let system_id = input.parse()?;
+
+        if !input.is_empty() {
+            input.parse::<Token![,]>()?;
+
+            if !input.is_empty() {
+                return Err(input.error("unexpected tokens after system name"));
+            }
+        }
+
+        Ok(Self { system_id })
+    }
+}
+
 pub(crate) fn expand(args: Args, item: ItemFn) -> Result<proc_macro2::TokenStream> {
     let function_name = item.sig.ident.clone();
     let system_id = function_name.to_string();
@@ -80,6 +100,20 @@ pub(crate) fn expand(args: Args, item: ItemFn) -> Result<proc_macro2::TokenStrea
         #selector
         #runner
     })
+}
+
+pub(crate) fn expand_attacher(
+    args: LifecycleArgs,
+    item: ItemFn,
+) -> Result<proc_macro2::TokenStream> {
+    expand_lifecycle("wxr_attach", args.system_id, item)
+}
+
+pub(crate) fn expand_detacher(
+    args: LifecycleArgs,
+    item: ItemFn,
+) -> Result<proc_macro2::TokenStream> {
+    expand_lifecycle("wxr_detach", args.system_id, item)
 }
 
 struct SystemSymbols {
@@ -208,4 +242,24 @@ fn create_component_groups(entities: &[Vec<LitStr>]) -> Vec<proc_macro2::TokenSt
             }
         })
         .collect()
+}
+
+fn expand_lifecycle(
+    symbol_prefix: &str,
+    system_id: Ident,
+    item: ItemFn,
+) -> Result<proc_macro2::TokenStream> {
+    let function_name = item.sig.ident.clone();
+    let wrapper_name = format!("{}_{}", symbol_prefix, system_id);
+    let wrapper_ident = format_ident!("{}", wrapper_name);
+
+    Ok(quote! {
+        #item
+
+        #[unsafe(export_name = #wrapper_name)]
+        unsafe extern "C" fn #wrapper_ident(scene: *mut ::wasserxr::scene::Scene) {
+            let scene = unsafe { &mut *scene };
+            #function_name(scene);
+        }
+    })
 }

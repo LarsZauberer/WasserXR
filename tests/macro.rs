@@ -2,7 +2,7 @@ use std::sync::{LazyLock, Mutex};
 
 use uuid::Uuid;
 use wasserxr::{
-    component,
+    attacher, component, detacher,
     error::{ComponentError, SceneError},
     scene::Scene,
     system,
@@ -63,6 +63,8 @@ static MACRO_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
     LazyLock::new(|| Mutex::new(None));
 static MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
     LazyLock::new(|| Mutex::new(None));
+static MACRO_ATTACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mutex::new(None));
+static MACRO_DETACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mutex::new(None));
 
 #[system(entities = [["MacroCounter"], ["MacroMarker"]])]
 pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
@@ -77,6 +79,27 @@ pub fn macro_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
 #[system(entities = [])]
 pub fn macro_explicit_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
     *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
+}
+
+#[system]
+pub fn macro_lifecycle_system(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
+
+#[attacher(macro_lifecycle_system)]
+pub fn attach_macro_lifecycle_system(scene: &mut Scene) {
+    let entity = scene.add_entity();
+    scene
+        .set_entity_name(entity, "attached".to_owned())
+        .unwrap();
+    *MACRO_ATTACH_ENTITY.lock().unwrap() = Some(entity);
+}
+
+#[detacher(macro_lifecycle_system)]
+pub fn detach_macro_lifecycle_system(scene: &mut Scene) {
+    let entity = scene.add_entity();
+    scene
+        .set_entity_name(entity, "detached".to_owned())
+        .unwrap();
+    *MACRO_DETACH_ENTITY.lock().unwrap() = Some(entity);
 }
 
 #[test]
@@ -280,6 +303,27 @@ fn system_macro_registers_and_runs_static_system() {
     assert!(entities[0].contains(&counter));
     assert!(entities[0].contains(&both));
     assert_eq!(entities[1], vec![marker]);
+}
+
+#[test]
+fn attacher_and_detacher_macros_run_system_lifecycle_hooks() {
+    *MACRO_ATTACH_ENTITY.lock().unwrap() = None;
+    *MACRO_DETACH_ENTITY.lock().unwrap() = None;
+
+    let mut scene = Scene::new();
+
+    scene
+        .add_system("macro_lifecycle_system".to_owned(), 1)
+        .unwrap();
+
+    let attach_entity = MACRO_ATTACH_ENTITY.lock().unwrap().unwrap();
+    assert_eq!(scene.get_entity_name(attach_entity), Ok("attached"));
+    assert_eq!(*MACRO_DETACH_ENTITY.lock().unwrap(), None);
+
+    scene.remove_system("macro_lifecycle_system").unwrap();
+
+    let detach_entity = MACRO_DETACH_ENTITY.lock().unwrap().unwrap();
+    assert_eq!(scene.get_entity_name(detach_entity), Ok("detached"));
 }
 
 #[test]

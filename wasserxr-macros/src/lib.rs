@@ -4,6 +4,50 @@ mod system;
 use proc_macro::TokenStream;
 use syn::{Error, ItemFn, ItemStruct, parse_macro_input};
 
+/// Turns a Rust system attach function into the C ABI function WasserXR needs.
+///
+/// Use it on a function with this shape:
+///
+/// ```ignore
+/// #[attacher(my_system)]
+/// fn attach_my_system(scene: &mut wasserxr::scene::Scene) {
+///     // ...
+/// }
+/// ```
+///
+/// The macro exports `wxr_attach_<system>`.
+#[proc_macro_attribute]
+pub fn attacher(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as system::LifecycleArgs);
+    let item = parse_macro_input!(item as ItemFn);
+
+    system::expand_attacher(args, item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Turns a Rust system detach function into the C ABI function WasserXR needs.
+///
+/// Use it on a function with this shape:
+///
+/// ```ignore
+/// #[detacher(my_system)]
+/// fn detach_my_system(scene: &mut wasserxr::scene::Scene) {
+///     // ...
+/// }
+/// ```
+///
+/// The macro exports `wxr_detach_<system>`.
+#[proc_macro_attribute]
+pub fn detacher(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as system::LifecycleArgs);
+    let item = parse_macro_input!(item as ItemFn);
+
+    system::expand_detacher(args, item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
 /// Turns a Rust system function into the C ABI functions WasserXR needs.
 ///
 /// Use it on a function with this shape:
