@@ -6,10 +6,11 @@ pub(crate) mod system;
 
 use component::Component;
 use entity::Entity;
+use log::{error, warn};
 use plugin::Plugin;
 use system::System;
 
-use crate::error::SceneError;
+use crate::error::{PluginError, SceneError};
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
 
@@ -22,6 +23,8 @@ pub struct Scene {
     plugins: HashMap<String, Plugin>,
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
+
+    should_reload: bool,
 }
 
 impl Default for Scene {
@@ -33,6 +36,7 @@ impl Default for Scene {
             plugins,
             systems: HashMap::new(),
             components: HashMap::new(),
+            should_reload: false,
         }
     }
 }
@@ -418,6 +422,53 @@ impl Scene {
             .is_some_and(|components| components.contains_key(component_id))
     }
 
+    /// This is reload the Scene immediately. It will serialize the current scene data, unload all
+    /// the plugins and reload them in. At the end it will deserialize the scene again.
+    ///
+    /// SAFETY: This function cannot be called inside of a system inside a plugin. This call will
+    /// then of course be unloaded and the executation cannot continue as expected. Only use this,
+    /// if you call it from always loaded code (e.g. main function). If you need to call a reload,
+    /// from a system, please call `Scene::should_reload()` instead.
+    pub unsafe fn reload(&mut self) -> Result<(), SceneError> {
+        // Serialize the important data
+        let plugins: Vec<String> = self.plugins.keys().map(|id| id.to_owned()).collect();
+        let serialization_data = self.serialize()?;
+
+        // Reset the scene
+        self.reset()?;
+
+        // Remove the plugins
+        for plugin in &plugins {
+            if self.unload_plugin(plugin).is_err() {
+                error!("Failed to unload the plugin: {}", plugin);
+            }
+        }
+
+        // Reload the plugins
+        for plugin in plugins {
+            match self.load_plugin(plugin) {
+                Err(SceneError::PluginLoading(PluginError::InvalidSymbol)) => {
+                    error!(
+                        "Symbol has a null byte during the plugin reloading! This is a bug! Please report this!"
+                    );
+                }
+                Err(SceneError::PluginLoading(PluginError::LinkingError(err))) => {
+                    error!("Plugin has a linking error while hotreloading: {}", err);
+                }
+                _ => {}
+            }
+        }
+
+        // Deserialize the scene data
+        self.deserialize(&serialization_data)?;
+
+        Ok(())
+    }
+
+    pub fn should_reload(&mut self) {
+        self.should_reload = true;
+    }
+
     fn run_system(&mut self, groups: usize, selector: Selector, runner: Runner) {
         let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
 
@@ -459,6 +510,16 @@ impl Scene {
 
         for (groups, selector, runner) in functions {
             self.run_system(groups, selector, runner);
+        }
+
+        // Check if the scene should reload
+        if self.should_reload {
+            unsafe {
+                if self.reload().is_err() {
+                    warn!("Reload Failed! The scene has maybe been partially been reloaded.");
+                }
+            }
+            self.should_reload = false;
         }
 
         true
@@ -600,7 +661,13 @@ mod tests {
 
     static SCENE_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_DEFERRED_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_DEFERRED_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
+        LazyLock::new(|| Mutex::new(Vec::new()));
+    static SCENE_RELOAD_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
 
     #[unsafe(no_mangle)]
@@ -627,6 +694,66 @@ mod tests {
         _entities: *const *const *const u8,
         _sizes: *const usize,
     ) {
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_reload_counted_system(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_attach_scene_reload_counted_system(_scene: *mut Scene) {
+        SCENE_RELOAD_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_detach_scene_reload_counted_system(_scene: *mut Scene) {
+        SCENE_RELOAD_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_deferred_reload_counted_system(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_attach_scene_deferred_reload_counted_system(_scene: *mut Scene) {
+        SCENE_DEFERRED_RELOAD_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_detach_scene_deferred_reload_counted_system(_scene: *mut Scene) {
+        SCENE_DEFERRED_RELOAD_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_deferred_reload_low_priority(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        SCENE_RELOAD_TICK_ORDER.lock().unwrap().push("low");
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_reload_request(
+        scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        unsafe {
+            (&mut *scene).should_reload();
+        }
+        SCENE_RELOAD_TICK_ORDER
+            .lock()
+            .unwrap()
+            .push("reload-request");
     }
 
     #[unsafe(no_mangle)]
@@ -867,6 +994,87 @@ mod tests {
         scene.tick();
 
         assert_eq!(*SCENE_TICK_ORDER.lock().unwrap(), vec!["high", "low"]);
+    }
+
+    #[test]
+    fn scene_reload_reinstantiates_scene_objects() {
+        SCENE_RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
+        SCENE_RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .set_entity_name(entity, "Reloaded".to_owned())
+            .unwrap();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+        scene
+            .set(entity, "scene_counter", "value", &42_i64)
+            .unwrap();
+        scene
+            .add_system("scene_reload_counted_system".to_owned(), 1)
+            .unwrap();
+
+        unsafe {
+            scene.reload().unwrap();
+        }
+
+        assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
+        assert_eq!(
+            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            42
+        );
+        assert_eq!(SCENE_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(SCENE_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(scene.remove_system("scene_reload_counted_system"), Ok(()));
+    }
+
+    #[test]
+    fn scene_tick_reloads_when_requested_by_system() {
+        SCENE_DEFERRED_RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
+        SCENE_DEFERRED_RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
+        SCENE_RELOAD_TICK_ORDER.lock().unwrap().clear();
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .set_entity_name(entity, "Deferred".to_owned())
+            .unwrap();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+        scene.set(entity, "scene_counter", "value", &7_i64).unwrap();
+        scene
+            .add_system("scene_deferred_reload_counted_system".to_owned(), 1)
+            .unwrap();
+        scene
+            .add_system("scene_deferred_reload_low_priority".to_owned(), 1)
+            .unwrap();
+        scene
+            .add_system("scene_reload_request".to_owned(), 2)
+            .unwrap();
+
+        assert!(scene.tick());
+
+        let tick_order = SCENE_RELOAD_TICK_ORDER.lock().unwrap();
+        assert_eq!(tick_order[0], "reload-request");
+        assert!(tick_order.contains(&"low"));
+        drop(tick_order);
+        assert_eq!(scene.get_entity_name(entity).unwrap(), "Deferred");
+        assert_eq!(
+            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            7
+        );
+        assert_eq!(SCENE_DEFERRED_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(SCENE_DEFERRED_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            scene.remove_system("scene_deferred_reload_counted_system"),
+            Ok(())
+        );
+        assert_eq!(
+            scene.remove_system("scene_deferred_reload_low_priority"),
+            Ok(())
+        );
+        assert_eq!(scene.remove_system("scene_reload_request"), Ok(()));
     }
 
     #[test]
