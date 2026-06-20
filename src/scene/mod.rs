@@ -431,7 +431,11 @@ impl Scene {
     /// from a system, please call `Scene::should_reload()` instead.
     pub unsafe fn reload(&mut self) -> Result<(), SceneError> {
         // Serialize the important data
-        let plugins: Vec<String> = self.plugins.keys().map(|id| id.to_owned()).collect();
+        let plugins: Vec<String> = self
+            .plugins
+            .keys()
+            .filter_map(|id| if id == "" { None } else { Some(id.to_owned()) })
+            .collect();
         let serialization_data = self.serialize()?;
 
         // Reset the scene
