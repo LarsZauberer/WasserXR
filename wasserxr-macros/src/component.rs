@@ -6,6 +6,8 @@ struct Field {
     ty: Type,
     has_getter: bool,
     has_setter: bool,
+    has_serializer: bool,
+    has_deserializer: bool,
 }
 
 pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
@@ -56,6 +58,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
 
         let mut has_getter = false;
         let mut has_setter = false;
+        let mut has_serializer = false;
+        let mut has_deserializer = false;
         let mut kept_attrs = Vec::new();
 
         for attr in field.attrs.drain(..) {
@@ -63,6 +67,10 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
                 has_getter = true;
             } else if attr.path().is_ident("setter") {
                 has_setter = true;
+            } else if attr.path().is_ident("serializer") {
+                has_serializer = true;
+            } else if attr.path().is_ident("deserializer") {
+                has_deserializer = true;
             } else {
                 kept_attrs.push(attr);
             }
@@ -75,6 +83,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
             ty: field.ty.clone(),
             has_getter,
             has_setter,
+            has_serializer,
+            has_deserializer,
         });
     }
 
@@ -134,19 +144,22 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
         } else {
             quote! { None }
         };
-        let serializer = if component_field_serialization_kind(&field.ty).is_some() {
+        let serializer = if field.has_serializer
+            && component_field_serialization_kind(&field.ty).is_some()
+        {
             let serializer_ident = format_ident!("wxr_serialize_{}_{}", component_id, field_ident);
             quote! { Some(#serializer_ident) }
         } else {
             quote! { None }
         };
-        let deserializer = if component_field_serialization_kind(&field.ty).is_some() {
-            let deserializer_ident =
-                format_ident!("wxr_deserialize_{}_{}", component_id, field_ident);
-            quote! { Some(#deserializer_ident) }
-        } else {
-            quote! { None }
-        };
+        let deserializer =
+            if field.has_deserializer && component_field_serialization_kind(&field.ty).is_some() {
+                let deserializer_ident =
+                    format_ident!("wxr_deserialize_{}_{}", component_id, field_ident);
+                quote! { Some(#deserializer_ident) }
+            } else {
+                quote! { None }
+            };
 
         quote! {
             (*schema).add_field(
@@ -240,57 +253,60 @@ fn create_serializer_functions(
     component_id: &str,
     fields: &[Field],
 ) -> proc_macro2::TokenStream {
-    let serializers = fields.iter().filter_map(|field| {
-        let field_ident = &field.ident;
-        let field_ty = &field.ty;
-        let serializer_name = format!("wxr_serialize_{}_{}", component_id, field_ident);
-        let serializer_ident = format_ident!("{}", serializer_name);
+    let serializers = fields
+        .iter()
+        .filter(|field| field.has_serializer)
+        .filter_map(|field| {
+            let field_ident = &field.ident;
+            let field_ty = &field.ty;
+            let serializer_name = format!("wxr_serialize_{}_{}", component_id, field_ident);
+            let serializer_ident = format_ident!("{}", serializer_name);
 
-        match component_field_serialization_kind(field_ty)? {
-            SerializationKind::Bytes => Some(quote! {
-                #[unsafe(export_name = #serializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #serializer_ident(
-                    ptr: *const ::std::ffi::c_void,
-                ) -> ::wasserxr::scene::component::SerializedBytes {
-                    unsafe {
-                        let value = &(*(ptr as *const #component_ident)).#field_ident;
-                        ::wasserxr::scene::component::SerializedBytes::from_vec(
-                            value.to_le_bytes().to_vec(),
-                        )
+            match component_field_serialization_kind(field_ty)? {
+                SerializationKind::Bytes => Some(quote! {
+                    #[unsafe(export_name = #serializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #serializer_ident(
+                        ptr: *const ::std::ffi::c_void,
+                    ) -> ::wasserxr::scene::component::SerializedBytes {
+                        unsafe {
+                            let value = &(*(ptr as *const #component_ident)).#field_ident;
+                            ::wasserxr::scene::component::SerializedBytes::from_vec(
+                                value.to_le_bytes().to_vec(),
+                            )
+                        }
                     }
-                }
-            }),
-            SerializationKind::Char => Some(quote! {
-                #[unsafe(export_name = #serializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #serializer_ident(
-                    ptr: *const ::std::ffi::c_void,
-                ) -> ::wasserxr::scene::component::SerializedBytes {
-                    unsafe {
-                        let value = (*(ptr as *const #component_ident)).#field_ident as u32;
-                        ::wasserxr::scene::component::SerializedBytes::from_vec(
-                            value.to_le_bytes().to_vec(),
-                        )
+                }),
+                SerializationKind::Char => Some(quote! {
+                    #[unsafe(export_name = #serializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #serializer_ident(
+                        ptr: *const ::std::ffi::c_void,
+                    ) -> ::wasserxr::scene::component::SerializedBytes {
+                        unsafe {
+                            let value = (*(ptr as *const #component_ident)).#field_ident as u32;
+                            ::wasserxr::scene::component::SerializedBytes::from_vec(
+                                value.to_le_bytes().to_vec(),
+                            )
+                        }
                     }
-                }
-            }),
-            SerializationKind::String => Some(quote! {
-                #[unsafe(export_name = #serializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #serializer_ident(
-                    ptr: *const ::std::ffi::c_void,
-                ) -> ::wasserxr::scene::component::SerializedBytes {
-                    unsafe {
-                        let value = &(*(ptr as *const #component_ident)).#field_ident;
-                        ::wasserxr::scene::component::SerializedBytes::from_vec(
-                            value.as_bytes().to_vec(),
-                        )
+                }),
+                SerializationKind::String => Some(quote! {
+                    #[unsafe(export_name = #serializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #serializer_ident(
+                        ptr: *const ::std::ffi::c_void,
+                    ) -> ::wasserxr::scene::component::SerializedBytes {
+                        unsafe {
+                            let value = &(*(ptr as *const #component_ident)).#field_ident;
+                            ::wasserxr::scene::component::SerializedBytes::from_vec(
+                                value.as_bytes().to_vec(),
+                            )
+                        }
                     }
-                }
-            }),
-        }
-    });
+                }),
+            }
+        });
 
     quote! {
         #(#serializers)*
@@ -302,7 +318,7 @@ fn create_deserializer_functions(
     component_id: &str,
     fields: &[Field],
 ) -> proc_macro2::TokenStream {
-    let deserializers = fields.iter().filter_map(|field| {
+    let deserializers = fields.iter().filter(|field| field.has_deserializer).filter_map(|field| {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
         let deserializer_name = format!("wxr_deserialize_{}_{}", component_id, field_ident);

@@ -16,10 +16,26 @@ pub struct MacroComponent {
 
     #[getter]
     #[setter]
+    #[serializer]
+    #[deserializer]
     my_string: String,
 
     #[allow(dead_code)]
     hidden: i32,
+}
+
+#[component]
+#[derive(Default)]
+pub struct MacroRoundTripComponent {
+    #[getter]
+    #[setter]
+    #[serializer]
+    #[deserializer]
+    health: i32,
+
+    #[getter]
+    #[setter]
+    label: String,
 }
 
 #[component]
@@ -44,6 +60,52 @@ static MACRO_SYSTEM_GROUPS: LazyLock<Mutex<Vec<usize>>> = LazyLock::new(|| Mutex
 pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>, groups: Vec<usize>) {
     *MACRO_SYSTEM_ENTITIES.lock().unwrap() = entities;
     *MACRO_SYSTEM_GROUPS.lock().unwrap() = groups;
+}
+
+#[test]
+fn component_macro_round_trip_keeps_component_behavior() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroRoundTripComponent".to_owned())
+        .unwrap();
+
+    scene
+        .set(entity, "MacroRoundTripComponent", "health", &24_i32)
+        .unwrap();
+
+    let label = "round trip".to_owned();
+    scene
+        .set(entity, "MacroRoundTripComponent", "label", &label)
+        .unwrap();
+
+    let serialized = scene.serialize().unwrap();
+    let mut loaded = Scene::new();
+    loaded.deserialize(&serialized).unwrap();
+
+    assert!(loaded.has_component(entity, "MacroRoundTripComponent"));
+    assert_eq!(
+        *loaded
+            .get::<i32>(entity, "MacroRoundTripComponent", "health")
+            .unwrap(),
+        24
+    );
+    assert_eq!(
+        loaded
+            .get::<String>(entity, "MacroRoundTripComponent", "label")
+            .unwrap(),
+        ""
+    );
+
+    loaded
+        .set(entity, "MacroRoundTripComponent", "health", &30_i32)
+        .unwrap();
+    assert_eq!(
+        *loaded
+            .get::<i32>(entity, "MacroRoundTripComponent", "health")
+            .unwrap(),
+        30
+    );
 }
 
 #[test]
