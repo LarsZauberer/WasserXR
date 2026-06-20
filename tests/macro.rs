@@ -54,12 +54,24 @@ pub struct MacroMarker {
 
 static MACRO_SYSTEM_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
-static MACRO_SYSTEM_GROUPS: LazyLock<Mutex<Vec<usize>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+static MACRO_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
+    LazyLock::new(|| Mutex::new(None));
+static MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 #[system(entities = [["MacroCounter"], ["MacroMarker"]])]
-pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>, groups: Vec<usize>) {
+pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
     *MACRO_SYSTEM_ENTITIES.lock().unwrap() = entities;
-    *MACRO_SYSTEM_GROUPS.lock().unwrap() = groups;
+}
+
+#[system]
+pub fn macro_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
+    *MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
+}
+
+#[system(entities = [])]
+pub fn macro_explicit_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
+    *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
 }
 
 #[test]
@@ -189,7 +201,6 @@ fn component_macro_serializes_static_component_fields() {
 #[test]
 fn system_macro_registers_and_runs_static_system() {
     MACRO_SYSTEM_ENTITIES.lock().unwrap().clear();
-    MACRO_SYSTEM_GROUPS.lock().unwrap().clear();
 
     let mut scene = Scene::new();
     let counter = scene.add_entity();
@@ -214,14 +225,41 @@ fn system_macro_registers_and_runs_static_system() {
 
     scene.tick();
 
-    let groups = MACRO_SYSTEM_GROUPS.lock().unwrap();
-    assert_eq!(*groups, vec![2, 1]);
-
     let entities = MACRO_SYSTEM_ENTITIES.lock().unwrap();
     assert_eq!(entities.len(), 2);
+    assert_eq!(
+        entities.iter().map(Vec::len).collect::<Vec<_>>(),
+        vec![2, 1]
+    );
     assert!(entities[0].contains(&counter));
     assert!(entities[0].contains(&both));
     assert_eq!(entities[1], vec![marker]);
+}
+
+#[test]
+fn system_macro_allows_empty_entities() {
+    *MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = None;
+    *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = None;
+
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroCounter".to_owned())
+        .unwrap();
+
+    scene
+        .add_system("macro_empty_system".to_owned(), 1)
+        .unwrap();
+    scene
+        .add_system("macro_explicit_empty_system".to_owned(), 1)
+        .unwrap();
+
+    scene.tick();
+
+    let entities = MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap();
+    assert_eq!(entities.as_ref(), Some(&Vec::new()));
+    let entities = MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap();
+    assert_eq!(entities.as_ref(), Some(&Vec::new()));
 }
 
 #[test]

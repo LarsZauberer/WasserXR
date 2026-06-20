@@ -10,7 +10,7 @@ use syn::{Error, ItemFn, ItemStruct, parse_macro_input};
 ///
 /// ```ignore
 /// #[system(entities = [["Transform", "Mesh"], ["Camera"]])]
-/// fn render(scene: &mut wasserxr::scene::Scene, entities: Vec<Vec<uuid::Uuid>>, groups: Vec<usize>) {
+/// fn render(scene: &mut wasserxr::scene::Scene, entities: Vec<Vec<uuid::Uuid>>) {
 ///     // ...
 /// }
 /// ```

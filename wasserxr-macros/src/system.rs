@@ -10,6 +10,12 @@ pub(crate) struct Args {
 
 impl Parse for Args {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(Self {
+                entities: Vec::new(),
+            });
+        }
+
         let key: Ident = input.parse()?;
         if key != "entities" {
             return Err(Error::new_spanned(key, "expected `entities`"));
@@ -51,13 +57,6 @@ impl Parse for Args {
             if !input.is_empty() {
                 return Err(input.error("unexpected tokens after `entities`"));
             }
-        }
-
-        if groups.is_empty() {
-            return Err(Error::new(
-                entities.span(),
-                "`entities` must contain at least one group",
-            ));
         }
 
         Ok(Self { entities: groups })
@@ -173,7 +172,7 @@ fn create_runner_function(
             entities: *const *const *const u8,
             groups: *const usize,
         ) {
-            let groups = unsafe { std::slice::from_raw_parts(groups, #groups_ident) }.to_vec();
+            let groups = unsafe { std::slice::from_raw_parts(groups, #groups_ident) };
             let raw_groups = unsafe { std::slice::from_raw_parts(entities, #groups_ident) };
             let mut rust_entities: Vec<Vec<::wasserxr::Uuid>> =
                 Vec::with_capacity(#groups_ident);
@@ -195,7 +194,7 @@ fn create_runner_function(
             }
 
             let scene = unsafe { &mut *scene };
-            #function_name(scene, rust_entities, groups);
+            #function_name(scene, rust_entities);
         }
     }
 }
