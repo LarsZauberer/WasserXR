@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     error::ComponentError,
     scene::component::{
-        field::{Deserializer, Field, Getter, Mover, Serializer, Setter, Taker},
+        field::{Deserializer, Field, Getter, GetterMut, Mover, Serializer, Setter, Taker},
         field_type::FieldType,
     },
 };
@@ -23,6 +23,7 @@ impl Schema {
         id: String,
         type_hint: FieldType,
         getter: Option<Getter>,
+        getter_mut: Option<GetterMut>,
         setter: Option<Setter>,
         mover: Option<Mover>,
         taker: Option<Taker>,
@@ -32,6 +33,7 @@ impl Schema {
         let field = Field::new(
             type_hint,
             getter,
+            getter_mut,
             setter,
             mover,
             taker,
@@ -47,6 +49,16 @@ impl Schema {
             Some(field) => field.get_getter(),
             None => {
                 log::debug!("Schema field `{}` was not found for read", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
+    pub(crate) fn get_getter_mut(&self, id: &str) -> Result<GetterMut, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => field.get_getter_mut(),
+            None => {
+                log::debug!("Schema field `{}` was not found for mutable read", id);
                 Err(ComponentError::FieldNotFound)
             }
         }
@@ -126,6 +138,10 @@ mod tests {
         std::ptr::null()
     }
 
+    unsafe extern "C" fn test_getter_mut(_data: *mut c_void) -> *mut c_void {
+        std::ptr::null_mut()
+    }
+
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
     unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
@@ -154,6 +170,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
+            Some(test_getter_mut),
             Some(test_setter),
             Some(test_mover),
             Some(test_taker),
@@ -174,6 +191,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
+            None,
             Some(test_setter),
             None,
             None,
@@ -198,6 +216,38 @@ mod tests {
     }
 
     #[test]
+    fn schema_get_getter_mut_for_existing_field() {
+        let mut schema = Schema::new();
+
+        schema.add_field(
+            "health".to_owned(),
+            FieldType::Long,
+            None,
+            Some(test_getter_mut),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            schema.get_getter_mut("health").unwrap() as usize,
+            test_getter_mut as *const () as usize
+        );
+    }
+
+    #[test]
+    fn schema_get_getter_mut_for_missing_field() {
+        let schema = Schema::new();
+
+        assert_eq!(
+            schema.get_getter_mut("health"),
+            Err(ComponentError::FieldNotFound)
+        );
+    }
+
+    #[test]
     fn schema_get_setter_for_existing_field() {
         let mut schema = Schema::new();
 
@@ -205,6 +255,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
+            None,
             Some(test_setter),
             None,
             None,
@@ -235,6 +286,7 @@ mod tests {
         schema.add_field(
             "health".to_owned(),
             FieldType::Long,
+            None,
             None,
             None,
             Some(test_mover),
@@ -268,6 +320,7 @@ mod tests {
             FieldType::Long,
             None,
             None,
+            None,
             Some(test_mover),
             Some(test_taker),
             None,
@@ -298,6 +351,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
+            None,
             Some(test_setter),
             None,
             None,
@@ -319,6 +373,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
+            None,
             Some(test_setter),
             None,
             None,

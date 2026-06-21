@@ -14,6 +14,7 @@ pub enum SystemError {
 pub enum ComponentError {
     FieldNotFound,
     FieldNoGetter,
+    FieldNoGetterMut,
     FieldNoSetter,
     FieldNoMover,
     FieldNoTaker,

@@ -6,6 +6,7 @@ use crate::{
 };
 
 pub type Getter = unsafe extern "C" fn(*const c_void) -> *const c_void;
+pub type GetterMut = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 pub type Setter = unsafe extern "C" fn(*mut c_void, *const c_void);
 pub type Mover = unsafe extern "C" fn(*mut c_void, *mut c_void);
 pub type Taker = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -16,6 +17,7 @@ pub type Deserializer = unsafe extern "C" fn(*mut c_void, SerializedBytes);
 pub struct Field {
     type_hint: FieldType,
     getter: Option<Getter>,
+    getter_mut: Option<GetterMut>,
     setter: Option<Setter>,
     mover: Option<Mover>,
     taker: Option<Taker>,
@@ -27,6 +29,7 @@ impl Field {
     pub fn new(
         type_hint: FieldType,
         getter: Option<Getter>,
+        getter_mut: Option<GetterMut>,
         setter: Option<Setter>,
         mover: Option<Mover>,
         taker: Option<Taker>,
@@ -36,6 +39,7 @@ impl Field {
         Self {
             type_hint,
             getter,
+            getter_mut,
             setter,
             mover,
             taker,
@@ -54,6 +58,16 @@ impl Field {
             None => {
                 log::debug!("Schema field has no getter function");
                 Err(ComponentError::FieldNoGetter)
+            }
+        }
+    }
+
+    pub fn get_getter_mut(&self) -> Result<GetterMut, ComponentError> {
+        match self.getter_mut {
+            Some(getter_mut) => Ok(getter_mut),
+            None => {
+                log::debug!("Schema field has no mutable getter function");
+                Err(ComponentError::FieldNoGetterMut)
             }
         }
     }
@@ -118,6 +132,10 @@ mod tests {
         std::ptr::null()
     }
 
+    unsafe extern "C" fn test_getter_mut(_data: *mut c_void) -> *mut c_void {
+        std::ptr::null_mut()
+    }
+
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
     unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
@@ -137,6 +155,7 @@ mod tests {
         let field = Field::new(
             FieldType::Long,
             Some(test_getter),
+            Some(test_getter_mut),
             Some(test_setter),
             Some(test_mover),
             Some(test_taker),
@@ -157,6 +176,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
 
         assert_eq!(
@@ -169,6 +189,7 @@ mod tests {
     fn field_get_getter_when_missing() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             Some(test_setter),
             None,
@@ -184,6 +205,7 @@ mod tests {
     fn field_get_setter_when_present() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             Some(test_setter),
             None,
@@ -208,15 +230,55 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
 
         assert_eq!(field.get_setter(), Err(ComponentError::FieldNoSetter));
     }
 
     #[test]
+    fn field_get_getter_mut_when_present() {
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            Some(test_getter_mut),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            field.get_getter_mut().unwrap() as usize,
+            test_getter_mut as *const () as usize
+        );
+    }
+
+    #[test]
+    fn field_get_getter_mut_when_missing() {
+        let field = Field::new(
+            FieldType::Blob,
+            Some(test_getter),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            field.get_getter_mut(),
+            Err(ComponentError::FieldNoGetterMut)
+        );
+    }
+
+    #[test]
     fn field_get_mover_when_present() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             None,
             Some(test_mover),
@@ -238,6 +300,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             Some(test_taker),
             None,
             None,
@@ -250,6 +313,7 @@ mod tests {
     fn field_get_taker_when_present() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             None,
             None,
@@ -270,6 +334,7 @@ mod tests {
             FieldType::Blob,
             None,
             None,
+            None,
             Some(test_mover),
             None,
             None,
@@ -283,6 +348,7 @@ mod tests {
     fn field_get_serializer_when_present() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             None,
             None,
@@ -306,6 +372,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             Some(test_deserializer),
         );
 
@@ -324,6 +391,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             Some(test_deserializer),
         );
 
@@ -337,6 +405,7 @@ mod tests {
     fn field_get_deserializer_when_missing() {
         let field = Field::new(
             FieldType::Blob,
+            None,
             None,
             None,
             None,

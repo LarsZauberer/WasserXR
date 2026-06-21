@@ -640,6 +640,34 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    pub fn get_mut<T>(
+        &mut self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<&mut T, SceneError> {
+        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for mutable component field read",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get_mut(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for mutable field read",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        component
+            .get_mut(field_id)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
     pub fn set<T>(
         &mut self,
         entity_id: Uuid,
@@ -819,6 +847,10 @@ mod tests {
         unsafe { &(*(data as *const SceneCounter)).value as *const i64 as *const c_void }
     }
 
+    unsafe extern "C" fn scene_counter_getter_mut(data: *mut c_void) -> *mut c_void {
+        unsafe { &mut (*(data as *mut SceneCounter)).value as *mut i64 as *mut c_void }
+    }
+
     unsafe extern "C" fn scene_counter_setter(data: *mut c_void, value: *const c_void) {
         unsafe {
             (*(data as *mut SceneCounter)).value = *(value as *const i64);
@@ -896,6 +928,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Long,
                 Some(scene_counter_getter),
+                Some(scene_counter_getter_mut),
                 Some(scene_counter_setter),
                 None,
                 None,
@@ -912,6 +945,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Blob,
                 Some(scene_owner_getter),
+                None,
                 None,
                 Some(scene_owner_mover),
                 Some(scene_owner_taker),
@@ -1174,6 +1208,40 @@ mod tests {
         assert_eq!(
             *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
             9
+        );
+    }
+
+    #[test]
+    fn scene_get_mut_component_field_for_existing_component() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        *scene
+            .get_mut::<i64>(entity, "scene_counter", "value")
+            .unwrap() = 17;
+
+        assert_eq!(
+            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
+            17
+        );
+    }
+
+    #[test]
+    fn scene_get_mut_component_field_without_getter_mut() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.get_mut::<SceneOwnedValue>(entity, "scene_owner", "value"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNoGetterMut
+            ))
         );
     }
 

@@ -5,6 +5,7 @@ struct Field {
     ident: Ident,
     ty: Type,
     has_getter: bool,
+    has_getter_mut: bool,
     has_setter: bool,
     has_mover: bool,
     has_taker: bool,
@@ -21,6 +22,8 @@ pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
     let destroyer = create_destroyer_function(&component_ident, &component_id);
     let schema = create_schema_function(&component_id, &component_fields);
     let getters = create_getter_functions(&component_ident, &component_id, &component_fields);
+    let getters_mut =
+        create_getter_mut_functions(&component_ident, &component_id, &component_fields);
     let setters = create_setter_functions(&component_ident, &component_id, &component_fields);
     let movers = create_mover_functions(&component_ident, &component_id, &component_fields);
     let takers = create_taker_functions(&component_ident, &component_id, &component_fields);
@@ -36,6 +39,7 @@ pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
         #destroyer
         #schema
         #getters
+        #getters_mut
         #setters
         #movers
         #takers
@@ -63,6 +67,7 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         };
 
         let mut has_getter = false;
+        let mut has_getter_mut = false;
         let mut has_setter = false;
         let mut has_mover = false;
         let mut has_taker = false;
@@ -74,6 +79,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         for attr in field.attrs.drain(..) {
             if attr.path().is_ident("getter") {
                 has_getter = true;
+            } else if attr.path().is_ident("getter_mut") {
+                has_getter_mut = true;
             } else if attr.path().is_ident("setter") {
                 has_setter = true;
             } else if attr.path().is_ident("mover") {
@@ -94,6 +101,7 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         field.attrs = kept_attrs;
 
         let has_explicit_field_function = has_getter
+            || has_getter_mut
             || has_setter
             || has_mover
             || has_taker
@@ -108,6 +116,7 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
 
         if !has_none && !has_explicit_field_function {
             has_getter = true;
+            has_getter_mut = true;
             has_setter = true;
             has_mover = true;
             has_taker = true;
@@ -119,6 +128,7 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
             ident: field_ident,
             ty: field.ty.clone(),
             has_getter,
+            has_getter_mut,
             has_setter,
             has_mover,
             has_taker,
@@ -177,6 +187,12 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
         } else {
             quote! { None }
         };
+        let getter_mut = if field.has_getter_mut {
+            let getter_mut_ident = format_ident!("wxr_get_mut_{}_{}", component_id, field_ident);
+            quote! { Some(#getter_mut_ident) }
+        } else {
+            quote! { None }
+        };
         let setter = if field.has_setter {
             let setter_ident = format_ident!("wxr_set_{}_{}", component_id, field_ident);
             quote! { Some(#setter_ident) }
@@ -217,6 +233,7 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
                 #field_name.to_owned(),
                 #field_type,
                 #getter,
+                #getter_mut,
                 #setter,
                 #mover,
                 #taker,
@@ -267,6 +284,37 @@ fn create_getter_functions(
 
     quote! {
         #(#getters)*
+    }
+}
+
+fn create_getter_mut_functions(
+    component_ident: &Ident,
+    component_id: &str,
+    fields: &[Field],
+) -> proc_macro2::TokenStream {
+    let getters_mut = fields.iter().filter(|field| field.has_getter_mut).map(|field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
+        let getter_mut_name = format!("wxr_get_mut_{}_{}", component_id, field_ident);
+        let getter_mut_ident = format_ident!("{}", getter_mut_name);
+
+        quote! {
+            #[unsafe(export_name = #getter_mut_name)]
+            #[allow(non_snake_case)]
+            pub unsafe extern "C" fn #getter_mut_ident(
+                ptr: *mut ::std::ffi::c_void,
+            ) -> *mut ::std::ffi::c_void {
+                unsafe {
+                    &mut (*(ptr as *mut #component_ident)).#field_ident
+                        as *mut #field_ty
+                        as *mut ::std::ffi::c_void
+                }
+            }
+        }
+    });
+
+    quote! {
+        #(#getters_mut)*
     }
 }
 

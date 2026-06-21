@@ -8,7 +8,7 @@ use std::ffi::c_void;
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
 pub use field::{Deserializer, Serializer};
-pub use field::{Getter, Mover, Setter, Taker};
+pub use field::{Getter, GetterMut, Mover, Setter, Taker};
 pub use field_type::FieldType;
 pub use schema::Schema;
 pub use serialized_bytes::SerializedBytes;
@@ -86,6 +86,15 @@ impl Component {
         unsafe {
             let data = getter(self.data as *const c_void);
             Ok(&*(data as *const T))
+        }
+    }
+
+    pub(crate) fn get_mut<T>(&mut self, id: &str) -> Result<&mut T, ComponentError> {
+        let getter_mut = self.schema.get_getter_mut(id)?;
+
+        unsafe {
+            let data = getter_mut(self.data);
+            Ok(&mut *(data as *mut T))
         }
     }
 
@@ -205,6 +214,10 @@ mod tests {
         unsafe { &(*(data as *const TestCounter)).value as *const i64 as *const c_void }
     }
 
+    unsafe extern "C" fn unit_counter_getter_mut(data: *mut c_void) -> *mut c_void {
+        unsafe { &mut (*(data as *mut TestCounter)).value as *mut i64 as *mut c_void }
+    }
+
     unsafe extern "C" fn unit_counter_setter(data: *mut c_void, value: *const c_void) {
         unsafe {
             (*(data as *mut TestCounter)).value = *(value as *const i64);
@@ -246,6 +259,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Long,
                 Some(unit_counter_getter),
+                Some(unit_counter_getter_mut),
                 Some(unit_counter_setter),
                 None,
                 None,
