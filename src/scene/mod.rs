@@ -32,6 +32,7 @@ pub struct Scene {
 
     deferred_calls: Vec<DeferredCall>,
     is_ticking: bool,
+    should_exit: bool,
 }
 
 impl Default for Scene {
@@ -45,6 +46,7 @@ impl Default for Scene {
             components: HashMap::new(),
             deferred_calls: Vec::new(),
             is_ticking: false,
+            should_exit: false,
         }
     }
 }
@@ -609,7 +611,9 @@ impl Scene {
             self.run_deferred_calls();
         }
 
-        true
+        let should_exit = self.should_exit;
+        self.should_exit = false;
+        !should_exit
     }
 
     pub fn get<T>(
@@ -807,6 +811,10 @@ impl Scene {
         component
             .get_field_type(field_id)
             .map_err(SceneError::ComponentFieldError)
+    }
+
+    pub fn should_exit(&mut self) {
+        self.should_exit = true;
     }
 }
 
