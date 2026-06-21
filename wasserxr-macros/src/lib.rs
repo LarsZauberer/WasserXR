@@ -91,10 +91,11 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro exports create, destroy, and schema functions for the component.
 /// Fields without field function attributes get generated getter, getter_mut,
-/// setter, mover, taker, serializer, and deserializer functions by default. If
-/// at least one field function attribute is present, only the requested
-/// functions are generated. Use `#[none]` to register a field without generated
-/// field functions.
+/// setter, serializer, and deserializer functions by default. Mover and taker
+/// functions are generated only with explicit `#[mover]` and `#[taker]`
+/// attributes. If at least one field function attribute is present, only the
+/// requested functions are generated. Use `#[none]` to register a field without
+/// generated field functions.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     if !args.is_empty() {

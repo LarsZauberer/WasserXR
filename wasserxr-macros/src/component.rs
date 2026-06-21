@@ -118,8 +118,6 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
             has_getter = true;
             has_getter_mut = true;
             has_setter = true;
-            has_mover = true;
-            has_taker = true;
             has_serializer = true;
             has_deserializer = true;
         }

@@ -207,6 +207,18 @@ fn component_macro_registers_and_accesses_static_component() {
     scene
         .set(entity, "MacroComponent", "default_int", &41_i32)
         .unwrap();
+    assert_eq!(
+        scene.r#move(entity, "MacroComponent", "default_int", 9_i32),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoMover
+        ))
+    );
+    assert_eq!(
+        scene.take::<i32>(entity, "MacroComponent", "default_int"),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoTaker
+        ))
+    );
     *scene
         .get_mut::<i32>(entity, "MacroComponent", "default_int")
         .unwrap() = 42;
