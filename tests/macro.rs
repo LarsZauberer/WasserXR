@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::sync::{LazyLock, Mutex};
 
 use uuid::Uuid;

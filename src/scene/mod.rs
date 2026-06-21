@@ -1,6 +1,7 @@
 pub mod component;
 pub(crate) mod entity;
 pub(crate) mod plugin;
+pub mod query;
 pub(crate) mod serialization;
 pub(crate) mod system;
 
@@ -8,6 +9,7 @@ use component::{Component, FieldType};
 use entity::Entity;
 use log::{error, warn};
 use plugin::Plugin;
+use query::{SceneQuery, SceneQueryMut};
 use system::System;
 
 use crate::error::{PluginError, SceneError};
@@ -616,6 +618,7 @@ impl Scene {
         !should_exit
     }
 
+    #[deprecated(note = "use query instead")]
     pub fn get<T>(
         &self,
         entity_id: Uuid,
@@ -644,6 +647,7 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    #[deprecated(note = "use query_mut instead")]
     pub fn get_mut<T>(
         &mut self,
         entity_id: Uuid,
@@ -672,6 +676,89 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    pub fn query<'scene, Q>(
+        &'scene self,
+        entity_id: Uuid,
+        component_id: &str,
+        fields: &[&str],
+    ) -> Result<Q, SceneError>
+    where
+        Q: SceneQuery<'scene>,
+    {
+        if fields.len() != Q::FIELD_COUNT {
+            return Err(SceneError::ComponentFieldError(
+                crate::error::ComponentError::FieldParsing,
+            ));
+        }
+
+        let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field query",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field query",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        let component = component as *const Component as *const std::ffi::c_void;
+        unsafe { Q::fetch(component, fields) }
+    }
+
+    pub fn query_mut<'scene, Q>(
+        &'scene mut self,
+        entity_id: Uuid,
+        component_id: &str,
+        fields: &[&str],
+    ) -> Result<Q, SceneError>
+    where
+        Q: SceneQueryMut<'scene>,
+    {
+        if fields.len() != Q::FIELD_COUNT {
+            return Err(SceneError::ComponentFieldError(
+                crate::error::ComponentError::FieldParsing,
+            ));
+        }
+
+        // Check if there are no duplicates in the fields
+        // This is not a thorough check but at least a good error prevention
+        for index in 0..fields.len() {
+            if fields[index + 1..].contains(&fields[index]) {
+                return Err(SceneError::ComponentFieldError(
+                    crate::error::ComponentError::FieldParsing,
+                ));
+            }
+        }
+
+        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for mutable component field query",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get_mut(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for mutable field query",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        let component = component as *mut Component as *mut std::ffi::c_void;
+        unsafe { Q::fetch(component, fields) }
+    }
+
+    #[deprecated(note = "use query_mut instead")]
     pub fn set<T>(
         &mut self,
         entity_id: Uuid,
@@ -820,11 +907,13 @@ impl Scene {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use crate::{
         error::ComponentError,
         scene::{
-            component::{FieldType, Schema, SerializedBytes},
+            component::{FieldType, Getter, Schema, SerializedBytes},
             serialization::{ComponentData, FieldData, SceneData},
         },
     };
@@ -839,6 +928,17 @@ mod tests {
     #[repr(C)]
     struct SceneCounter {
         value: i64,
+    }
+
+    #[repr(C)]
+    struct ScenePair {
+        a: i64,
+        b: i64,
+    }
+
+    #[repr(C)]
+    struct SceneOctet {
+        values: [i64; 8],
     }
 
     #[derive(Default, Debug, PartialEq, Eq)]
@@ -858,6 +958,41 @@ mod tests {
     unsafe extern "C" fn scene_counter_getter_mut(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut SceneCounter)).value as *mut i64 as *mut c_void }
     }
+
+    unsafe extern "C" fn scene_pair_a_getter(data: *const c_void) -> *const c_void {
+        unsafe { &(*(data as *const ScenePair)).a as *const i64 as *const c_void }
+    }
+
+    unsafe extern "C" fn scene_pair_a_getter_mut(data: *mut c_void) -> *mut c_void {
+        unsafe { &mut (*(data as *mut ScenePair)).a as *mut i64 as *mut c_void }
+    }
+
+    unsafe extern "C" fn scene_pair_b_getter(data: *const c_void) -> *const c_void {
+        unsafe { &(*(data as *const ScenePair)).b as *const i64 as *const c_void }
+    }
+
+    unsafe extern "C" fn scene_pair_b_getter_mut(data: *mut c_void) -> *mut c_void {
+        unsafe { &mut (*(data as *mut ScenePair)).b as *mut i64 as *mut c_void }
+    }
+
+    macro_rules! scene_octet_getter {
+        ($name:ident, $index:expr) => {
+            unsafe extern "C" fn $name(data: *const c_void) -> *const c_void {
+                unsafe {
+                    &(*(data as *const SceneOctet)).values[$index] as *const i64 as *const c_void
+                }
+            }
+        };
+    }
+
+    scene_octet_getter!(scene_octet_a_getter, 0);
+    scene_octet_getter!(scene_octet_b_getter, 1);
+    scene_octet_getter!(scene_octet_c_getter, 2);
+    scene_octet_getter!(scene_octet_d_getter, 3);
+    scene_octet_getter!(scene_octet_e_getter, 4);
+    scene_octet_getter!(scene_octet_f_getter, 5);
+    scene_octet_getter!(scene_octet_g_getter, 6);
+    scene_octet_getter!(scene_octet_h_getter, 7);
 
     unsafe extern "C" fn scene_counter_setter(data: *mut c_void, value: *const c_void) {
         unsafe {
@@ -910,9 +1045,35 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_scene_pair() -> *mut c_void {
+        Box::into_raw(Box::new(ScenePair { a: 1, b: 2 })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_scene_octet() -> *mut c_void {
+        Box::into_raw(Box::new(SceneOctet {
+            values: [1, 2, 3, 4, 5, 6, 7, 8],
+        })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_destroy_scene_counter(data: *mut c_void) {
         unsafe {
             drop(Box::from_raw(data as *mut SceneCounter));
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_scene_pair(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut ScenePair));
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_scene_octet(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut SceneOctet));
         }
     }
 
@@ -944,6 +1105,64 @@ mod tests {
                 Some(scene_counter_serializer),
                 Some(scene_counter_deserializer),
             );
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_schema_scene_pair(schema: *mut Schema) {
+        unsafe {
+            (*schema).add_field(
+                "a".to_owned(),
+                FieldType::Long,
+                Some(scene_pair_a_getter),
+                Some(scene_pair_a_getter_mut),
+                None,
+                None,
+                None,
+                None,
+                None,
+            );
+            (*schema).add_field(
+                "b".to_owned(),
+                FieldType::Long,
+                Some(scene_pair_b_getter),
+                Some(scene_pair_b_getter_mut),
+                None,
+                None,
+                None,
+                None,
+                None,
+            );
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_schema_scene_octet(schema: *mut Schema) {
+        let fields: [(&str, Getter); 8] = [
+            ("a", scene_octet_a_getter),
+            ("b", scene_octet_b_getter),
+            ("c", scene_octet_c_getter),
+            ("d", scene_octet_d_getter),
+            ("e", scene_octet_e_getter),
+            ("f", scene_octet_f_getter),
+            ("g", scene_octet_g_getter),
+            ("h", scene_octet_h_getter),
+        ];
+
+        unsafe {
+            for (id, getter) in fields {
+                (*schema).add_field(
+                    id.to_owned(),
+                    FieldType::Long,
+                    Some(getter),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                );
+            }
         }
     }
 
@@ -1248,6 +1467,165 @@ mod tests {
 
         assert_eq!(
             scene.get_mut::<SceneOwnedValue>(entity, "scene_owner", "value"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNoGetterMut
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_query_gets_shared_field() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        let (value,) = scene
+            .query::<(&i64,)>(entity, "scene_counter", &["value"])
+            .unwrap();
+
+        assert_eq!(*value, 1);
+    }
+
+    #[test]
+    fn scene_query_gets_mutable_field() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        {
+            let (value,) = scene
+                .query_mut::<(&mut i64,)>(entity, "scene_counter", &["value"])
+                .unwrap();
+            *value = 17;
+        }
+
+        let (value,) = scene
+            .query::<(&i64,)>(entity, "scene_counter", &["value"])
+            .unwrap();
+        assert_eq!(*value, 17);
+    }
+
+    #[test]
+    fn scene_query_gets_mutable_and_shared_fields() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        {
+            let (a, b) = scene
+                .query_mut::<(&mut i64, &i64)>(entity, "scene_pair", &["a", "b"])
+                .unwrap();
+            assert_eq!(*b, 2);
+            *a = 5;
+        }
+
+        let (a, b) = scene
+            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
+            .unwrap();
+        assert_eq!((*a, *b), (5, 2));
+    }
+
+    #[test]
+    fn scene_query_allows_multiple_shared_queries() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        let (a, b) = scene
+            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
+            .unwrap();
+        let (c, d) = scene
+            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
+            .unwrap();
+
+        assert_eq!((*a, *b, *c, *d), (1, 2, 1, 2));
+    }
+
+    #[test]
+    fn scene_query_gets_eight_shared_fields() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_octet".to_owned())
+            .unwrap();
+
+        let (a, b, c, d, e, f, g, h) = scene
+            .query::<(&i64, &i64, &i64, &i64, &i64, &i64, &i64, &i64)>(
+                entity,
+                "scene_octet",
+                &["a", "b", "c", "d", "e", "f", "g", "h"],
+            )
+            .unwrap();
+
+        assert_eq!((*a, *b, *c, *d, *e, *f, *g, *h), (1, 2, 3, 4, 5, 6, 7, 8));
+    }
+
+    #[test]
+    fn scene_query_rejects_duplicate_fields() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.query_mut::<(&mut i64, &i64)>(entity, "scene_pair", &["a", "a"]),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldParsing
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_query_rejects_wrong_field_count() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.query::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldParsing
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_query_mut_rejects_wrong_field_count() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.query_mut::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldParsing
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_query_reports_missing_getter_mut() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.query_mut::<(&mut SceneOwnedValue,)>(entity, "scene_owner", &["value"]),
             Err(SceneError::ComponentFieldError(
                 ComponentError::FieldNoGetterMut
             ))
