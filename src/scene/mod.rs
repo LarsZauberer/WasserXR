@@ -18,13 +18,20 @@ use std::{collections::HashMap, fs, path::Path};
 
 use uuid::Uuid;
 
+enum DeferredCall {
+    Reload,
+    UnloadPlugin(String),
+    RemoveSystem(String),
+}
+
 pub struct Scene {
     entities: HashMap<Uuid, Entity>,
     plugins: HashMap<String, Plugin>,
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
 
-    should_reload: bool,
+    deferred_calls: Vec<DeferredCall>,
+    is_ticking: bool,
 }
 
 impl Default for Scene {
@@ -36,7 +43,8 @@ impl Default for Scene {
             plugins,
             systems: HashMap::new(),
             components: HashMap::new(),
-            should_reload: false,
+            deferred_calls: Vec::new(),
+            is_ticking: false,
         }
     }
 }
@@ -180,6 +188,12 @@ impl Scene {
     }
 
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
+        if self.is_ticking {
+            self.deferred_calls
+                .push(DeferredCall::UnloadPlugin(path.to_owned()));
+            return Ok(());
+        }
+
         if path.is_empty() {
             log::warn!("Static plugin cannot be unloaded");
             return Err(SceneError::StaticPluginUnload);
@@ -328,6 +342,12 @@ impl Scene {
     }
 
     pub fn remove_system(&mut self, id: &str) -> Result<(), SceneError> {
+        if self.is_ticking {
+            self.deferred_calls
+                .push(DeferredCall::RemoveSystem(id.to_owned()));
+            return Ok(());
+        }
+
         let Some(system) = self.systems.remove(id) else {
             log::warn!("System `{}` was not found for removal", id);
             return Err(SceneError::SystemNotFound);
@@ -471,12 +491,12 @@ impl Scene {
 
     /// This is reload the Scene immediately. It will serialize the current scene data, unload all
     /// the plugins and reload them in. At the end it will deserialize the scene again.
-    ///
-    /// SAFETY: This function cannot be called inside of a system inside a plugin. This call will
-    /// then of course be unloaded and the executation cannot continue as expected. Only use this,
-    /// if you call it from always loaded code (e.g. main function). If you need to call a reload,
-    /// from a system, please call `Scene::should_reload()` instead.
-    pub unsafe fn reload(&mut self) -> Result<(), SceneError> {
+    pub fn reload(&mut self) -> Result<(), SceneError> {
+        if self.is_ticking {
+            self.deferred_calls.push(DeferredCall::Reload);
+            return Ok(());
+        }
+
         // Serialize the important data
         let plugins: Vec<String> = self
             .plugins
@@ -516,10 +536,6 @@ impl Scene {
         Ok(())
     }
 
-    pub fn should_reload(&mut self) {
-        self.should_reload = true;
-    }
-
     fn run_system(&mut self, groups: usize, selector: Selector, runner: Runner) {
         let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
 
@@ -543,34 +559,54 @@ impl Scene {
         }
     }
 
+    fn run_deferred_calls(&mut self) {
+        let deferred_calls = std::mem::take(&mut self.deferred_calls);
+
+        for deferred_call in deferred_calls {
+            match deferred_call {
+                DeferredCall::Reload => {
+                    if self.reload().is_err() {
+                        warn!("Reload Failed! The scene has maybe been partially been reloaded.");
+                    }
+                }
+                DeferredCall::UnloadPlugin(plugin_id) => {
+                    if self.unload_plugin(&plugin_id).is_err() {
+                        warn!("Deferred unload of plugin `{}` failed", plugin_id);
+                    }
+                }
+                DeferredCall::RemoveSystem(system_id) => {
+                    if self.remove_system(&system_id).is_err() {
+                        warn!("Deferred removal of system `{}` failed", system_id);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn tick(&mut self) -> bool {
         let mut systems_sorted: Vec<&System> = self.systems.values().collect();
         systems_sorted.sort_by_key(|a| a.get_priority());
 
-        let functions: Vec<(usize, Selector, Runner)> = systems_sorted
+        let system_ids: Vec<String> = systems_sorted
             .iter()
             .rev()
-            .map(|system| {
-                (
-                    system.get_groups(),
-                    system.get_selector(),
-                    system.get_runner(),
-                )
-            })
+            .map(|system| system.get_id().to_owned())
             .collect();
 
-        for (groups, selector, runner) in functions {
-            self.run_system(groups, selector, runner);
-        }
+        for system_id in system_ids {
+            let Some(system) = self.systems.get(&system_id) else {
+                continue;
+            };
 
-        // Check if the scene should reload
-        if self.should_reload {
-            unsafe {
-                if self.reload().is_err() {
-                    warn!("Reload Failed! The scene has maybe been partially been reloaded.");
-                }
-            }
-            self.should_reload = false;
+            let groups = system.get_groups();
+            let selector = system.get_selector();
+            let runner = system.get_runner();
+
+            self.is_ticking = true;
+            self.run_system(groups, selector, runner);
+            self.is_ticking = false;
+
+            self.run_deferred_calls();
         }
 
         true
@@ -760,7 +796,7 @@ mod tests {
         ffi::c_void,
         sync::{
             LazyLock, Mutex,
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
     };
 
@@ -891,9 +927,13 @@ mod tests {
     static SCENE_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_DEFERRED_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_DEFERRED_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SCENE_DEFERRED_REMOVE_TARGET_PRESENT: AtomicBool = AtomicBool::new(false);
+    static SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT: AtomicBool = AtomicBool::new(false);
     static SCENE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
     static SCENE_RELOAD_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
+        LazyLock::new(|| Mutex::new(Vec::new()));
+    static SCENE_DEFERRED_REMOVE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
 
     #[unsafe(no_mangle)]
@@ -974,12 +1014,58 @@ mod tests {
         _sizes: *const usize,
     ) {
         unsafe {
-            (&mut *scene).should_reload();
+            (&mut *scene).reload().unwrap();
         }
         SCENE_RELOAD_TICK_ORDER
             .lock()
             .unwrap()
             .push("reload-request");
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_deferred_remove_request(
+        scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        let scene = unsafe { &mut *scene };
+        scene.remove_system("scene_deferred_remove_target").unwrap();
+        SCENE_DEFERRED_REMOVE_TARGET_PRESENT.store(
+            scene
+                .get_systems()
+                .contains(&"scene_deferred_remove_target".to_owned()),
+            Ordering::SeqCst,
+        );
+        SCENE_DEFERRED_REMOVE_TICK_ORDER
+            .lock()
+            .unwrap()
+            .push("remove-request");
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_deferred_remove_target(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        SCENE_DEFERRED_REMOVE_TICK_ORDER
+            .lock()
+            .unwrap()
+            .push("remove-target");
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_deferred_unload_request(
+        scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        let scene = unsafe { &mut *scene };
+        scene.unload_plugin("dynamic_deferred").unwrap();
+        SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.store(
+            scene.get_plugins().contains(&"dynamic_deferred".to_owned()),
+            Ordering::SeqCst,
+        );
     }
 
     #[unsafe(no_mangle)]
@@ -1407,6 +1493,52 @@ mod tests {
     }
 
     #[test]
+    fn scene_tick_defers_remove_system_until_current_runner_finishes() {
+        SCENE_DEFERRED_REMOVE_TARGET_PRESENT.store(false, Ordering::SeqCst);
+        SCENE_DEFERRED_REMOVE_TICK_ORDER.lock().unwrap().clear();
+        let mut scene = Scene::new();
+        scene.add_entity();
+        scene
+            .add_system("scene_deferred_remove_target".to_owned(), 1)
+            .unwrap();
+        scene
+            .add_system("scene_deferred_remove_request".to_owned(), 2)
+            .unwrap();
+
+        assert!(scene.tick());
+
+        assert!(SCENE_DEFERRED_REMOVE_TARGET_PRESENT.load(Ordering::SeqCst));
+        assert_eq!(
+            *SCENE_DEFERRED_REMOVE_TICK_ORDER.lock().unwrap(),
+            vec!["remove-request"]
+        );
+        assert_eq!(
+            scene.remove_system("scene_deferred_remove_target"),
+            Err(SceneError::SystemNotFound)
+        );
+        assert_eq!(scene.remove_system("scene_deferred_remove_request"), Ok(()));
+    }
+
+    #[test]
+    fn scene_tick_defers_unload_plugin_until_current_runner_finishes() {
+        SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.store(false, Ordering::SeqCst);
+        let mut scene = Scene::new();
+        scene.add_entity();
+        scene.plugins.insert(
+            "dynamic_deferred".to_owned(),
+            Plugin::new_test_dynamic("dynamic_deferred".to_owned()),
+        );
+        scene
+            .add_system("scene_deferred_unload_request".to_owned(), 1)
+            .unwrap();
+
+        assert!(scene.tick());
+
+        assert!(SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.load(Ordering::SeqCst));
+        assert!(!scene.get_plugins().contains(&"dynamic_deferred".to_owned()));
+    }
+
+    #[test]
     fn scene_reload_reinstantiates_scene_objects() {
         SCENE_RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
         SCENE_RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
@@ -1425,9 +1557,7 @@ mod tests {
             .add_system("scene_reload_counted_system".to_owned(), 1)
             .unwrap();
 
-        unsafe {
-            scene.reload().unwrap();
-        }
+        scene.reload().unwrap();
 
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
         assert_eq!(
