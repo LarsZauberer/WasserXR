@@ -633,6 +633,63 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    pub fn r#move<T>(
+        &mut self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+        data: T,
+    ) -> Result<(), SceneError> {
+        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field move",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get_mut(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field move",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        component
+            .r#move(field_id, data)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
+    pub fn take<T>(
+        &mut self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<T, SceneError> {
+        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component field take",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get_mut(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for field take",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        component
+            .take(field_id)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
     pub fn get_component_fields(
         &self,
         entity_id: Uuid,
@@ -692,9 +749,12 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::{
-        component::{FieldType, Schema, SerializedBytes},
-        serialization::{ComponentData, FieldData, SceneData},
+    use crate::{
+        error::ComponentError,
+        scene::{
+            component::{FieldType, Schema, SerializedBytes},
+            serialization::{ComponentData, FieldData, SceneData},
+        },
     };
     use std::{
         ffi::c_void,
@@ -707,6 +767,16 @@ mod tests {
     #[repr(C)]
     struct SceneCounter {
         value: i64,
+    }
+
+    #[derive(Default, Debug, PartialEq, Eq)]
+    struct SceneOwnedValue {
+        value: String,
+    }
+
+    #[repr(C)]
+    struct SceneOwner {
+        value: SceneOwnedValue,
     }
 
     unsafe extern "C" fn scene_counter_getter(data: *const c_void) -> *const c_void {
@@ -739,6 +809,24 @@ mod tests {
         }
     }
 
+    unsafe extern "C" fn scene_owner_getter(data: *const c_void) -> *const c_void {
+        unsafe { &(*(data as *const SceneOwner)).value as *const SceneOwnedValue as *const c_void }
+    }
+
+    unsafe extern "C" fn scene_owner_mover(data: *mut c_void, value: *mut c_void) {
+        unsafe {
+            (*(data as *mut SceneOwner)).value = *Box::from_raw(value as *mut SceneOwnedValue);
+        }
+    }
+
+    unsafe extern "C" fn scene_owner_taker(data: *mut c_void) -> *mut c_void {
+        unsafe {
+            Box::into_raw(Box::new(std::mem::take(
+                &mut (*(data as *mut SceneOwner)).value,
+            ))) as *mut c_void
+        }
+    }
+
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_create_scene_counter() -> *mut c_void {
         Box::into_raw(Box::new(SceneCounter { value: 1 })) as *mut c_void
@@ -752,6 +840,20 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_scene_owner() -> *mut c_void {
+        Box::into_raw(Box::new(SceneOwner {
+            value: SceneOwnedValue::default(),
+        })) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_scene_owner(data: *mut c_void) {
+        unsafe {
+            drop(Box::from_raw(data as *mut SceneOwner));
+        }
+    }
+
+    #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_schema_scene_counter(schema: *mut Schema) {
         unsafe {
             (*schema).add_field(
@@ -759,8 +861,26 @@ mod tests {
                 FieldType::Long,
                 Some(scene_counter_getter),
                 Some(scene_counter_setter),
+                None,
+                None,
                 Some(scene_counter_serializer),
                 Some(scene_counter_deserializer),
+            );
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_schema_scene_owner(schema: *mut Schema) {
+        unsafe {
+            (*schema).add_field(
+                "value".to_owned(),
+                FieldType::Blob,
+                Some(scene_owner_getter),
+                None,
+                Some(scene_owner_mover),
+                Some(scene_owner_taker),
+                None,
+                None,
             );
         }
     }
@@ -968,6 +1088,103 @@ mod tests {
         assert_eq!(
             *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
             9
+        );
+    }
+
+    #[test]
+    fn scene_move_component_field_for_existing_component() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+
+        scene
+            .r#move(
+                entity,
+                "scene_owner",
+                "value",
+                SceneOwnedValue {
+                    value: "moved".to_owned(),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            scene
+                .get::<SceneOwnedValue>(entity, "scene_owner", "value")
+                .unwrap(),
+            &SceneOwnedValue {
+                value: "moved".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn scene_take_component_field_for_existing_component() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+        scene
+            .r#move(
+                entity,
+                "scene_owner",
+                "value",
+                SceneOwnedValue {
+                    value: "taken".to_owned(),
+                },
+            )
+            .unwrap();
+
+        let value = scene
+            .take::<SceneOwnedValue>(entity, "scene_owner", "value")
+            .unwrap();
+
+        assert_eq!(
+            value,
+            SceneOwnedValue {
+                value: "taken".to_owned(),
+            }
+        );
+        assert_eq!(
+            scene
+                .get::<SceneOwnedValue>(entity, "scene_owner", "value")
+                .unwrap(),
+            &SceneOwnedValue::default()
+        );
+    }
+
+    #[test]
+    fn scene_move_component_field_without_mover() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.r#move(entity, "scene_counter", "value", 2_i64),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNoMover
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_take_component_field_without_taker() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.take::<i64>(entity, "scene_counter", "value"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNoTaker
+            ))
         );
     }
 

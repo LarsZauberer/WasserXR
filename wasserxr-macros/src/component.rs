@@ -6,6 +6,8 @@ struct Field {
     ty: Type,
     has_getter: bool,
     has_setter: bool,
+    has_mover: bool,
+    has_taker: bool,
     has_serializer: bool,
     has_deserializer: bool,
 }
@@ -20,6 +22,8 @@ pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
     let schema = create_schema_function(&component_id, &component_fields);
     let getters = create_getter_functions(&component_ident, &component_id, &component_fields);
     let setters = create_setter_functions(&component_ident, &component_id, &component_fields);
+    let movers = create_mover_functions(&component_ident, &component_id, &component_fields);
+    let takers = create_taker_functions(&component_ident, &component_id, &component_fields);
     let serializers =
         create_serializer_functions(&component_ident, &component_id, &component_fields);
     let deserializers =
@@ -33,6 +37,8 @@ pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
         #schema
         #getters
         #setters
+        #movers
+        #takers
         #serializers
         #deserializers
     })
@@ -58,6 +64,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
 
         let mut has_getter = false;
         let mut has_setter = false;
+        let mut has_mover = false;
+        let mut has_taker = false;
         let mut has_serializer = false;
         let mut has_deserializer = false;
         let mut has_none = false;
@@ -68,6 +76,10 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
                 has_getter = true;
             } else if attr.path().is_ident("setter") {
                 has_setter = true;
+            } else if attr.path().is_ident("mover") {
+                has_mover = true;
+            } else if attr.path().is_ident("taker") {
+                has_taker = true;
             } else if attr.path().is_ident("serializer") {
                 has_serializer = true;
             } else if attr.path().is_ident("deserializer") {
@@ -81,8 +93,12 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
 
         field.attrs = kept_attrs;
 
-        let has_explicit_field_function =
-            has_getter || has_setter || has_serializer || has_deserializer;
+        let has_explicit_field_function = has_getter
+            || has_setter
+            || has_mover
+            || has_taker
+            || has_serializer
+            || has_deserializer;
         if has_none && has_explicit_field_function {
             return Err(Error::new_spanned(
                 field,
@@ -93,6 +109,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         if !has_none && !has_explicit_field_function {
             has_getter = true;
             has_setter = true;
+            has_mover = true;
+            has_taker = true;
             has_serializer = true;
             has_deserializer = true;
         }
@@ -102,6 +120,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
             ty: field.ty.clone(),
             has_getter,
             has_setter,
+            has_mover,
+            has_taker,
             has_serializer,
             has_deserializer,
         });
@@ -163,6 +183,18 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
         } else {
             quote! { None }
         };
+        let mover = if field.has_mover {
+            let mover_ident = format_ident!("wxr_move_{}_{}", component_id, field_ident);
+            quote! { Some(#mover_ident) }
+        } else {
+            quote! { None }
+        };
+        let taker = if field.has_taker {
+            let taker_ident = format_ident!("wxr_take_{}_{}", component_id, field_ident);
+            quote! { Some(#taker_ident) }
+        } else {
+            quote! { None }
+        };
         let serializer = if field.has_serializer
             && component_field_serialization_kind(&field.ty).is_some()
         {
@@ -186,6 +218,8 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
                 #field_type,
                 #getter,
                 #setter,
+                #mover,
+                #taker,
                 #serializer,
                 #deserializer,
             );
@@ -264,6 +298,68 @@ fn create_setter_functions(
 
     quote! {
         #(#setters)*
+    }
+}
+
+fn create_mover_functions(
+    component_ident: &Ident,
+    component_id: &str,
+    fields: &[Field],
+) -> proc_macro2::TokenStream {
+    let movers = fields.iter().filter(|field| field.has_mover).map(|field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
+        let mover_name = format!("wxr_move_{}_{}", component_id, field_ident);
+        let mover_ident = format_ident!("{}", mover_name);
+
+        quote! {
+            #[unsafe(export_name = #mover_name)]
+            #[allow(non_snake_case)]
+            pub unsafe extern "C" fn #mover_ident(
+                ptr: *mut ::std::ffi::c_void,
+                data: *mut ::std::ffi::c_void,
+            ) {
+                unsafe {
+                    (*(ptr as *mut #component_ident)).#field_ident =
+                        *Box::from_raw(data as *mut #field_ty);
+                }
+            }
+        }
+    });
+
+    quote! {
+        #(#movers)*
+    }
+}
+
+fn create_taker_functions(
+    component_ident: &Ident,
+    component_id: &str,
+    fields: &[Field],
+) -> proc_macro2::TokenStream {
+    let takers = fields.iter().filter(|field| field.has_taker).map(|field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
+        let taker_name = format!("wxr_take_{}_{}", component_id, field_ident);
+        let taker_ident = format_ident!("{}", taker_name);
+
+        quote! {
+            #[unsafe(export_name = #taker_name)]
+            #[allow(non_snake_case)]
+            pub unsafe extern "C" fn #taker_ident(
+                ptr: *mut ::std::ffi::c_void,
+            ) -> *mut ::std::ffi::c_void {
+                unsafe {
+                    Box::into_raw(Box::new(::std::mem::take(
+                        &mut (*(ptr as *mut #component_ident)).#field_ident,
+                    ))) as *mut #field_ty as *mut ::std::ffi::c_void
+                }
+            }
+        }
+    });
+
+    quote! {
+        #(#takers)*
     }
 }
 

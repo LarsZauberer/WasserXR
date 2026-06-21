@@ -57,6 +57,20 @@ pub struct MacroMarker {
     value: i64,
 }
 
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct MacroOwnedValue {
+    value: String,
+}
+
+#[component]
+#[derive(Default)]
+pub struct MacroOwnershipComponent {
+    #[getter]
+    #[mover]
+    #[taker]
+    value: MacroOwnedValue,
+}
+
 static MACRO_SYSTEM_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 static MACRO_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
@@ -211,6 +225,63 @@ fn component_macro_registers_and_accesses_static_component() {
     );
     assert_eq!(
         scene.set(entity, "MacroComponent", "hidden", &7_i32),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoSetter
+        ))
+    );
+}
+
+#[test]
+fn component_macro_moves_and_takes_non_clone_field() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+
+    scene
+        .add_component(entity, "MacroOwnershipComponent".to_owned())
+        .unwrap();
+    scene
+        .r#move(
+            entity,
+            "MacroOwnershipComponent",
+            "value",
+            MacroOwnedValue {
+                value: "owned".to_owned(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        scene
+            .get::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+            .unwrap(),
+        &MacroOwnedValue {
+            value: "owned".to_owned(),
+        }
+    );
+
+    let value = scene
+        .take::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+        .unwrap();
+
+    assert_eq!(
+        value,
+        MacroOwnedValue {
+            value: "owned".to_owned(),
+        }
+    );
+    assert_eq!(
+        scene
+            .get::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+            .unwrap(),
+        &MacroOwnedValue::default()
+    );
+    assert_eq!(
+        scene.set(
+            entity,
+            "MacroOwnershipComponent",
+            "value",
+            &MacroOwnedValue::default(),
+        ),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNoSetter
         ))

@@ -7,6 +7,8 @@ use crate::{
 
 pub type Getter = unsafe extern "C" fn(*const c_void) -> *const c_void;
 pub type Setter = unsafe extern "C" fn(*mut c_void, *const c_void);
+pub type Mover = unsafe extern "C" fn(*mut c_void, *mut c_void);
+pub type Taker = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 pub type Serializer = unsafe extern "C" fn(*const c_void) -> SerializedBytes;
 pub type Deserializer = unsafe extern "C" fn(*mut c_void, SerializedBytes);
 
@@ -15,6 +17,8 @@ pub struct Field {
     type_hint: FieldType,
     getter: Option<Getter>,
     setter: Option<Setter>,
+    mover: Option<Mover>,
+    taker: Option<Taker>,
     serializer: Option<Serializer>,
     deserializer: Option<Deserializer>,
 }
@@ -24,6 +28,8 @@ impl Field {
         type_hint: FieldType,
         getter: Option<Getter>,
         setter: Option<Setter>,
+        mover: Option<Mover>,
+        taker: Option<Taker>,
         serializer: Option<Serializer>,
         deserializer: Option<Deserializer>,
     ) -> Self {
@@ -31,6 +37,8 @@ impl Field {
             type_hint,
             getter,
             setter,
+            mover,
+            taker,
             serializer,
             deserializer,
         }
@@ -56,6 +64,26 @@ impl Field {
             None => {
                 log::debug!("Schema field has no setter function");
                 Err(ComponentError::FieldNoSetter)
+            }
+        }
+    }
+
+    pub fn get_mover(&self) -> Result<Mover, ComponentError> {
+        match self.mover {
+            Some(mover) => Ok(mover),
+            None => {
+                log::debug!("Schema field has no mover function");
+                Err(ComponentError::FieldNoMover)
+            }
+        }
+    }
+
+    pub fn get_taker(&self) -> Result<Taker, ComponentError> {
+        match self.taker {
+            Some(taker) => Ok(taker),
+            None => {
+                log::debug!("Schema field has no taker function");
+                Err(ComponentError::FieldNoTaker)
             }
         }
     }
@@ -92,6 +120,12 @@ mod tests {
 
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
+    unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
+
+    unsafe extern "C" fn test_taker(_data: *mut c_void) -> *mut c_void {
+        std::ptr::null_mut()
+    }
+
     unsafe extern "C" fn test_serializer(_data: *const c_void) -> SerializedBytes {
         SerializedBytes::from_vec(vec![1, 2, 3])
     }
@@ -104,6 +138,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            Some(test_mover),
+            Some(test_taker),
             Some(test_serializer),
             Some(test_deserializer),
         );
@@ -113,7 +149,15 @@ mod tests {
 
     #[test]
     fn field_get_getter_when_present() {
-        let field = Field::new(FieldType::Blob, Some(test_getter), None, None, None);
+        let field = Field::new(
+            FieldType::Blob,
+            Some(test_getter),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(
             field.get_getter().unwrap() as usize,
@@ -123,14 +167,30 @@ mod tests {
 
     #[test]
     fn field_get_getter_when_missing() {
-        let field = Field::new(FieldType::Blob, None, Some(test_setter), None, None);
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            Some(test_setter),
+            None,
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(field.get_getter(), Err(ComponentError::FieldNoGetter));
     }
 
     #[test]
     fn field_get_setter_when_present() {
-        let field = Field::new(FieldType::Blob, None, Some(test_setter), None, None);
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            Some(test_setter),
+            None,
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(
             field.get_setter().unwrap() as usize,
@@ -140,14 +200,96 @@ mod tests {
 
     #[test]
     fn field_get_setter_when_missing() {
-        let field = Field::new(FieldType::Blob, Some(test_getter), None, None, None);
+        let field = Field::new(
+            FieldType::Blob,
+            Some(test_getter),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(field.get_setter(), Err(ComponentError::FieldNoSetter));
     }
 
     #[test]
+    fn field_get_mover_when_present() {
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            Some(test_mover),
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            field.get_mover().unwrap() as usize,
+            test_mover as *const () as usize
+        );
+    }
+
+    #[test]
+    fn field_get_mover_when_missing() {
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            Some(test_taker),
+            None,
+            None,
+        );
+
+        assert_eq!(field.get_mover(), Err(ComponentError::FieldNoMover));
+    }
+
+    #[test]
+    fn field_get_taker_when_present() {
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            Some(test_taker),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            field.get_taker().unwrap() as usize,
+            test_taker as *const () as usize
+        );
+    }
+
+    #[test]
+    fn field_get_taker_when_missing() {
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            Some(test_mover),
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(field.get_taker(), Err(ComponentError::FieldNoTaker));
+    }
+
+    #[test]
     fn field_get_serializer_when_present() {
-        let field = Field::new(FieldType::Blob, None, None, Some(test_serializer), None);
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            None,
+            Some(test_serializer),
+            None,
+        );
 
         assert_eq!(
             field.get_serializer().unwrap() as usize,
@@ -157,7 +299,15 @@ mod tests {
 
     #[test]
     fn field_get_serializer_when_missing() {
-        let field = Field::new(FieldType::Blob, None, None, None, Some(test_deserializer));
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(test_deserializer),
+        );
 
         assert_eq!(
             field.get_serializer(),
@@ -167,7 +317,15 @@ mod tests {
 
     #[test]
     fn field_get_deserializer_when_present() {
-        let field = Field::new(FieldType::Blob, None, None, None, Some(test_deserializer));
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(test_deserializer),
+        );
 
         assert_eq!(
             field.get_deserializer().unwrap() as usize,
@@ -177,7 +335,15 @@ mod tests {
 
     #[test]
     fn field_get_deserializer_when_missing() {
-        let field = Field::new(FieldType::Blob, None, None, Some(test_serializer), None);
+        let field = Field::new(
+            FieldType::Blob,
+            None,
+            None,
+            None,
+            None,
+            Some(test_serializer),
+            None,
+        );
 
         assert_eq!(
             field.get_deserializer(),

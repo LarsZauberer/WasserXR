@@ -15,6 +15,8 @@ pub enum ComponentError {
     FieldNotFound,
     FieldNoGetter,
     FieldNoSetter,
+    FieldNoMover,
+    FieldNoTaker,
     FieldNoSerializer,
     FieldNoDeserializer,
     NoCreator(PluginError),

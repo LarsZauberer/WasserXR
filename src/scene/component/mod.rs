@@ -8,7 +8,7 @@ use std::ffi::c_void;
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
 pub use field::{Deserializer, Serializer};
-pub use field::{Getter, Setter};
+pub use field::{Getter, Mover, Setter, Taker};
 pub use field_type::FieldType;
 pub use schema::Schema;
 pub use serialized_bytes::SerializedBytes;
@@ -96,6 +96,25 @@ impl Component {
             setter(self.data, data as *const T as *const c_void);
         }
         Ok(())
+    }
+
+    pub(crate) fn r#move<T>(&mut self, id: &str, data: T) -> Result<(), ComponentError> {
+        let mover = self.schema.get_mover(id)?;
+        let data = Box::into_raw(Box::new(data));
+
+        unsafe {
+            mover(self.data, data as *mut c_void);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn take<T>(&mut self, id: &str) -> Result<T, ComponentError> {
+        let taker = self.schema.get_taker(id)?;
+
+        unsafe {
+            let data = taker(self.data);
+            Ok(*Box::from_raw(data as *mut T))
+        }
     }
 
     pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
@@ -228,6 +247,8 @@ mod tests {
                 FieldType::Long,
                 Some(unit_counter_getter),
                 Some(unit_counter_setter),
+                None,
+                None,
                 Some(unit_counter_serializer),
                 Some(unit_counter_deserializer),
             );

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     error::ComponentError,
     scene::component::{
-        field::{Deserializer, Field, Getter, Serializer, Setter},
+        field::{Deserializer, Field, Getter, Mover, Serializer, Setter, Taker},
         field_type::FieldType,
     },
 };
@@ -24,10 +24,20 @@ impl Schema {
         type_hint: FieldType,
         getter: Option<Getter>,
         setter: Option<Setter>,
+        mover: Option<Mover>,
+        taker: Option<Taker>,
         serializer: Option<Serializer>,
         deserializer: Option<Deserializer>,
     ) {
-        let field = Field::new(type_hint, getter, setter, serializer, deserializer);
+        let field = Field::new(
+            type_hint,
+            getter,
+            setter,
+            mover,
+            taker,
+            serializer,
+            deserializer,
+        );
         log::debug!("Schema field `{}` added", id);
         self.fields.insert(id, field);
     }
@@ -47,6 +57,26 @@ impl Schema {
             Some(field) => field.get_setter(),
             None => {
                 log::debug!("Schema field `{}` was not found for update", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
+    pub(crate) fn get_mover(&self, id: &str) -> Result<Mover, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => field.get_mover(),
+            None => {
+                log::debug!("Schema field `{}` was not found for move", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
+    pub(crate) fn get_taker(&self, id: &str) -> Result<Taker, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => field.get_taker(),
+            None => {
+                log::debug!("Schema field `{}` was not found for take", id);
                 Err(ComponentError::FieldNotFound)
             }
         }
@@ -98,6 +128,12 @@ mod tests {
 
     unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
 
+    unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
+
+    unsafe extern "C" fn test_taker(_data: *mut c_void) -> *mut c_void {
+        std::ptr::null_mut()
+    }
+
     unsafe extern "C" fn test_serializer(
         _data: *const c_void,
     ) -> crate::scene::component::SerializedBytes {
@@ -119,6 +155,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            Some(test_mover),
+            Some(test_taker),
             Some(test_serializer),
             Some(test_deserializer),
         );
@@ -137,6 +175,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            None,
+            None,
             None,
             None,
         );
@@ -168,6 +208,8 @@ mod tests {
             Some(test_setter),
             None,
             None,
+            None,
+            None,
         );
 
         assert_eq!(
@@ -187,6 +229,68 @@ mod tests {
     }
 
     #[test]
+    fn schema_get_mover_for_existing_field() {
+        let mut schema = Schema::new();
+
+        schema.add_field(
+            "health".to_owned(),
+            FieldType::Long,
+            None,
+            None,
+            Some(test_mover),
+            Some(test_taker),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            schema.get_mover("health").unwrap() as usize,
+            test_mover as *const () as usize
+        );
+    }
+
+    #[test]
+    fn schema_get_mover_for_missing_field() {
+        let schema = Schema::new();
+
+        assert_eq!(
+            schema.get_mover("health"),
+            Err(ComponentError::FieldNotFound)
+        );
+    }
+
+    #[test]
+    fn schema_get_taker_for_existing_field() {
+        let mut schema = Schema::new();
+
+        schema.add_field(
+            "health".to_owned(),
+            FieldType::Long,
+            None,
+            None,
+            Some(test_mover),
+            Some(test_taker),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            schema.get_taker("health").unwrap() as usize,
+            test_taker as *const () as usize
+        );
+    }
+
+    #[test]
+    fn schema_get_taker_for_missing_field() {
+        let schema = Schema::new();
+
+        assert_eq!(
+            schema.get_taker("health"),
+            Err(ComponentError::FieldNotFound)
+        );
+    }
+
+    #[test]
     fn schema_get_serializer_for_existing_field() {
         let mut schema = Schema::new();
 
@@ -195,6 +299,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            None,
+            None,
             Some(test_serializer),
             Some(test_deserializer),
         );
@@ -214,6 +320,8 @@ mod tests {
             FieldType::Long,
             Some(test_getter),
             Some(test_setter),
+            None,
+            None,
             Some(test_serializer),
             Some(test_deserializer),
         );
