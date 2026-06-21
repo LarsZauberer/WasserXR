@@ -146,9 +146,7 @@ mod tests {
 
     unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
 
-    unsafe extern "C" fn test_taker(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
-    }
+    unsafe extern "C" fn test_taker(_data: *mut c_void, _out: *mut c_void) {}
 
     unsafe extern "C" fn test_serializer(
         _data: *const c_void,

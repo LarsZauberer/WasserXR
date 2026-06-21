@@ -66,6 +66,7 @@ pub struct MacroOwnedValue {
 #[derive(Default)]
 pub struct MacroOwnershipComponent {
     #[getter]
+    #[getter_mut]
     #[mover]
     #[taker]
     value: MacroOwnedValue,
@@ -204,6 +205,9 @@ fn component_macro_registers_and_accesses_static_component() {
     scene
         .set(entity, "MacroComponent", "default_int", &41_i32)
         .unwrap();
+    *scene
+        .get_mut::<i32>(entity, "MacroComponent", "default_int")
+        .unwrap() = 42;
 
     assert_eq!(
         scene
@@ -215,8 +219,14 @@ fn component_macro_registers_and_accesses_static_component() {
         *scene
             .get::<i32>(entity, "MacroComponent", "default_int")
             .unwrap(),
-        41
+        42
     );
+    assert!(matches!(
+        scene.get_mut::<i32>(entity, "MacroComponent", "my_int"),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoGetterMut
+        ))
+    ));
     assert_eq!(
         scene.get::<i32>(entity, "MacroComponent", "hidden"),
         Err(SceneError::ComponentFieldError(
@@ -229,6 +239,12 @@ fn component_macro_registers_and_accesses_static_component() {
             ComponentError::FieldNoSetter
         ))
     );
+    assert!(matches!(
+        scene.get_mut::<i32>(entity, "MacroComponent", "hidden"),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNoGetterMut
+        ))
+    ));
 }
 
 #[test]
@@ -258,6 +274,11 @@ fn component_macro_moves_and_takes_non_clone_field() {
             value: "owned".to_owned(),
         }
     );
+    scene
+        .get_mut::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+        .unwrap()
+        .value
+        .push_str(" mut");
 
     let value = scene
         .take::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
@@ -266,7 +287,7 @@ fn component_macro_moves_and_takes_non_clone_field() {
     assert_eq!(
         value,
         MacroOwnedValue {
-            value: "owned".to_owned(),
+            value: "owned mut".to_owned(),
         }
     );
     assert_eq!(

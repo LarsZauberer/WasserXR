@@ -292,26 +292,29 @@ fn create_getter_mut_functions(
     component_id: &str,
     fields: &[Field],
 ) -> proc_macro2::TokenStream {
-    let getters_mut = fields.iter().filter(|field| field.has_getter_mut).map(|field| {
-        let field_ident = &field.ident;
-        let field_ty = &field.ty;
-        let getter_mut_name = format!("wxr_get_mut_{}_{}", component_id, field_ident);
-        let getter_mut_ident = format_ident!("{}", getter_mut_name);
+    let getters_mut = fields
+        .iter()
+        .filter(|field| field.has_getter_mut)
+        .map(|field| {
+            let field_ident = &field.ident;
+            let field_ty = &field.ty;
+            let getter_mut_name = format!("wxr_get_mut_{}_{}", component_id, field_ident);
+            let getter_mut_ident = format_ident!("{}", getter_mut_name);
 
-        quote! {
-            #[unsafe(export_name = #getter_mut_name)]
-            #[allow(non_snake_case)]
-            pub unsafe extern "C" fn #getter_mut_ident(
-                ptr: *mut ::std::ffi::c_void,
-            ) -> *mut ::std::ffi::c_void {
-                unsafe {
-                    &mut (*(ptr as *mut #component_ident)).#field_ident
-                        as *mut #field_ty
-                        as *mut ::std::ffi::c_void
+            quote! {
+                #[unsafe(export_name = #getter_mut_name)]
+                #[allow(non_snake_case)]
+                pub unsafe extern "C" fn #getter_mut_ident(
+                    ptr: *mut ::std::ffi::c_void,
+                ) -> *mut ::std::ffi::c_void {
+                    unsafe {
+                        &mut (*(ptr as *mut #component_ident)).#field_ident
+                            as *mut #field_ty
+                            as *mut ::std::ffi::c_void
+                    }
                 }
             }
-        }
-    });
+        });
 
     quote! {
         #(#getters_mut)*
@@ -396,11 +399,15 @@ fn create_taker_functions(
             #[allow(non_snake_case)]
             pub unsafe extern "C" fn #taker_ident(
                 ptr: *mut ::std::ffi::c_void,
-            ) -> *mut ::std::ffi::c_void {
+                out: *mut ::std::ffi::c_void,
+            ) {
                 unsafe {
-                    Box::into_raw(Box::new(::std::mem::take(
-                        &mut (*(ptr as *mut #component_ident)).#field_ident,
-                    ))) as *mut #field_ty as *mut ::std::ffi::c_void
+                    ::std::ptr::write(
+                        out as *mut #field_ty,
+                        ::std::mem::take(
+                            &mut (*(ptr as *mut #component_ident)).#field_ident,
+                        ),
+                    );
                 }
             }
         }

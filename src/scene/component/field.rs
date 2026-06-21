@@ -9,7 +9,7 @@ pub type Getter = unsafe extern "C" fn(*const c_void) -> *const c_void;
 pub type GetterMut = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 pub type Setter = unsafe extern "C" fn(*mut c_void, *const c_void);
 pub type Mover = unsafe extern "C" fn(*mut c_void, *mut c_void);
-pub type Taker = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub type Taker = unsafe extern "C" fn(*mut c_void, *mut c_void);
 pub type Serializer = unsafe extern "C" fn(*const c_void) -> SerializedBytes;
 pub type Deserializer = unsafe extern "C" fn(*mut c_void, SerializedBytes);
 
@@ -140,9 +140,7 @@ mod tests {
 
     unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
 
-    unsafe extern "C" fn test_taker(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
-    }
+    unsafe extern "C" fn test_taker(_data: *mut c_void, _out: *mut c_void) {}
 
     unsafe extern "C" fn test_serializer(_data: *const c_void) -> SerializedBytes {
         SerializedBytes::from_vec(vec![1, 2, 3])

@@ -895,11 +895,12 @@ mod tests {
         }
     }
 
-    unsafe extern "C" fn scene_owner_taker(data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn scene_owner_taker(data: *mut c_void, out: *mut c_void) {
         unsafe {
-            Box::into_raw(Box::new(std::mem::take(
-                &mut (*(data as *mut SceneOwner)).value,
-            ))) as *mut c_void
+            std::ptr::write(
+                out as *mut SceneOwnedValue,
+                std::mem::take(&mut (*(data as *mut SceneOwner)).value),
+            );
         }
     }
 

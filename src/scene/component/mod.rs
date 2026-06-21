@@ -3,7 +3,7 @@ pub mod field_type;
 pub mod schema;
 pub mod serialized_bytes;
 
-use std::ffi::c_void;
+use std::{ffi::c_void, mem::MaybeUninit};
 
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
@@ -121,8 +121,9 @@ impl Component {
         let taker = self.schema.get_taker(id)?;
 
         unsafe {
-            let data = taker(self.data);
-            Ok(*Box::from_raw(data as *mut T))
+            let mut data = MaybeUninit::<T>::uninit();
+            taker(self.data, data.as_mut_ptr() as *mut c_void);
+            Ok(data.assume_init())
         }
     }
 
@@ -319,6 +320,16 @@ mod tests {
         let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
         assert_eq!(*component.get::<i64>("value").unwrap(), 5);
+    }
+
+    #[test]
+    fn component_get_mut_existing_field() {
+        let plugin = Plugin::new_static();
+        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+
+        *component.get_mut::<i64>("value").unwrap() = 11;
+
+        assert_eq!(*component.get::<i64>("value").unwrap(), 11);
     }
 
     #[test]
