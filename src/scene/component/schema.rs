@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     error::ComponentError,
     scene::component::{
-        field::{Deserializer, Field, Getter, GetterMut, Mover, Serializer, Setter, Taker},
+        field::{Deserializer, Field, Getter, Serializer},
         field_type::FieldType,
     },
 };
@@ -23,23 +23,11 @@ impl Schema {
         id: String,
         type_hint: FieldType,
         getter: Option<Getter>,
-        getter_mut: Option<GetterMut>,
-        setter: Option<Setter>,
-        mover: Option<Mover>,
-        taker: Option<Taker>,
+        mutable: bool,
         serializer: Option<Serializer>,
         deserializer: Option<Deserializer>,
     ) {
-        let field = Field::new(
-            type_hint,
-            getter,
-            getter_mut,
-            setter,
-            mover,
-            taker,
-            serializer,
-            deserializer,
-        );
+        let field = Field::new(type_hint, getter, mutable, serializer, deserializer);
         log::debug!("Schema field `{}` added", id);
         self.fields.insert(id, field);
     }
@@ -54,41 +42,11 @@ impl Schema {
         }
     }
 
-    pub(crate) fn get_getter_mut(&self, id: &str) -> Result<GetterMut, ComponentError> {
+    pub(crate) fn is_mutable(&self, id: &str) -> Result<bool, ComponentError> {
         match self.fields.get(id) {
-            Some(field) => field.get_getter_mut(),
+            Some(field) => Ok(field.is_mutable()),
             None => {
-                log::debug!("Schema field `{}` was not found for mutable read", id);
-                Err(ComponentError::FieldNotFound)
-            }
-        }
-    }
-
-    pub(crate) fn get_setter(&self, id: &str) -> Result<Setter, ComponentError> {
-        match self.fields.get(id) {
-            Some(field) => field.get_setter(),
-            None => {
-                log::debug!("Schema field `{}` was not found for update", id);
-                Err(ComponentError::FieldNotFound)
-            }
-        }
-    }
-
-    pub(crate) fn get_mover(&self, id: &str) -> Result<Mover, ComponentError> {
-        match self.fields.get(id) {
-            Some(field) => field.get_mover(),
-            None => {
-                log::debug!("Schema field `{}` was not found for move", id);
-                Err(ComponentError::FieldNotFound)
-            }
-        }
-    }
-
-    pub(crate) fn get_taker(&self, id: &str) -> Result<Taker, ComponentError> {
-        match self.fields.get(id) {
-            Some(field) => field.get_taker(),
-            None => {
-                log::debug!("Schema field `{}` was not found for take", id);
+                log::debug!("Schema field `{}` was not found for mutability lookup", id);
                 Err(ComponentError::FieldNotFound)
             }
         }
@@ -134,19 +92,9 @@ mod tests {
     use super::*;
     use std::ffi::c_void;
 
-    unsafe extern "C" fn test_getter(_data: *const c_void) -> *const c_void {
-        std::ptr::null()
-    }
-
-    unsafe extern "C" fn test_getter_mut(_data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
         std::ptr::null_mut()
     }
-
-    unsafe extern "C" fn test_setter(_data: *mut c_void, _value: *const c_void) {}
-
-    unsafe extern "C" fn test_mover(_data: *mut c_void, _value: *mut c_void) {}
-
-    unsafe extern "C" fn test_taker(_data: *mut c_void, _out: *mut c_void) {}
 
     unsafe extern "C" fn test_serializer(
         _data: *const c_void,
@@ -168,10 +116,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
-            Some(test_getter_mut),
-            Some(test_setter),
-            Some(test_mover),
-            Some(test_taker),
+            true,
             Some(test_serializer),
             Some(test_deserializer),
         );
@@ -189,10 +134,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
-            None,
-            Some(test_setter),
-            None,
-            None,
+            false,
             None,
             None,
         );
@@ -214,129 +156,43 @@ mod tests {
     }
 
     #[test]
-    fn schema_get_getter_mut_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::Long,
-            None,
-            Some(test_getter_mut),
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-
-        assert_eq!(
-            schema.get_getter_mut("health").unwrap() as usize,
-            test_getter_mut as *const () as usize
-        );
-    }
-
-    #[test]
-    fn schema_get_getter_mut_for_missing_field() {
-        let schema = Schema::new();
-
-        assert_eq!(
-            schema.get_getter_mut("health"),
-            Err(ComponentError::FieldNotFound)
-        );
-    }
-
-    #[test]
-    fn schema_get_setter_for_existing_field() {
+    fn schema_is_mutable_for_existing_field() {
         let mut schema = Schema::new();
 
         schema.add_field(
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
-            None,
-            Some(test_setter),
-            None,
-            None,
+            true,
             None,
             None,
         );
 
-        assert_eq!(
-            schema.get_setter("health").unwrap() as usize,
-            test_setter as *const () as usize
-        );
+        assert!(schema.is_mutable("health").unwrap());
     }
 
     #[test]
-    fn schema_get_setter_for_missing_field() {
-        let schema = Schema::new();
-
-        assert_eq!(
-            schema.get_setter("health"),
-            Err(ComponentError::FieldNotFound)
-        );
-    }
-
-    #[test]
-    fn schema_get_mover_for_existing_field() {
+    fn schema_is_not_mutable_for_existing_field() {
         let mut schema = Schema::new();
 
         schema.add_field(
             "health".to_owned(),
             FieldType::Long,
-            None,
-            None,
-            None,
-            Some(test_mover),
-            Some(test_taker),
+            Some(test_getter),
+            false,
             None,
             None,
         );
 
-        assert_eq!(
-            schema.get_mover("health").unwrap() as usize,
-            test_mover as *const () as usize
-        );
+        assert!(!schema.is_mutable("health").unwrap());
     }
 
     #[test]
-    fn schema_get_mover_for_missing_field() {
+    fn schema_is_mutable_for_missing_field() {
         let schema = Schema::new();
 
         assert_eq!(
-            schema.get_mover("health"),
-            Err(ComponentError::FieldNotFound)
-        );
-    }
-
-    #[test]
-    fn schema_get_taker_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::Long,
-            None,
-            None,
-            None,
-            Some(test_mover),
-            Some(test_taker),
-            None,
-            None,
-        );
-
-        assert_eq!(
-            schema.get_taker("health").unwrap() as usize,
-            test_taker as *const () as usize
-        );
-    }
-
-    #[test]
-    fn schema_get_taker_for_missing_field() {
-        let schema = Schema::new();
-
-        assert_eq!(
-            schema.get_taker("health"),
+            schema.is_mutable("health"),
             Err(ComponentError::FieldNotFound)
         );
     }
@@ -349,10 +205,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
-            None,
-            Some(test_setter),
-            None,
-            None,
+            false,
             Some(test_serializer),
             Some(test_deserializer),
         );
@@ -371,10 +224,7 @@ mod tests {
             "health".to_owned(),
             FieldType::Long,
             Some(test_getter),
-            None,
-            Some(test_setter),
-            None,
-            None,
+            false,
             Some(test_serializer),
             Some(test_deserializer),
         );

@@ -81,8 +81,7 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// struct MyComponent {
 ///     value: i32,
 ///     #[getter]
-///     #[getter_mut]
-///     #[setter]
+///     #[mutable]
 ///     name: String,
 ///     #[none]
 ///     internal: i32,
@@ -90,12 +89,11 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro exports create, destroy, and schema functions for the component.
-/// Fields without field function attributes get generated getter, getter_mut,
-/// setter, serializer, and deserializer functions by default. Mover and taker
-/// functions are generated only with explicit `#[mover]` and `#[taker]`
-/// attributes. If at least one field function attribute is present, only the
-/// requested functions are generated. Use `#[none]` to register a field without
-/// generated field functions.
+/// Fields without field function attributes get generated getter, serializer,
+/// and deserializer functions by default. Use `#[mutable]` to allow mutable
+/// references through `Scene::query_mut`. If at least one field function
+/// attribute is present, only the requested functions are generated. Use
+/// `#[none]` to register a field without generated field functions.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     if !args.is_empty() {

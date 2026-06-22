@@ -16,6 +16,7 @@ use crate::error::{PluginError, SceneError};
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
 
+use std::ffi::c_void;
 use std::{collections::HashMap, fs, path::Path};
 
 use uuid::Uuid;
@@ -618,62 +619,37 @@ impl Scene {
         !should_exit
     }
 
-    #[deprecated(note = "use query instead")]
-    pub fn get<T>(
-        &self,
-        entity_id: Uuid,
-        component_id: &str,
-        field_id: &str,
-    ) -> Result<&T, SceneError> {
+    fn get_component(&self, entity_id: Uuid, component_id: &str) -> Result<&Component, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for component field read",
-                entity_id
-            );
+            log::warn!("Entity `{}` was not found for component lookup", entity_id);
             return Err(SceneError::EntityNotFound);
         };
 
         let Some(component) = entity_components.get(component_id) else {
             log::warn!(
-                "Component `{}` was not found on entity `{}` for field read",
+                "Component `{}` was not found on entity `{}`",
                 component_id,
                 entity_id
             );
             return Err(SceneError::ComponentNotFound);
         };
 
-        component
-            .get(field_id)
-            .map_err(SceneError::ComponentFieldError)
+        Ok(component)
     }
 
-    #[deprecated(note = "use query_mut instead")]
-    pub fn get_mut<T>(
-        &mut self,
+    pub(crate) unsafe fn get_field_ptrs(
+        &self,
         entity_id: Uuid,
         component_id: &str,
-        field_id: &str,
-    ) -> Result<&mut T, SceneError> {
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for mutable component field read",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
-
-        let Some(component) = entity_components.get_mut(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for mutable field read",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        component
-            .get_mut(field_id)
-            .map_err(SceneError::ComponentFieldError)
+        fields: &[&str],
+    ) -> Result<Vec<*mut c_void>, SceneError> {
+        let component = self.get_component(entity_id, component_id)?;
+        fields
+            .iter()
+            .map(|field| {
+                unsafe { component.get_field_ptr(field) }.map_err(SceneError::ComponentFieldError)
+            })
+            .collect()
     }
 
     pub fn query<'scene, Q>(
@@ -691,25 +667,8 @@ impl Scene {
             ));
         }
 
-        let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for component field query",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
-
-        let Some(component) = entity_components.get(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for field query",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        let component = component as *const Component as *const std::ffi::c_void;
-        unsafe { Q::fetch(component, fields) }
+        let field_ptrs = unsafe { self.get_field_ptrs(entity_id, component_id, fields)? };
+        unsafe { Q::fetch(&field_ptrs) }
     }
 
     pub fn query_mut<'scene, Q>(
@@ -737,112 +696,22 @@ impl Scene {
             }
         }
 
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for mutable component field query",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
+        let component = self.get_component(entity_id, component_id)?;
+        Q::for_each_mutable_field(fields, |field| {
+            if component
+                .is_field_mutable(field)
+                .map_err(SceneError::ComponentFieldError)?
+            {
+                Ok(())
+            } else {
+                Err(SceneError::ComponentFieldError(
+                    crate::error::ComponentError::FieldNotMutable,
+                ))
+            }
+        })?;
 
-        let Some(component) = entity_components.get_mut(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for mutable field query",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        let component = component as *mut Component as *mut std::ffi::c_void;
-        unsafe { Q::fetch(component, fields) }
-    }
-
-    #[deprecated(note = "use query_mut instead")]
-    pub fn set<T>(
-        &mut self,
-        entity_id: Uuid,
-        component_id: &str,
-        field_id: &str,
-        data: &T,
-    ) -> Result<(), SceneError> {
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for component field update",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
-
-        let Some(component) = entity_components.get_mut(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for field update",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        component
-            .set(field_id, data)
-            .map_err(SceneError::ComponentFieldError)
-    }
-
-    pub fn r#move<T>(
-        &mut self,
-        entity_id: Uuid,
-        component_id: &str,
-        field_id: &str,
-        data: T,
-    ) -> Result<(), SceneError> {
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for component field move",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
-
-        let Some(component) = entity_components.get_mut(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for field move",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        component
-            .r#move(field_id, data)
-            .map_err(SceneError::ComponentFieldError)
-    }
-
-    pub fn take<T>(
-        &mut self,
-        entity_id: Uuid,
-        component_id: &str,
-        field_id: &str,
-    ) -> Result<T, SceneError> {
-        let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!(
-                "Entity `{}` was not found for component field take",
-                entity_id
-            );
-            return Err(SceneError::EntityNotFound);
-        };
-
-        let Some(component) = entity_components.get_mut(component_id) else {
-            log::warn!(
-                "Component `{}` was not found on entity `{}` for field take",
-                component_id,
-                entity_id
-            );
-            return Err(SceneError::ComponentNotFound);
-        };
-
-        component
-            .take(field_id)
-            .map_err(SceneError::ComponentFieldError)
+        let field_ptrs = unsafe { self.get_field_ptrs(entity_id, component_id, fields)? };
+        unsafe { Q::fetch(&field_ptrs) }
     }
 
     pub fn get_component_fields(
@@ -917,12 +786,9 @@ mod tests {
             serialization::{ComponentData, FieldData, SceneData},
         },
     };
-    use std::{
-        ffi::c_void,
-        sync::{
-            LazyLock, Mutex,
-            atomic::{AtomicBool, AtomicUsize, Ordering},
-        },
+    use std::sync::{
+        LazyLock, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     };
 
     #[repr(C)]
@@ -951,35 +817,23 @@ mod tests {
         value: SceneOwnedValue,
     }
 
-    unsafe extern "C" fn scene_counter_getter(data: *const c_void) -> *const c_void {
-        unsafe { &(*(data as *const SceneCounter)).value as *const i64 as *const c_void }
-    }
-
-    unsafe extern "C" fn scene_counter_getter_mut(data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn scene_counter_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut SceneCounter)).value as *mut i64 as *mut c_void }
     }
 
-    unsafe extern "C" fn scene_pair_a_getter(data: *const c_void) -> *const c_void {
-        unsafe { &(*(data as *const ScenePair)).a as *const i64 as *const c_void }
-    }
-
-    unsafe extern "C" fn scene_pair_a_getter_mut(data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn scene_pair_a_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut ScenePair)).a as *mut i64 as *mut c_void }
     }
 
-    unsafe extern "C" fn scene_pair_b_getter(data: *const c_void) -> *const c_void {
-        unsafe { &(*(data as *const ScenePair)).b as *const i64 as *const c_void }
-    }
-
-    unsafe extern "C" fn scene_pair_b_getter_mut(data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn scene_pair_b_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut ScenePair)).b as *mut i64 as *mut c_void }
     }
 
     macro_rules! scene_octet_getter {
         ($name:ident, $index:expr) => {
-            unsafe extern "C" fn $name(data: *const c_void) -> *const c_void {
+            unsafe extern "C" fn $name(data: *mut c_void) -> *mut c_void {
                 unsafe {
-                    &(*(data as *const SceneOctet)).values[$index] as *const i64 as *const c_void
+                    &mut (*(data as *mut SceneOctet)).values[$index] as *mut i64 as *mut c_void
                 }
             }
         };
@@ -993,12 +847,6 @@ mod tests {
     scene_octet_getter!(scene_octet_f_getter, 5);
     scene_octet_getter!(scene_octet_g_getter, 6);
     scene_octet_getter!(scene_octet_h_getter, 7);
-
-    unsafe extern "C" fn scene_counter_setter(data: *mut c_void, value: *const c_void) {
-        unsafe {
-            (*(data as *mut SceneCounter)).value = *(value as *const i64);
-        }
-    }
 
     unsafe extern "C" fn scene_counter_serializer(data: *const c_void) -> SerializedBytes {
         unsafe {
@@ -1020,23 +868,8 @@ mod tests {
         }
     }
 
-    unsafe extern "C" fn scene_owner_getter(data: *const c_void) -> *const c_void {
-        unsafe { &(*(data as *const SceneOwner)).value as *const SceneOwnedValue as *const c_void }
-    }
-
-    unsafe extern "C" fn scene_owner_mover(data: *mut c_void, value: *mut c_void) {
-        unsafe {
-            (*(data as *mut SceneOwner)).value = *Box::from_raw(value as *mut SceneOwnedValue);
-        }
-    }
-
-    unsafe extern "C" fn scene_owner_taker(data: *mut c_void, out: *mut c_void) {
-        unsafe {
-            std::ptr::write(
-                out as *mut SceneOwnedValue,
-                std::mem::take(&mut (*(data as *mut SceneOwner)).value),
-            );
-        }
+    unsafe extern "C" fn scene_owner_getter(data: *mut c_void) -> *mut c_void {
+        unsafe { &mut (*(data as *mut SceneOwner)).value as *mut SceneOwnedValue as *mut c_void }
     }
 
     #[unsafe(no_mangle)]
@@ -1098,10 +931,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Long,
                 Some(scene_counter_getter),
-                Some(scene_counter_getter_mut),
-                Some(scene_counter_setter),
-                None,
-                None,
+                true,
                 Some(scene_counter_serializer),
                 Some(scene_counter_deserializer),
             );
@@ -1115,10 +945,7 @@ mod tests {
                 "a".to_owned(),
                 FieldType::Long,
                 Some(scene_pair_a_getter),
-                Some(scene_pair_a_getter_mut),
-                None,
-                None,
-                None,
+                true,
                 None,
                 None,
             );
@@ -1126,10 +953,7 @@ mod tests {
                 "b".to_owned(),
                 FieldType::Long,
                 Some(scene_pair_b_getter),
-                Some(scene_pair_b_getter_mut),
-                None,
-                None,
-                None,
+                false,
                 None,
                 None,
             );
@@ -1155,10 +979,7 @@ mod tests {
                     id.to_owned(),
                     FieldType::Long,
                     Some(getter),
-                    None,
-                    None,
-                    None,
-                    None,
+                    false,
                     None,
                     None,
                 );
@@ -1173,10 +994,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Blob,
                 Some(scene_owner_getter),
-                None,
-                None,
-                Some(scene_owner_mover),
-                Some(scene_owner_taker),
+                false,
                 None,
                 None,
             );
@@ -1197,6 +1015,20 @@ mod tests {
         LazyLock::new(|| Mutex::new(Vec::new()));
     static SCENE_DEFERRED_REMOVE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
+
+    fn set_scene_counter(scene: &mut Scene, entity: Uuid, value: i64) {
+        let (field,) = scene
+            .query_mut::<(&mut i64,)>(entity, "scene_counter", &["value"])
+            .unwrap();
+        *field = value;
+    }
+
+    fn get_scene_counter(scene: &Scene, entity: Uuid) -> i64 {
+        let (field,) = scene
+            .query::<(&i64,)>(entity, "scene_counter", &["value"])
+            .unwrap();
+        *field
+    }
 
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_attach_system(
@@ -1424,56 +1256,6 @@ mod tests {
     }
 
     #[test]
-    fn scene_set_component_field_for_existing_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        scene.set(entity, "scene_counter", "value", &9_i64).unwrap();
-
-        assert_eq!(
-            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            9
-        );
-    }
-
-    #[test]
-    fn scene_get_mut_component_field_for_existing_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        *scene
-            .get_mut::<i64>(entity, "scene_counter", "value")
-            .unwrap() = 17;
-
-        assert_eq!(
-            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            17
-        );
-    }
-
-    #[test]
-    fn scene_get_mut_component_field_without_getter_mut() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.get_mut::<SceneOwnedValue>(entity, "scene_owner", "value"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNoGetterMut
-            ))
-        );
-    }
-
-    #[test]
     fn scene_query_gets_shared_field() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
@@ -1617,7 +1399,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_query_reports_missing_getter_mut() {
+    fn scene_query_mut_rejects_non_mutable_field() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
@@ -1627,106 +1409,24 @@ mod tests {
         assert_eq!(
             scene.query_mut::<(&mut SceneOwnedValue,)>(entity, "scene_owner", &["value"]),
             Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNoGetterMut
+                ComponentError::FieldNotMutable
             ))
         );
     }
 
     #[test]
-    fn scene_move_component_field_for_existing_component() {
+    fn scene_query_mut_allows_shared_non_mutable_field() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
         scene
             .add_component(entity, "scene_owner".to_owned())
             .unwrap();
 
-        scene
-            .r#move(
-                entity,
-                "scene_owner",
-                "value",
-                SceneOwnedValue {
-                    value: "moved".to_owned(),
-                },
-            )
+        let (value,) = scene
+            .query_mut::<(&SceneOwnedValue,)>(entity, "scene_owner", &["value"])
             .unwrap();
 
-        assert_eq!(
-            scene
-                .get::<SceneOwnedValue>(entity, "scene_owner", "value")
-                .unwrap(),
-            &SceneOwnedValue {
-                value: "moved".to_owned(),
-            }
-        );
-    }
-
-    #[test]
-    fn scene_take_component_field_for_existing_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
-            .unwrap();
-        scene
-            .r#move(
-                entity,
-                "scene_owner",
-                "value",
-                SceneOwnedValue {
-                    value: "taken".to_owned(),
-                },
-            )
-            .unwrap();
-
-        let value = scene
-            .take::<SceneOwnedValue>(entity, "scene_owner", "value")
-            .unwrap();
-
-        assert_eq!(
-            value,
-            SceneOwnedValue {
-                value: "taken".to_owned(),
-            }
-        );
-        assert_eq!(
-            scene
-                .get::<SceneOwnedValue>(entity, "scene_owner", "value")
-                .unwrap(),
-            &SceneOwnedValue::default()
-        );
-    }
-
-    #[test]
-    fn scene_move_component_field_without_mover() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.r#move(entity, "scene_counter", "value", 2_i64),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNoMover
-            ))
-        );
-    }
-
-    #[test]
-    fn scene_take_component_field_without_taker() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.take::<i64>(entity, "scene_counter", "value"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNoTaker
-            ))
-        );
+        assert_eq!(value, &SceneOwnedValue::default());
     }
 
     #[test]
@@ -1754,7 +1454,7 @@ mod tests {
         scene.remove_component(entity, "scene_counter").unwrap();
 
         assert_eq!(
-            scene.get::<i64>(entity, "scene_counter", "value"),
+            scene.query::<(&i64,)>(entity, "scene_counter", &["value"]),
             Err(SceneError::ComponentNotFound)
         );
     }
@@ -1923,10 +1623,7 @@ mod tests {
 
         assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
 
-        assert_eq!(
-            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            1
-        );
+        assert_eq!(get_scene_counter(&scene, entity), 1);
         scene.remove_system("scene_cleanup_system").unwrap();
     }
 
@@ -2005,9 +1702,7 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene
-            .set(entity, "scene_counter", "value", &42_i64)
-            .unwrap();
+        set_scene_counter(&mut scene, entity, 42);
         scene
             .add_system("scene_reload_counted_system".to_owned(), 1)
             .unwrap();
@@ -2015,10 +1710,7 @@ mod tests {
         scene.reload().unwrap();
 
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
-        assert_eq!(
-            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            42
-        );
+        assert_eq!(get_scene_counter(&scene, entity), 42);
         assert_eq!(SCENE_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
         assert_eq!(SCENE_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
         assert_eq!(scene.remove_system("scene_reload_counted_system"), Ok(()));
@@ -2037,7 +1729,7 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene.set(entity, "scene_counter", "value", &7_i64).unwrap();
+        set_scene_counter(&mut scene, entity, 7);
         scene
             .add_system("scene_deferred_reload_counted_system".to_owned(), 1)
             .unwrap();
@@ -2055,10 +1747,7 @@ mod tests {
         assert!(tick_order.contains(&"low"));
         drop(tick_order);
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Deferred");
-        assert_eq!(
-            *scene.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            7
-        );
+        assert_eq!(get_scene_counter(&scene, entity), 7);
         assert_eq!(SCENE_DEFERRED_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
         assert_eq!(SCENE_DEFERRED_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
         assert_eq!(
@@ -2080,9 +1769,7 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene
-            .set(entity, "scene_counter", "value", &42_i64)
-            .unwrap();
+        set_scene_counter(&mut scene, entity, 42);
         scene
             .add_system("scene_cleanup_system".to_owned(), 3)
             .unwrap();
@@ -2092,10 +1779,7 @@ mod tests {
         loaded.deserialize(&serialized).unwrap();
 
         assert_eq!(loaded.get_entity_name(entity).unwrap(), "Player");
-        assert_eq!(
-            *loaded.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            42
-        );
+        assert_eq!(get_scene_counter(&loaded, entity), 42);
         assert_eq!(loaded.remove_system("scene_cleanup_system"), Ok(()));
     }
 
@@ -2119,12 +1803,7 @@ mod tests {
         let mut scene = Scene::new();
         scene.deserialize(&data.encode().unwrap()).unwrap();
 
-        assert_eq!(
-            *scene
-                .get::<i64>(entity_data.id, "scene_counter", "value")
-                .unwrap(),
-            1
-        );
+        assert_eq!(get_scene_counter(&scene, entity_data.id), 1);
     }
 
     #[test]
@@ -2159,9 +1838,7 @@ mod tests {
         scene
             .add_component(entity, "scene_counter".to_owned())
             .unwrap();
-        scene
-            .set(entity, "scene_counter", "value", &11_i64)
-            .unwrap();
+        set_scene_counter(&mut scene, entity, 11);
 
         let path = std::env::temp_dir().join(format!("wasserxr-{}.scene", Uuid::now_v7()));
         scene.save(&path).unwrap();
@@ -2171,10 +1848,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
 
         assert_eq!(loaded.get_entity_name(entity).unwrap(), "Saved");
-        assert_eq!(
-            *loaded.get::<i64>(entity, "scene_counter", "value").unwrap(),
-            11
-        );
+        assert_eq!(get_scene_counter(&loaded, entity), 11);
     }
 
     #[test]

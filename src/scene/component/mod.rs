@@ -3,12 +3,12 @@ pub mod field_type;
 pub mod schema;
 pub mod serialized_bytes;
 
-use std::{ffi::c_void, mem::MaybeUninit};
+use std::ffi::c_void;
 
 use crate::{error::ComponentError, scene::plugin::Plugin};
 
+pub use field::Getter;
 pub use field::{Deserializer, Serializer};
-pub use field::{Getter, GetterMut, Mover, Setter, Taker};
 pub use field_type::FieldType;
 pub use schema::Schema;
 pub use serialized_bytes::SerializedBytes;
@@ -80,51 +80,14 @@ impl Component {
         })
     }
 
-    pub(crate) fn get<T>(&self, id: &str) -> Result<&T, ComponentError> {
+    pub(crate) unsafe fn get_field_ptr(&self, id: &str) -> Result<*mut c_void, ComponentError> {
         let getter = self.schema.get_getter(id)?;
 
-        unsafe {
-            let data = getter(self.data as *const c_void);
-            Ok(&*(data as *const T))
-        }
+        Ok(unsafe { getter(self.data) })
     }
 
-    pub(crate) fn get_mut<T>(&mut self, id: &str) -> Result<&mut T, ComponentError> {
-        let getter_mut = self.schema.get_getter_mut(id)?;
-
-        unsafe {
-            let data = getter_mut(self.data);
-            Ok(&mut *(data as *mut T))
-        }
-    }
-
-    pub(crate) fn set<T>(&mut self, id: &str, data: &T) -> Result<(), ComponentError> {
-        let setter = self.schema.get_setter(id)?;
-
-        unsafe {
-            setter(self.data, data as *const T as *const c_void);
-        }
-        Ok(())
-    }
-
-    pub(crate) fn r#move<T>(&mut self, id: &str, data: T) -> Result<(), ComponentError> {
-        let mover = self.schema.get_mover(id)?;
-        let data = Box::into_raw(Box::new(data));
-
-        unsafe {
-            mover(self.data, data as *mut c_void);
-        }
-        Ok(())
-    }
-
-    pub(crate) fn take<T>(&mut self, id: &str) -> Result<T, ComponentError> {
-        let taker = self.schema.get_taker(id)?;
-
-        unsafe {
-            let mut data = MaybeUninit::<T>::uninit();
-            taker(self.data, data.as_mut_ptr() as *mut c_void);
-            Ok(data.assume_init())
-        }
+    pub(crate) fn is_field_mutable(&self, id: &str) -> Result<bool, ComponentError> {
+        self.schema.is_mutable(id)
     }
 
     pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
@@ -210,19 +173,8 @@ mod tests {
         value: i64,
     }
 
-    // Getter and Setter
-    unsafe extern "C" fn unit_counter_getter(data: *const c_void) -> *const c_void {
-        unsafe { &(*(data as *const TestCounter)).value as *const i64 as *const c_void }
-    }
-
-    unsafe extern "C" fn unit_counter_getter_mut(data: *mut c_void) -> *mut c_void {
+    unsafe extern "C" fn unit_counter_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut TestCounter)).value as *mut i64 as *mut c_void }
-    }
-
-    unsafe extern "C" fn unit_counter_setter(data: *mut c_void, value: *const c_void) {
-        unsafe {
-            (*(data as *mut TestCounter)).value = *(value as *const i64);
-        }
     }
 
     unsafe extern "C" fn unit_counter_serializer(data: *const c_void) -> SerializedBytes {
@@ -260,10 +212,7 @@ mod tests {
                 "value".to_owned(),
                 FieldType::Long,
                 Some(unit_counter_getter),
-                Some(unit_counter_getter_mut),
-                Some(unit_counter_setter),
-                None,
-                None,
+                true,
                 Some(unit_counter_serializer),
                 Some(unit_counter_deserializer),
             );
@@ -315,53 +264,61 @@ mod tests {
     }
 
     #[test]
-    fn component_get_existing_field() {
+    fn component_get_field_ptr_existing_field() {
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
-        assert_eq!(*component.get::<i64>("value").unwrap(), 5);
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
+
+        assert_eq!(unsafe { *(field as *const i64) }, 5);
     }
 
     #[test]
-    fn component_get_mut_existing_field() {
+    fn component_get_field_ptr_allows_raw_mutation() {
         let plugin = Plugin::new_static();
-        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
-        *component.get_mut::<i64>("value").unwrap() = 11;
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        unsafe {
+            *(field as *mut i64) = 11;
+        }
 
-        assert_eq!(*component.get::<i64>("value").unwrap(), 11);
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        assert_eq!(unsafe { *(field as *const i64) }, 11);
     }
 
     #[test]
-    fn component_set_existing_field() {
+    fn component_reports_field_mutability() {
         let plugin = Plugin::new_static();
-        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
 
-        component.set("value", &12_i64).unwrap();
-
-        assert_eq!(*component.get::<i64>("value").unwrap(), 12);
+        assert!(component.is_field_mutable("value").unwrap());
     }
 
     #[test]
     fn component_serialize_round_trip() {
         let plugin = Plugin::new_static();
-        let mut component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
-        component.set("value", &12_i64).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        unsafe {
+            *(field as *mut i64) = 12;
+        }
 
         let data = component.serialize(uuid::Uuid::now_v7());
         let mut deserialized = Component::deserialize("unit_counter".to_owned(), &plugin).unwrap();
         deserialized.deserialize_fields(data.fields);
 
-        assert_eq!(*deserialized.get::<i64>("value").unwrap(), 12);
+        let field = unsafe { deserialized.get_field_ptr("value").unwrap() };
+        assert_eq!(unsafe { *(field as *const i64) }, 12);
     }
 
     #[test]
-    fn component_get_missing_field() {
+    fn component_get_field_ptr_missing_field() {
         let plugin = Plugin::new_static();
         let component = Component::new("schema_less_counter".to_owned(), &plugin).unwrap();
 
         assert_eq!(
-            component.get::<i64>("value"),
+            unsafe { component.get_field_ptr("value") },
             Err(ComponentError::FieldNotFound)
         );
     }

@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use std::sync::{LazyLock, Mutex};
 
 use uuid::Uuid;
@@ -16,14 +14,16 @@ pub struct MacroComponent {
     #[getter]
     my_int: i32,
 
+    #[mutable]
     default_int: i32,
 
     #[getter]
-    #[setter]
+    #[mutable]
     #[serializer]
     #[deserializer]
     my_string: String,
 
+    #[mutable]
     default_string: String,
 
     #[none]
@@ -35,13 +35,13 @@ pub struct MacroComponent {
 #[derive(Default)]
 pub struct MacroRoundTripComponent {
     #[getter]
-    #[setter]
+    #[mutable]
     #[serializer]
     #[deserializer]
     health: i32,
 
     #[getter]
-    #[setter]
+    #[mutable]
     label: String,
 }
 
@@ -67,10 +67,7 @@ pub struct MacroOwnedValue {
 #[component]
 #[derive(Default)]
 pub struct MacroOwnershipComponent {
-    #[getter]
-    #[getter_mut]
-    #[mover]
-    #[taker]
+    #[mutable]
     value: MacroOwnedValue,
 }
 
@@ -127,42 +124,37 @@ fn component_macro_round_trip_keeps_component_behavior() {
         .add_component(entity, "MacroRoundTripComponent".to_owned())
         .unwrap();
 
-    scene
-        .set(entity, "MacroRoundTripComponent", "health", &24_i32)
-        .unwrap();
-
-    let label = "round trip".to_owned();
-    scene
-        .set(entity, "MacroRoundTripComponent", "label", &label)
-        .unwrap();
+    {
+        let (health, label) = scene
+            .query_mut::<(&mut i32, &mut String)>(
+                entity,
+                "MacroRoundTripComponent",
+                &["health", "label"],
+            )
+            .unwrap();
+        *health = 24;
+        *label = "round trip".to_owned();
+    }
 
     let serialized = scene.serialize().unwrap();
     let mut loaded = Scene::new();
     loaded.deserialize(&serialized).unwrap();
 
     assert!(loaded.has_component(entity, "MacroRoundTripComponent"));
-    assert_eq!(
-        *loaded
-            .get::<i32>(entity, "MacroRoundTripComponent", "health")
-            .unwrap(),
-        24
-    );
-    assert_eq!(
-        loaded
-            .get::<String>(entity, "MacroRoundTripComponent", "label")
-            .unwrap(),
-        ""
-    );
-
-    loaded
-        .set(entity, "MacroRoundTripComponent", "health", &30_i32)
+    let (health, label) = loaded
+        .query::<(&i32, &String)>(entity, "MacroRoundTripComponent", &["health", "label"])
         .unwrap();
-    assert_eq!(
-        *loaded
-            .get::<i32>(entity, "MacroRoundTripComponent", "health")
-            .unwrap(),
-        30
-    );
+    assert_eq!(*health, 24);
+    assert_eq!(label, "");
+
+    let (health,) = loaded
+        .query_mut::<(&mut i32,)>(entity, "MacroRoundTripComponent", &["health"])
+        .unwrap();
+    *health = 30;
+    let (health,) = loaded
+        .query::<(&i32,)>(entity, "MacroRoundTripComponent", &["health"])
+        .unwrap();
+    assert_eq!(*health, 30);
 }
 
 #[test]
@@ -174,152 +166,77 @@ fn component_macro_registers_and_accesses_static_component() {
         .add_component(entity, "MacroComponent".to_owned())
         .unwrap();
 
-    assert_eq!(
-        *scene
-            .get::<i32>(entity, "MacroComponent", "my_int")
-            .unwrap(),
-        0
-    );
-    assert_eq!(
-        scene
-            .get::<String>(entity, "MacroComponent", "my_string")
-            .unwrap(),
-        ""
-    );
-    assert_eq!(
-        *scene
-            .get::<i32>(entity, "MacroComponent", "default_int")
-            .unwrap(),
-        0
-    );
-
-    assert_eq!(
-        scene.set(entity, "MacroComponent", "my_int", &7_i32),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoSetter
-        ))
-    );
-
-    let updated = "updated through setter".to_owned();
-    scene
-        .set(entity, "MacroComponent", "my_string", &updated)
+    let (my_int, my_string, default_int) = scene
+        .query::<(&i32, &String, &i32)>(
+            entity,
+            "MacroComponent",
+            &["my_int", "my_string", "default_int"],
+        )
         .unwrap();
-    scene
-        .set(entity, "MacroComponent", "default_int", &41_i32)
-        .unwrap();
-    assert_eq!(
-        scene.r#move(entity, "MacroComponent", "default_int", 9_i32),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoMover
-        ))
-    );
-    assert_eq!(
-        scene.take::<i32>(entity, "MacroComponent", "default_int"),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoTaker
-        ))
-    );
-    *scene
-        .get_mut::<i32>(entity, "MacroComponent", "default_int")
-        .unwrap() = 42;
+    assert_eq!(*my_int, 0);
+    assert_eq!(my_string, "");
+    assert_eq!(*default_int, 0);
 
     assert_eq!(
-        scene
-            .get::<String>(entity, "MacroComponent", "my_string")
-            .unwrap(),
-        "updated through setter"
-    );
-    assert_eq!(
-        *scene
-            .get::<i32>(entity, "MacroComponent", "default_int")
-            .unwrap(),
-        42
-    );
-    assert!(matches!(
-        scene.get_mut::<i32>(entity, "MacroComponent", "my_int"),
+        scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["my_int"]),
         Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoGetterMut
+            ComponentError::FieldNotMutable
         ))
-    ));
+    );
+
+    let (my_string, default_int) = scene
+        .query_mut::<(&mut String, &mut i32)>(
+            entity,
+            "MacroComponent",
+            &["my_string", "default_int"],
+        )
+        .unwrap();
+    *my_string = "updated through query_mut".to_owned();
+    *default_int = 42;
+
+    let (my_string, default_int) = scene
+        .query::<(&String, &i32)>(entity, "MacroComponent", &["my_string", "default_int"])
+        .unwrap();
+    assert_eq!(my_string, "updated through query_mut");
+    assert_eq!(*default_int, 42);
     assert_eq!(
-        scene.get::<i32>(entity, "MacroComponent", "hidden"),
+        scene.query::<(&i32,)>(entity, "MacroComponent", &["hidden"]),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNoGetter
         ))
     );
-    assert_eq!(
-        scene.set(entity, "MacroComponent", "hidden", &7_i32),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoSetter
-        ))
-    );
     assert!(matches!(
-        scene.get_mut::<i32>(entity, "MacroComponent", "hidden"),
+        scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["hidden"]),
         Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoGetterMut
+            ComponentError::FieldNotMutable
         ))
     ));
 }
 
 #[test]
-fn component_macro_moves_and_takes_non_clone_field() {
+fn component_macro_mutates_non_clone_field() {
     let mut scene = Scene::new();
     let entity = scene.add_entity();
 
     scene
         .add_component(entity, "MacroOwnershipComponent".to_owned())
         .unwrap();
-    scene
-        .r#move(
-            entity,
-            "MacroOwnershipComponent",
-            "value",
-            MacroOwnedValue {
-                value: "owned".to_owned(),
-            },
-        )
-        .unwrap();
 
-    assert_eq!(
-        scene
-            .get::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
-            .unwrap(),
-        &MacroOwnedValue {
-            value: "owned".to_owned(),
-        }
-    );
     scene
-        .get_mut::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+        .query_mut::<(&mut MacroOwnedValue,)>(entity, "MacroOwnershipComponent", &["value"])
         .unwrap()
+        .0
         .value
-        .push_str(" mut");
-
-    let value = scene
-        .take::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
+        .push_str("owned");
+    let (value,) = scene
+        .query::<(&MacroOwnedValue,)>(entity, "MacroOwnershipComponent", &["value"])
         .unwrap();
 
     assert_eq!(
         value,
-        MacroOwnedValue {
-            value: "owned mut".to_owned(),
+        &MacroOwnedValue {
+            value: "owned".to_owned(),
         }
-    );
-    assert_eq!(
-        scene
-            .get::<MacroOwnedValue>(entity, "MacroOwnershipComponent", "value")
-            .unwrap(),
-        &MacroOwnedValue::default()
-    );
-    assert_eq!(
-        scene.set(
-            entity,
-            "MacroOwnershipComponent",
-            "value",
-            &MacroOwnedValue::default(),
-        ),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoSetter
-        ))
     );
 }
 
@@ -331,46 +248,34 @@ fn component_macro_serializes_static_component_fields() {
         .add_component(entity, "MacroComponent".to_owned())
         .unwrap();
 
-    let updated = "serialized through macro".to_owned();
-    scene
-        .set(entity, "MacroComponent", "my_string", &updated)
-        .unwrap();
-    scene
-        .set(entity, "MacroComponent", "default_int", &12_i32)
-        .unwrap();
-    let default_string = "default serialization".to_owned();
-    scene
-        .set(entity, "MacroComponent", "default_string", &default_string)
-        .unwrap();
+    {
+        let (my_string, default_int, default_string) = scene
+            .query_mut::<(&mut String, &mut i32, &mut String)>(
+                entity,
+                "MacroComponent",
+                &["my_string", "default_int", "default_string"],
+            )
+            .unwrap();
+        *my_string = "serialized through macro".to_owned();
+        *default_int = 12;
+        *default_string = "default serialization".to_owned();
+    }
 
     let serialized = scene.serialize().unwrap();
     let mut loaded = Scene::new();
     loaded.deserialize(&serialized).unwrap();
 
-    assert_eq!(
-        *loaded
-            .get::<i32>(entity, "MacroComponent", "my_int")
-            .unwrap(),
-        0
-    );
-    assert_eq!(
-        *loaded
-            .get::<i32>(entity, "MacroComponent", "default_int")
-            .unwrap(),
-        12
-    );
-    assert_eq!(
-        loaded
-            .get::<String>(entity, "MacroComponent", "my_string")
-            .unwrap(),
-        "serialized through macro"
-    );
-    assert_eq!(
-        loaded
-            .get::<String>(entity, "MacroComponent", "default_string")
-            .unwrap(),
-        "default serialization"
-    );
+    let (my_int, default_int, my_string, default_string) = loaded
+        .query::<(&i32, &i32, &String, &String)>(
+            entity,
+            "MacroComponent",
+            &["my_int", "default_int", "my_string", "default_string"],
+        )
+        .unwrap();
+    assert_eq!(*my_int, 0);
+    assert_eq!(*default_int, 12);
+    assert_eq!(my_string, "serialized through macro");
+    assert_eq!(default_string, "default serialization");
 }
 
 #[test]
