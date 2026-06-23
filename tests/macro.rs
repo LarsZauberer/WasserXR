@@ -1,10 +1,16 @@
-use std::sync::{LazyLock, Mutex};
+use std::{
+    ffi::c_void,
+    sync::{LazyLock, Mutex},
+};
 
 use uuid::Uuid;
 use wasserxr::{
     attacher, component, detacher,
     error::{ComponentError, SceneError},
-    scene::Scene,
+    scene::{
+        Scene,
+        component::{FieldType, Schema, SerializedBytes},
+    },
     system,
 };
 
@@ -69,6 +75,66 @@ pub struct MacroOwnedValue {
 pub struct MacroOwnershipComponent {
     #[mutable]
     value: MacroOwnedValue,
+}
+
+#[component(no_schema)]
+#[derive(Default)]
+pub struct MacroManualSchemaComponent {
+    #[none]
+    value: i32,
+}
+
+#[component(no_schema)]
+#[derive(Default)]
+pub struct MacroNoSchemaComponent {
+    #[allow(dead_code)]
+    value: i32,
+}
+
+unsafe extern "C" fn macro_manual_schema_value_getter(ptr: *mut c_void) -> *mut c_void {
+    unsafe { &mut (*(ptr as *mut MacroManualSchemaComponent)).value as *mut i32 as *mut c_void }
+}
+
+#[unsafe(export_name = "wxr_schema_MacroManualSchemaComponent")]
+#[allow(non_snake_case)]
+pub unsafe extern "C" fn wxr_schema_MacroManualSchemaComponent(schema: *mut Schema) {
+    unsafe {
+        (*schema).add_field(
+            "value".to_owned(),
+            FieldType::Long,
+            Some(macro_manual_schema_value_getter),
+            true,
+            None,
+            None,
+        );
+    }
+}
+
+#[component]
+#[derive(Default)]
+pub struct MacroCustomHooksComponent {
+    #[getter(macro_custom_value_getter)]
+    #[mutable]
+    #[serializer(macro_custom_value_serializer)]
+    #[deserializer(macro_custom_value_deserializer)]
+    value: usize,
+}
+
+unsafe extern "C" fn macro_custom_value_getter(ptr: *mut c_void) -> *mut c_void {
+    unsafe { &mut (*(ptr as *mut MacroCustomHooksComponent)).value as *mut usize as *mut c_void }
+}
+
+unsafe extern "C" fn macro_custom_value_serializer(_ptr: *const c_void) -> SerializedBytes {
+    SerializedBytes::from_vec(99usize.to_le_bytes().to_vec())
+}
+
+unsafe extern "C" fn macro_custom_value_deserializer(ptr: *mut c_void, data: SerializedBytes) {
+    let bytes = unsafe { data.into_vec() };
+    if let Ok(bytes) = <[u8; std::mem::size_of::<usize>()]>::try_from(bytes.as_slice()) {
+        unsafe {
+            (*(ptr as *mut MacroCustomHooksComponent)).value = usize::from_le_bytes(bytes) + 1;
+        }
+    }
 }
 
 static MACRO_SYSTEM_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
@@ -276,6 +342,64 @@ fn component_macro_serializes_static_component_fields() {
     assert_eq!(*default_int, 12);
     assert_eq!(my_string, "serialized through macro");
     assert_eq!(default_string, "default serialization");
+}
+
+#[test]
+fn component_macro_allows_custom_schema_function() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroManualSchemaComponent".to_owned())
+        .unwrap();
+
+    let (value,) = scene
+        .query_mut::<(&mut i32,)>(entity, "MacroManualSchemaComponent", &["value"])
+        .unwrap();
+    *value = 64;
+
+    let (value,) = scene
+        .query::<(&i32,)>(entity, "MacroManualSchemaComponent", &["value"])
+        .unwrap();
+    assert_eq!(*value, 64);
+}
+
+#[test]
+fn component_macro_allows_missing_schema_function() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroNoSchemaComponent".to_owned())
+        .unwrap();
+
+    assert_eq!(
+        scene.query::<(&i32,)>(entity, "MacroNoSchemaComponent", &["value"]),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNotFound
+        ))
+    );
+}
+
+#[test]
+fn component_macro_registers_custom_field_functions() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroCustomHooksComponent".to_owned())
+        .unwrap();
+
+    let (value,) = scene
+        .query_mut::<(&mut usize,)>(entity, "MacroCustomHooksComponent", &["value"])
+        .unwrap();
+    *value = 12;
+
+    let serialized = scene.serialize().unwrap();
+    let mut loaded = Scene::new();
+    loaded.deserialize(&serialized).unwrap();
+
+    let (value,) = loaded
+        .query::<(&usize,)>(entity, "MacroCustomHooksComponent", &["value"])
+        .unwrap();
+    assert_eq!(*value, 100);
 }
 
 #[test]

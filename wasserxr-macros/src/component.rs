@@ -1,23 +1,62 @@
 use quote::{format_ident, quote};
-use syn::{Error, Fields, Ident, ItemStruct, Result, Type};
+use syn::{
+    Attribute, Error, Fields, Ident, ItemStruct, Meta, Path, Result, Type,
+    parse::{Parse, ParseStream},
+};
+
+#[derive(Default)]
+pub(crate) struct Args {
+    no_schema: bool,
+}
+
+impl Parse for Args {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(Args::default());
+        }
+
+        let ident: Ident = input.parse()?;
+        if ident != "no_schema" {
+            return Err(Error::new_spanned(
+                ident,
+                "`component` only supports the `no_schema` argument",
+            ));
+        }
+
+        if !input.is_empty() {
+            return Err(input.error("`component` only supports the `no_schema` argument"));
+        }
+
+        Ok(Args { no_schema: true })
+    }
+}
+
+enum FieldFunction {
+    Generated,
+    Custom(Path),
+}
 
 struct Field {
     ident: Ident,
     ty: Type,
-    has_getter: bool,
+    getter: Option<FieldFunction>,
     is_mutable: bool,
-    has_serializer: bool,
-    has_deserializer: bool,
+    serializer: Option<FieldFunction>,
+    deserializer: Option<FieldFunction>,
 }
 
-pub(crate) fn expand(mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
+pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
     let component_ident = item.ident.clone();
     let component_id = component_ident.to_string();
     let component_fields = parse_component_fields(&mut item)?;
 
     let creator = create_creator_function(&component_ident, &component_id);
     let destroyer = create_destroyer_function(&component_ident, &component_id);
-    let schema = create_schema_function(&component_id, &component_fields);
+    let schema = if args.no_schema {
+        quote! {}
+    } else {
+        create_schema_function(&component_id, &component_fields)
+    };
     let getters = create_getter_functions(&component_ident, &component_id, &component_fields);
     let serializers =
         create_serializer_functions(&component_ident, &component_id, &component_fields);
@@ -54,22 +93,22 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
             ));
         };
 
-        let mut has_getter = false;
+        let mut getter = None;
         let mut is_mutable = false;
-        let mut has_serializer = false;
-        let mut has_deserializer = false;
+        let mut serializer = None;
+        let mut deserializer = None;
         let mut has_none = false;
         let mut kept_attrs = Vec::new();
 
         for attr in field.attrs.drain(..) {
             if attr.path().is_ident("getter") {
-                has_getter = true;
+                getter = Some(parse_field_function_attribute(&attr, "getter")?);
             } else if attr.path().is_ident("mutable") {
                 is_mutable = true;
             } else if attr.path().is_ident("serializer") {
-                has_serializer = true;
+                serializer = Some(parse_field_function_attribute(&attr, "serializer")?);
             } else if attr.path().is_ident("deserializer") {
-                has_deserializer = true;
+                deserializer = Some(parse_field_function_attribute(&attr, "deserializer")?);
             } else if attr.path().is_ident("none") {
                 has_none = true;
             } else {
@@ -79,7 +118,8 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
 
         field.attrs = kept_attrs;
 
-        let has_explicit_field_function = has_getter || has_serializer || has_deserializer;
+        let has_explicit_field_function =
+            getter.is_some() || serializer.is_some() || deserializer.is_some();
         if has_none && (has_explicit_field_function || is_mutable) {
             return Err(Error::new_spanned(
                 field,
@@ -88,26 +128,37 @@ fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
         }
 
         if !has_none && !has_explicit_field_function {
-            has_getter = true;
-            has_serializer = true;
-            has_deserializer = true;
+            getter = Some(FieldFunction::Generated);
+            serializer = Some(FieldFunction::Generated);
+            deserializer = Some(FieldFunction::Generated);
         }
 
-        if is_mutable {
-            has_getter = true;
+        if is_mutable && getter.is_none() {
+            getter = Some(FieldFunction::Generated);
         }
 
         component_fields.push(Field {
             ident: field_ident,
             ty: field.ty.clone(),
-            has_getter,
+            getter,
             is_mutable,
-            has_serializer,
-            has_deserializer,
+            serializer,
+            deserializer,
         });
     }
 
     Ok(component_fields)
+}
+
+fn parse_field_function_attribute(attr: &Attribute, name: &str) -> Result<FieldFunction> {
+    match &attr.meta {
+        Meta::Path(_) => Ok(FieldFunction::Generated),
+        Meta::List(_) => Ok(FieldFunction::Custom(attr.parse_args()?)),
+        Meta::NameValue(_) => Err(Error::new_spanned(
+            attr,
+            format!("`{name}` expects no value or a custom function path"),
+        )),
+    }
 }
 
 fn create_creator_function(
@@ -151,29 +202,10 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
         let field_ident = &field.ident;
         let field_name = field_ident.to_string();
         let field_type = component_field_type(&field.ty);
-        let getter = if field.has_getter {
-            let getter_ident = format_ident!("wxr_get_{}_{}", component_id, field_ident);
-            quote! { Some(#getter_ident) }
-        } else {
-            quote! { None }
-        };
+        let getter = create_getter_option(component_id, field);
         let mutable = field.is_mutable;
-        let serializer = if field.has_serializer
-            && component_field_serialization_kind(&field.ty).is_some()
-        {
-            let serializer_ident = format_ident!("wxr_serialize_{}_{}", component_id, field_ident);
-            quote! { Some(#serializer_ident) }
-        } else {
-            quote! { None }
-        };
-        let deserializer =
-            if field.has_deserializer && component_field_serialization_kind(&field.ty).is_some() {
-                let deserializer_ident =
-                    format_ident!("wxr_deserialize_{}_{}", component_id, field_ident);
-                quote! { Some(#deserializer_ident) }
-            } else {
-                quote! { None }
-            };
+        let serializer = create_serializer_option(component_id, field);
+        let deserializer = create_deserializer_option(component_id, field);
 
         quote! {
             (*schema).add_field(
@@ -200,31 +232,86 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
     }
 }
 
+fn create_getter_option(component_id: &str, field: &Field) -> proc_macro2::TokenStream {
+    match &field.getter {
+        Some(FieldFunction::Generated) => {
+            let field_ident = &field.ident;
+            let getter_ident = format_ident!("wxr_get_{}_{}", component_id, field_ident);
+            quote! { Some(#getter_ident) }
+        }
+        Some(FieldFunction::Custom(getter)) => quote! {{
+            let getter: ::wasserxr::scene::component::Getter = #getter;
+            Some(getter)
+        }},
+        None => quote! { None },
+    }
+}
+
+fn create_serializer_option(component_id: &str, field: &Field) -> proc_macro2::TokenStream {
+    match &field.serializer {
+        Some(FieldFunction::Generated)
+            if component_field_serialization_kind(&field.ty).is_some() =>
+        {
+            let field_ident = &field.ident;
+            let serializer_ident = format_ident!("wxr_serialize_{}_{}", component_id, field_ident);
+            quote! { Some(#serializer_ident) }
+        }
+        Some(FieldFunction::Generated) => quote! { None },
+        Some(FieldFunction::Custom(serializer)) => quote! {{
+            let serializer: ::wasserxr::scene::component::Serializer = #serializer;
+            Some(serializer)
+        }},
+        None => quote! { None },
+    }
+}
+
+fn create_deserializer_option(component_id: &str, field: &Field) -> proc_macro2::TokenStream {
+    match &field.deserializer {
+        Some(FieldFunction::Generated)
+            if component_field_serialization_kind(&field.ty).is_some() =>
+        {
+            let field_ident = &field.ident;
+            let deserializer_ident =
+                format_ident!("wxr_deserialize_{}_{}", component_id, field_ident);
+            quote! { Some(#deserializer_ident) }
+        }
+        Some(FieldFunction::Generated) => quote! { None },
+        Some(FieldFunction::Custom(deserializer)) => quote! {{
+            let deserializer: ::wasserxr::scene::component::Deserializer = #deserializer;
+            Some(deserializer)
+        }},
+        None => quote! { None },
+    }
+}
+
 fn create_getter_functions(
     component_ident: &Ident,
     component_id: &str,
     fields: &[Field],
 ) -> proc_macro2::TokenStream {
-    let getters = fields.iter().filter(|field| field.has_getter).map(|field| {
-        let field_ident = &field.ident;
-        let field_ty = &field.ty;
-        let getter_name = format!("wxr_get_{}_{}", component_id, field_ident);
-        let getter_ident = format_ident!("{}", getter_name);
+    let getters = fields
+        .iter()
+        .filter(|field| matches!(&field.getter, Some(FieldFunction::Generated)))
+        .map(|field| {
+            let field_ident = &field.ident;
+            let field_ty = &field.ty;
+            let getter_name = format!("wxr_get_{}_{}", component_id, field_ident);
+            let getter_ident = format_ident!("{}", getter_name);
 
-        quote! {
-            #[unsafe(export_name = #getter_name)]
-            #[allow(non_snake_case)]
-            pub unsafe extern "C" fn #getter_ident(
-                ptr: *mut ::std::ffi::c_void,
-            ) -> *mut ::std::ffi::c_void {
-                unsafe {
-                    &mut (*(ptr as *mut #component_ident)).#field_ident
-                        as *mut #field_ty
-                        as *mut ::std::ffi::c_void
+            quote! {
+                #[unsafe(export_name = #getter_name)]
+                #[allow(non_snake_case)]
+                pub unsafe extern "C" fn #getter_ident(
+                    ptr: *mut ::std::ffi::c_void,
+                ) -> *mut ::std::ffi::c_void {
+                    unsafe {
+                        &mut (*(ptr as *mut #component_ident)).#field_ident
+                            as *mut #field_ty
+                            as *mut ::std::ffi::c_void
+                    }
                 }
             }
-        }
-    });
+        });
 
     quote! {
         #(#getters)*
@@ -238,7 +325,7 @@ fn create_serializer_functions(
 ) -> proc_macro2::TokenStream {
     let serializers = fields
         .iter()
-        .filter(|field| field.has_serializer)
+        .filter(|field| matches!(&field.serializer, Some(FieldFunction::Generated)))
         .filter_map(|field| {
             let field_ident = &field.ident;
             let field_ty = &field.ty;
@@ -301,65 +388,68 @@ fn create_deserializer_functions(
     component_id: &str,
     fields: &[Field],
 ) -> proc_macro2::TokenStream {
-    let deserializers = fields.iter().filter(|field| field.has_deserializer).filter_map(|field| {
-        let field_ident = &field.ident;
-        let field_ty = &field.ty;
-        let deserializer_name = format!("wxr_deserialize_{}_{}", component_id, field_ident);
-        let deserializer_ident = format_ident!("{}", deserializer_name);
+    let deserializers = fields
+        .iter()
+        .filter(|field| matches!(&field.deserializer, Some(FieldFunction::Generated)))
+        .filter_map(|field| {
+            let field_ident = &field.ident;
+            let field_ty = &field.ty;
+            let deserializer_name = format!("wxr_deserialize_{}_{}", component_id, field_ident);
+            let deserializer_ident = format_ident!("{}", deserializer_name);
 
-        match component_field_serialization_kind(field_ty)? {
-            SerializationKind::Bytes => Some(quote! {
-                #[unsafe(export_name = #deserializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #deserializer_ident(
-                    ptr: *mut ::std::ffi::c_void,
-                    data: ::wasserxr::scene::component::SerializedBytes,
-                ) {
-                    unsafe {
-                        let bytes = data.into_vec();
-                        if let Ok(bytes) =
-                            <[u8; ::std::mem::size_of::<#field_ty>()]>::try_from(bytes.as_slice())
-                        {
-                            (*(ptr as *mut #component_ident)).#field_ident =
-                                #field_ty::from_le_bytes(bytes);
+            match component_field_serialization_kind(field_ty)? {
+                SerializationKind::Bytes => Some(quote! {
+                    #[unsafe(export_name = #deserializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #deserializer_ident(
+                        ptr: *mut ::std::ffi::c_void,
+                        data: ::wasserxr::scene::component::SerializedBytes,
+                    ) {
+                        unsafe {
+                            let bytes = data.into_vec();
+                            if let Ok(bytes) =
+                                <[u8; ::std::mem::size_of::<#field_ty>()]>::try_from(bytes.as_slice())
+                            {
+                                (*(ptr as *mut #component_ident)).#field_ident =
+                                    #field_ty::from_le_bytes(bytes);
+                            }
                         }
                     }
-                }
-            }),
-            SerializationKind::Char => Some(quote! {
-                #[unsafe(export_name = #deserializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #deserializer_ident(
-                    ptr: *mut ::std::ffi::c_void,
-                    data: ::wasserxr::scene::component::SerializedBytes,
-                ) {
-                    unsafe {
-                        let bytes = data.into_vec();
-                        if let Ok(bytes) = <[u8; 4]>::try_from(bytes.as_slice()) {
-                            if let Some(value) = ::std::char::from_u32(u32::from_le_bytes(bytes)) {
+                }),
+                SerializationKind::Char => Some(quote! {
+                    #[unsafe(export_name = #deserializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #deserializer_ident(
+                        ptr: *mut ::std::ffi::c_void,
+                        data: ::wasserxr::scene::component::SerializedBytes,
+                    ) {
+                        unsafe {
+                            let bytes = data.into_vec();
+                            if let Ok(bytes) = <[u8; 4]>::try_from(bytes.as_slice()) {
+                                if let Some(value) = ::std::char::from_u32(u32::from_le_bytes(bytes)) {
+                                    (*(ptr as *mut #component_ident)).#field_ident = value;
+                                }
+                            }
+                        }
+                    }
+                }),
+                SerializationKind::String => Some(quote! {
+                    #[unsafe(export_name = #deserializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #deserializer_ident(
+                        ptr: *mut ::std::ffi::c_void,
+                        data: ::wasserxr::scene::component::SerializedBytes,
+                    ) {
+                        unsafe {
+                            let bytes = data.into_vec();
+                            if let Ok(value) = ::std::string::String::from_utf8(bytes) {
                                 (*(ptr as *mut #component_ident)).#field_ident = value;
                             }
                         }
                     }
-                }
-            }),
-            SerializationKind::String => Some(quote! {
-                #[unsafe(export_name = #deserializer_name)]
-                #[allow(non_snake_case)]
-                pub unsafe extern "C" fn #deserializer_ident(
-                    ptr: *mut ::std::ffi::c_void,
-                    data: ::wasserxr::scene::component::SerializedBytes,
-                ) {
-                    unsafe {
-                        let bytes = data.into_vec();
-                        if let Ok(value) = ::std::string::String::from_utf8(bytes) {
-                            (*(ptr as *mut #component_ident)).#field_ident = value;
-                        }
-                    }
-                }
-            }),
-        }
-    });
+                }),
+            }
+        });
 
     quote! {
         #(#deserializers)*

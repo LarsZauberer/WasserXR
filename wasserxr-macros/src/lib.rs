@@ -76,11 +76,11 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Use it on a named-field struct that implements `Default`:
 ///
 /// ```ignore
-/// #[component]
+/// #[component(no_schema)]
 /// #[derive(Default)]
 /// struct MyComponent {
 ///     value: i32,
-///     #[getter]
+///     #[getter(custom_name_getter)]
 ///     #[mutable]
 ///     name: String,
 ///     #[none]
@@ -89,25 +89,21 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro exports create, destroy, and schema functions for the component.
+/// Use `#[component(no_schema)]` to skip schema generation and provide a custom
+/// `wxr_schema_<Component>` function yourself.
 /// Fields without field function attributes get generated getter, serializer,
 /// and deserializer functions by default. Use `#[mutable]` to allow mutable
 /// references through `Scene::query_mut`. If at least one field function
-/// attribute is present, only the requested functions are generated. Use
-/// `#[none]` to register a field without generated field functions.
+/// attribute is present, only the requested functions are generated. Field
+/// function attributes can also take a custom function path, for example
+/// `#[getter(my_getter)]`. Use `#[none]` to register a field without generated
+/// field functions.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
-    if !args.is_empty() {
-        return Error::new(
-            proc_macro2::Span::call_site(),
-            "`component` does not take arguments",
-        )
-        .into_compile_error()
-        .into();
-    }
-
+    let args = parse_macro_input!(args as component::Args);
     let item = parse_macro_input!(item as ItemStruct);
 
-    component::expand(item)
+    component::expand(args, item)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }
