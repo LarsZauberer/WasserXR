@@ -508,10 +508,14 @@ impl Scene {
             .keys()
             .filter_map(|id| if id == "" { None } else { Some(id.to_owned()) })
             .collect();
-        let serialization_data = self.serialize()?;
-
-        // Reset the scene
-        self.reset()?;
+        let serialization_data = self.serialize().inspect_err(|err| match err {
+            SceneError::Serialization(msg) => {
+                error!("Scene serialization failed: {}", msg);
+            }
+            _ => {
+                error!("Failed to serialize the scene: {:?}", err);
+            }
+        })?;
 
         // Remove the plugins
         for plugin in &plugins {
@@ -535,8 +539,16 @@ impl Scene {
             }
         }
 
-        // Deserialize the scene data
-        self.deserialize(&serialization_data)?;
+        // Deserialize the scene data (Scene reset also happens in here)
+        self.deserialize(&serialization_data)
+            .inspect_err(|err| match err {
+                SceneError::Deserialization(msg) => {
+                    error!("Scene deserialization failed: {}", msg);
+                }
+                _ => {
+                    error!("Failed to deserialize the scene: {:?}", err);
+                }
+            })?;
 
         Ok(())
     }
