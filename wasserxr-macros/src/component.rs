@@ -1,6 +1,6 @@
 use quote::{format_ident, quote};
 use syn::{
-    Attribute, Error, Fields, Ident, ItemStruct, Meta, Path, Result, Type,
+    Attribute, Error, Fields, Ident, ItemStruct, Meta, Path, Result, Token, Type,
     parse::{Parse, ParseStream},
 };
 
@@ -45,9 +45,76 @@ struct Field {
     deserializer: Option<FieldFunction>,
 }
 
+struct VirtualField {
+    ident: Ident,
+    ty: Type,
+    getter: Path,
+    is_mutable: bool,
+}
+
+impl Parse for VirtualField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ident = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let ty = input.parse()?;
+        let mut getter = None;
+        let mut is_mutable = false;
+
+        while !input.is_empty() {
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+
+            let key: Ident = input.parse()?;
+            if key == "getter" {
+                if getter.is_some() {
+                    return Err(Error::new_spanned(
+                        key,
+                        "virtual field getter is duplicated",
+                    ));
+                }
+                input.parse::<Token![=]>()?;
+                getter = Some(input.parse()?);
+            } else if key == "mutable" {
+                if is_mutable {
+                    return Err(Error::new_spanned(
+                        key,
+                        "virtual field mutable marker is duplicated",
+                    ));
+                }
+                is_mutable = true;
+            } else {
+                return Err(Error::new_spanned(
+                    key,
+                    "virtual field only supports `getter = ...` and `mutable`",
+                ));
+            }
+        }
+
+        let Some(getter) = getter else {
+            return Err(input.error("virtual field requires `getter = ...`"));
+        };
+
+        Ok(VirtualField {
+            ident,
+            ty,
+            getter,
+            is_mutable,
+        })
+    }
+}
+
 pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::TokenStream> {
     let component_ident = item.ident.clone();
     let component_id = component_ident.to_string();
+    let virtual_fields = parse_virtual_fields(&mut item)?;
+    if args.no_schema && !virtual_fields.is_empty() {
+        return Err(Error::new_spanned(
+            item.ident,
+            "`virtual_field` cannot be used with `component(no_schema)`",
+        ));
+    }
     let component_fields = parse_component_fields(&mut item)?;
 
     let creator = create_creator_function(&component_ident, &component_id);
@@ -55,7 +122,7 @@ pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::To
     let schema = if args.no_schema {
         quote! {}
     } else {
-        create_schema_function(&component_id, &component_fields)
+        create_schema_function(&component_id, &component_fields, &virtual_fields)
     };
     let getters = create_getter_functions(&component_ident, &component_id, &component_fields);
     let serializers =
@@ -73,6 +140,22 @@ pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::To
         #serializers
         #deserializers
     })
+}
+
+fn parse_virtual_fields(item: &mut ItemStruct) -> Result<Vec<VirtualField>> {
+    let mut virtual_fields = Vec::new();
+    let mut kept_attrs = Vec::new();
+
+    for attr in item.attrs.drain(..) {
+        if attr.path().is_ident("virtual_field") {
+            virtual_fields.push(attr.parse_args()?);
+        } else {
+            kept_attrs.push(attr);
+        }
+    }
+
+    item.attrs = kept_attrs;
+    Ok(virtual_fields)
 }
 
 fn parse_component_fields(item: &mut ItemStruct) -> Result<Vec<Field>> {
@@ -195,7 +278,11 @@ fn create_destroyer_function(
     }
 }
 
-fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::TokenStream {
+fn create_schema_function(
+    component_id: &str,
+    fields: &[Field],
+    virtual_fields: &[VirtualField],
+) -> proc_macro2::TokenStream {
     let schema_name = format!("wxr_schema_{}", component_id);
     let schema_ident = format_ident!("{}", schema_name);
     let schema_fields = fields.iter().map(|field| {
@@ -218,6 +305,26 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
             );
         }
     });
+    let schema_virtual_fields = virtual_fields.iter().map(|field| {
+        let field_name = field.ident.to_string();
+        let field_type = component_field_type(&field.ty);
+        let getter = &field.getter;
+        let mutable = field.is_mutable;
+
+        quote! {
+            (*schema).add_field(
+                #field_name.to_owned(),
+                #field_type,
+                {
+                    let getter: ::wasserxr::scene::component::Getter = #getter;
+                    Some(getter)
+                },
+                #mutable,
+                None,
+                None,
+            );
+        }
+    });
 
     quote! {
         #[unsafe(export_name = #schema_name)]
@@ -227,6 +334,7 @@ fn create_schema_function(component_id: &str, fields: &[Field]) -> proc_macro2::
         ) {
             unsafe {
                 #(#schema_fields)*
+                #(#schema_virtual_fields)*
             }
         }
     }

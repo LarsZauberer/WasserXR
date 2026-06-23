@@ -137,6 +137,22 @@ unsafe extern "C" fn macro_custom_value_deserializer(ptr: *mut c_void, data: Ser
     }
 }
 
+#[component]
+#[virtual_field(x: f32, getter = macro_position_x, mutable)]
+#[virtual_field(y: f32, getter = macro_position_y)]
+#[derive(Default)]
+pub struct MacroPosition {
+    position: [f32; 3],
+}
+
+unsafe extern "C" fn macro_position_x(ptr: *mut c_void) -> *mut c_void {
+    unsafe { &mut (*(ptr as *mut MacroPosition)).position[0] as *mut f32 as *mut c_void }
+}
+
+unsafe extern "C" fn macro_position_y(ptr: *mut c_void) -> *mut c_void {
+    unsafe { &mut (*(ptr as *mut MacroPosition)).position[1] as *mut f32 as *mut c_void }
+}
+
 static MACRO_SYSTEM_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 static MACRO_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
@@ -400,6 +416,42 @@ fn component_macro_registers_custom_field_functions() {
         .query::<(&usize,)>(entity, "MacroCustomHooksComponent", &["value"])
         .unwrap();
     assert_eq!(*value, 100);
+}
+
+#[test]
+fn component_macro_registers_virtual_fields() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroPosition".to_owned())
+        .unwrap();
+
+    let (x,) = scene
+        .query_mut::<(&mut f32,)>(entity, "MacroPosition", &["x"])
+        .unwrap();
+    *x = 7.5;
+
+    let (x, y, position) = scene
+        .query::<(&f32, &f32, &[f32; 3])>(entity, "MacroPosition", &["x", "y", "position"])
+        .unwrap();
+    assert_eq!(*x, 7.5);
+    assert_eq!(*y, 0.0);
+    assert_eq!(position[0], 7.5);
+
+    assert_eq!(
+        scene.query_mut::<(&mut f32,)>(entity, "MacroPosition", &["y"]),
+        Err(SceneError::ComponentFieldError(
+            ComponentError::FieldNotMutable
+        ))
+    );
+
+    let serialized = scene.serialize().unwrap();
+    let mut loaded = Scene::new();
+    loaded.deserialize(&serialized).unwrap();
+    let (x,) = loaded
+        .query::<(&f32,)>(entity, "MacroPosition", &["x"])
+        .unwrap();
+    assert_eq!(*x, 0.0);
 }
 
 #[test]
