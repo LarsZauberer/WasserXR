@@ -12,14 +12,10 @@ pub(crate) struct Plugin {
 
 impl Plugin {
     pub(crate) fn new(path: String) -> Result<Plugin, PluginError> {
-        // Create the symbol
-        let Ok(convert_path) = CString::new(path.to_owned()) else {
-            log::error!("Plugin path contains a null byte");
-            return Err(PluginError::InvalidSymbol);
-        };
+        let path_cstring = Self::create_c_string(path.clone())?;
 
         // Open the library
-        let fd: *mut c_void = unsafe { libc::dlopen(convert_path.as_ptr(), libc::RTLD_NOW) };
+        let fd: *mut c_void = unsafe { libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW) };
         if fd.is_null() {
             let error = unsafe {
                 let error = libc::dlerror();
@@ -81,6 +77,13 @@ impl Plugin {
             None => "",
         }
     }
+
+    fn create_c_string(data: String) -> Result<CString, PluginError> {
+        CString::new(data).map_err(|_| {
+            log::error!("Plugin path contains a null byte");
+            PluginError::InvalidSymbol
+        })
+    }
 }
 
 impl Drop for Plugin {
@@ -89,10 +92,38 @@ impl Drop for Plugin {
             return;
         }
 
+        let Some(path) = &self.path else {
+            return;
+        };
+
         unsafe {
             libc::dlclose(self.fd);
         }
-        log::info!("Plugin `{}` closed", self.get_id());
+
+        // Check if it is really unloaded (dlclose doesn't necessarily unload the library)
+        let Ok(path_cstring) = Self::create_c_string(path.clone()) else {
+            log::warn!(
+                "Failed to check if the plugin `{}` is truely unloaded",
+                path
+            );
+            return;
+        };
+        unsafe {
+            let still_loaded: *mut c_void =
+                libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW | libc::RTLD_NOLOAD);
+
+            if !still_loaded.is_null() {
+                // Failed to unload
+                // Still has to close the new handle
+                libc::dlclose(still_loaded);
+                log::warn!(
+                    "Plugin `{}` failed to be unloaded. It is still in kernel memory. You cannot load old systems, components should have been removed and new systems and components will not be loaded from this plugin. Still threads spawned by the plugin could still be running. Furthermore, when you load the plugin again, it will not load a new version. Make sure that at the end of a plugin lifetime no threads are running anymore.",
+                    path
+                );
+            } else {
+                log::info!("Plugin `{}` closed", path);
+            }
+        }
     }
 }
 
