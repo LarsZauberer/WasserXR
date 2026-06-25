@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod component;
 pub(crate) mod entity;
 pub mod logging;
@@ -6,13 +7,14 @@ pub mod query;
 pub(crate) mod serialization;
 pub(crate) mod system;
 
+use assets::{Asset, AssetType};
 use component::{Component, FieldType};
 use entity::Entity;
 use plugin::Plugin;
 use query::{SceneQuery, SceneQueryMut};
 use system::System;
 
-use crate::error::{PluginError, SceneError};
+use crate::error::{AssetError, PluginError, SceneError};
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
@@ -33,6 +35,8 @@ pub struct Scene {
     plugins: HashMap<String, Plugin>,
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
+    asset_types: HashMap<String, AssetType>,
+    assets: HashMap<String, HashMap<String, Asset>>,
 
     // Deferred Calls
     deferred_calls: Vec<DeferredCall>,
@@ -54,6 +58,8 @@ impl Default for Scene {
             plugins,
             systems: HashMap::new(),
             components: HashMap::new(),
+            asset_types: HashMap::new(),
+            assets: HashMap::new(),
 
             // Deferred Calls
             deferred_calls: Vec::new(),
@@ -70,6 +76,16 @@ impl Default for Scene {
 
 impl Drop for Scene {
     fn drop(&mut self) {
+        let assets = std::mem::take(&mut self.assets);
+
+        for (asset_type, assets) in assets {
+            for asset in assets.into_values() {
+                self.set_logger(asset_type.clone());
+                drop(asset);
+                self.reset_logger();
+            }
+        }
+
         let components = std::mem::take(&mut self.components);
 
         for entity_components in components.into_values() {
@@ -88,6 +104,8 @@ impl Scene {
     }
 
     pub fn reset(&mut self) -> Result<(), SceneError> {
+        self.clear_assets();
+
         // Kill all systems
         let systems: Vec<String> = self.systems.keys().cloned().collect();
         for i in systems {
@@ -286,6 +304,18 @@ impl Scene {
 
         for (entity, component_id) in components {
             self.remove_component(entity, &component_id)?;
+        }
+
+        // Unload all the asset types that are still loaded with this plugin
+        let asset_types: Vec<String> = self
+            .asset_types
+            .values()
+            .filter(|asset_type| asset_type.get_plugin_id() == path)
+            .map(|asset_type| asset_type.get_id().to_owned())
+            .collect();
+
+        for asset_type in asset_types {
+            self.remove_asset_type(&asset_type);
         }
 
         // Remove the plugin itself
@@ -863,6 +893,149 @@ impl Scene {
         })?;
 
         let field_ptrs = unsafe { self.get_field_ptrs(entity_id, component_id, fields)? };
+        unsafe { Q::fetch(&field_ptrs) }
+    }
+
+    fn clear_assets(&mut self) {
+        let assets = std::mem::take(&mut self.assets);
+
+        for (asset_type, assets) in assets {
+            for asset in assets.into_values() {
+                self.set_logger(asset_type.clone());
+                drop(asset);
+                self.reset_logger();
+            }
+        }
+    }
+
+    fn remove_asset_type(&mut self, asset_type: &str) {
+        if let Some(assets) = self.assets.remove(asset_type) {
+            for asset in assets.into_values() {
+                self.set_logger(asset_type.to_owned());
+                drop(asset);
+                self.reset_logger();
+            }
+        }
+
+        self.asset_types.remove(asset_type);
+        crate::info!(self, "Asset type `{}` removed", asset_type);
+    }
+
+    fn ensure_asset_type(&mut self, asset_type: &str) -> Result<(), SceneError> {
+        if self.asset_types.contains_key(asset_type) {
+            return Ok(());
+        }
+
+        let asset_type_data = self
+            .plugins_dynamic_first()
+            .find_map(|plugin| AssetType::new(asset_type.to_owned(), plugin, self).ok());
+
+        let Some(asset_type_data) = asset_type_data else {
+            crate::warn!(self, "Asset type `{}` could not be created", asset_type);
+            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+        };
+
+        self.asset_types
+            .insert(asset_type.to_owned(), asset_type_data);
+        Ok(())
+    }
+
+    fn ensure_asset(&mut self, asset_type: &str, data_string: &str) -> Result<(), SceneError> {
+        if self
+            .assets
+            .get(asset_type)
+            .is_some_and(|assets| assets.contains_key(data_string))
+        {
+            return Ok(());
+        }
+
+        self.ensure_asset_type(asset_type)?;
+
+        let asset = self
+            .asset_types
+            .get(asset_type)
+            .ok_or(SceneError::AssetError(AssetError::AssetTypeNotFound))?
+            .create_asset(data_string, self)
+            .map_err(SceneError::AssetError)?;
+
+        self.assets
+            .entry(asset_type.to_owned())
+            .or_default()
+            .insert(data_string.to_owned(), asset);
+
+        crate::info!(
+            self,
+            "Asset `{}` with data `{}` created",
+            asset_type,
+            data_string
+        );
+        Ok(())
+    }
+
+    fn get_asset(&self, asset_type: &str, data_string: &str) -> Result<&Asset, SceneError> {
+        let Some(assets) = self.assets.get(asset_type) else {
+            crate::debug!(
+                self,
+                "Asset type `{}` was not found for asset lookup",
+                asset_type
+            );
+            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+        };
+
+        let Some(asset) = assets.get(data_string) else {
+            crate::debug!(
+                self,
+                "Asset `{}` with data `{}` was not found",
+                asset_type,
+                data_string
+            );
+            return Err(SceneError::AssetError(AssetError::InvalidAsset));
+        };
+
+        Ok(asset)
+    }
+
+    unsafe fn get_asset_field_ptrs(
+        &self,
+        asset_type: &str,
+        data_string: &str,
+        fields: &[&str],
+    ) -> Result<Vec<*mut c_void>, SceneError> {
+        let Some(asset_type_data) = self.asset_types.get(asset_type) else {
+            crate::debug!(
+                self,
+                "Asset type `{}` was not found for field lookup",
+                asset_type
+            );
+            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+        };
+        let asset = self.get_asset(asset_type, data_string)?;
+
+        fields
+            .iter()
+            .map(|field| {
+                unsafe { asset_type_data.get_field_ptr(asset, field, self) }
+                    .map_err(SceneError::AssetError)
+            })
+            .collect()
+    }
+
+    pub fn asset_query<'scene, Q>(
+        &'scene mut self,
+        asset_type: &str,
+        data_string: &str,
+        fields: &[&str],
+    ) -> Result<Q, SceneError>
+    where
+        Q: SceneQuery<'scene>,
+    {
+        if fields.len() != Q::FIELD_COUNT {
+            return Err(SceneError::AssetError(AssetError::FieldParsing));
+        }
+
+        self.ensure_asset(asset_type, data_string)?;
+
+        let field_ptrs = unsafe { self.get_asset_field_ptrs(asset_type, data_string, fields)? };
         unsafe { Q::fetch(&field_ptrs) }
     }
 

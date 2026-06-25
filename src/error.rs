@@ -24,6 +24,18 @@ pub enum ComponentError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AssetError {
+    FieldNotFound,
+    FieldNoGetter,
+    FieldParsing,
+    InvalidAsset,
+    NoCreator(PluginError),
+    NoSchema(PluginError),
+    NoDestroyer(PluginError),
+    AssetTypeNotFound,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SceneError {
     EntityNotFound,
     ComponentAlreadyExists,
@@ -34,6 +46,7 @@ pub enum SceneError {
     StaticPluginUnload,
     ComponentNotFound,
     ComponentFieldError(ComponentError),
+    AssetError(AssetError),
     PluginLoading(PluginError),
     SystemCreation,
     ComponentCreation,

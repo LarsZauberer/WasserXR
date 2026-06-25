@@ -1,3 +1,4 @@
+mod asset;
 mod component;
 mod system;
 
@@ -106,6 +107,42 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
 
     component::expand(args, item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Turns a Rust asset struct into the C ABI functions WasserXR needs.
+///
+/// The macro exports destroy, schema, and getter functions for the asset type.
+/// Every named field is queryable unless it has `#[none]`.
+#[proc_macro_attribute]
+pub fn asset_type(args: TokenStream, item: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        return Error::new(
+            proc_macro2::Span::call_site(),
+            "`asset_type` does not support arguments",
+        )
+        .into_compile_error()
+        .into();
+    }
+
+    let item = parse_macro_input!(item as ItemStruct);
+
+    asset::expand_asset_type(item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Wraps `fn create(data: &str) -> Option<AssetType>` as an asset creator.
+///
+/// The macro exports `wxr_asset_create_<AssetType>` and maps `None` or invalid
+/// C strings to a null pointer.
+#[proc_macro_attribute]
+pub fn asset_type_creator(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as asset::CreatorArgs);
+    let item = parse_macro_input!(item as ItemFn);
+
+    asset::expand_asset_type_creator(args, item)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }
