@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::c_void};
 
 use crate::{
     error::ComponentError,
@@ -82,6 +82,43 @@ impl Schema {
         }
     }
 
+    pub(crate) unsafe fn render_field(
+        &self,
+        id: &str,
+        data: *mut c_void,
+    ) -> Result<String, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => {
+                let getter = field.get_getter()?;
+                let field_ptr = unsafe { getter(data) };
+                unsafe { field.render(field_ptr) }
+            }
+            None => {
+                log::debug!("Schema field `{}` was not found for render", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
+    pub(crate) unsafe fn parse_field(
+        &self,
+        id: &str,
+        data: *mut c_void,
+        input: &str,
+    ) -> Result<(), ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => {
+                let getter = field.get_getter()?;
+                let field_ptr = unsafe { getter(data) };
+                unsafe { field.parse(field_ptr, input) }
+            }
+            None => {
+                log::debug!("Schema field `{}` was not found for parse", id);
+                Err(ComponentError::FieldNotFound)
+            }
+        }
+    }
+
     pub(crate) fn get_fields(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }
@@ -114,7 +151,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             true,
             Some(test_serializer),
@@ -132,7 +169,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             false,
             None,
@@ -161,7 +198,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             true,
             None,
@@ -177,7 +214,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             false,
             None,
@@ -203,7 +240,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             false,
             Some(test_serializer),
@@ -222,7 +259,7 @@ mod tests {
 
         schema.add_field(
             "health".to_owned(),
-            FieldType::Long,
+            FieldType::I64,
             Some(test_getter),
             false,
             Some(test_serializer),

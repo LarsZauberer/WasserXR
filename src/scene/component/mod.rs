@@ -140,6 +140,18 @@ impl Component {
         self.schema.get_field_type(id)
     }
 
+    pub(crate) fn render_field(&self, id: &str) -> Result<String, ComponentError> {
+        unsafe { self.schema.render_field(id, self.data) }
+    }
+
+    pub(crate) fn parse_field(&self, id: &str, input: &str) -> Result<(), ComponentError> {
+        if !self.schema.is_mutable(id)? {
+            return Err(ComponentError::FieldNotMutable);
+        }
+
+        unsafe { self.schema.parse_field(id, self.data, input) }
+    }
+
     pub(crate) fn get_id(&self) -> &str {
         &self.id
     }
@@ -210,7 +222,7 @@ mod tests {
         unsafe {
             (*schema).add_field(
                 "value".to_owned(),
-                FieldType::Long,
+                FieldType::I64,
                 Some(unit_counter_getter),
                 true,
                 Some(unit_counter_serializer),

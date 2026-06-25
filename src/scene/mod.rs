@@ -781,6 +781,33 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    pub fn render_field(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<String, SceneError> {
+        let component = self.get_component(entity_id, component_id)?;
+
+        component
+            .render_field(field_id)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
+    pub fn parse_field(
+        &mut self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+        input: &str,
+    ) -> Result<(), SceneError> {
+        let component = self.get_component(entity_id, component_id)?;
+
+        component
+            .parse_field(field_id, input)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
     pub fn should_exit(&mut self) {
         self.should_exit = true;
     }
@@ -941,7 +968,7 @@ mod tests {
         unsafe {
             (*schema).add_field(
                 "value".to_owned(),
-                FieldType::Long,
+                FieldType::I64,
                 Some(scene_counter_getter),
                 true,
                 Some(scene_counter_serializer),
@@ -955,7 +982,7 @@ mod tests {
         unsafe {
             (*schema).add_field(
                 "a".to_owned(),
-                FieldType::Long,
+                FieldType::I64,
                 Some(scene_pair_a_getter),
                 true,
                 None,
@@ -963,7 +990,7 @@ mod tests {
             );
             (*schema).add_field(
                 "b".to_owned(),
-                FieldType::Long,
+                FieldType::I64,
                 Some(scene_pair_b_getter),
                 false,
                 None,
@@ -989,7 +1016,7 @@ mod tests {
             for (id, getter) in fields {
                 (*schema).add_field(
                     id.to_owned(),
-                    FieldType::Long,
+                    FieldType::I64,
                     Some(getter),
                     false,
                     None,
@@ -1497,7 +1524,87 @@ mod tests {
             scene
                 .get_component_field_type(entity, "scene_counter", "value")
                 .unwrap(),
-            FieldType::Long
+            FieldType::I64
+        );
+    }
+
+    #[test]
+    fn scene_render_field_returns_rendered_value() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene
+                .render_field(entity, "scene_counter", "value")
+                .unwrap(),
+            "1"
+        );
+    }
+
+    #[test]
+    fn scene_parse_field_updates_mutable_value() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        scene
+            .parse_field(entity, "scene_counter", "value", "42")
+            .unwrap();
+
+        assert_eq!(get_scene_counter(&scene, entity), 42);
+    }
+
+    #[test]
+    fn scene_parse_field_rejects_invalid_value() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.parse_field(entity, "scene_counter", "value", "invalid"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldValueParsing
+            ))
+        );
+        assert_eq!(get_scene_counter(&scene, entity), 1);
+    }
+
+    #[test]
+    fn scene_parse_field_rejects_immutable_field() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.parse_field(entity, "scene_pair", "b", "42"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNotMutable
+            ))
+        );
+    }
+
+    #[test]
+    fn scene_render_field_renders_blob_pointer() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+
+        assert!(
+            scene
+                .render_field(entity, "scene_owner", "value")
+                .unwrap()
+                .starts_with("0x")
         );
     }
 

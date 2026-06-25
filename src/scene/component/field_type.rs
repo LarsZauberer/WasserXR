@@ -1,7 +1,19 @@
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
 pub enum FieldType {
-    Long,
-    Float,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    F32,
+    F64,
     Char,
     String,
 

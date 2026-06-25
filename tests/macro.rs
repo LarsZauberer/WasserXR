@@ -101,7 +101,7 @@ pub unsafe extern "C" fn wxr_schema_MacroManualSchemaComponent(schema: *mut Sche
     unsafe {
         (*schema).add_field(
             "value".to_owned(),
-            FieldType::Long,
+            FieldType::I32,
             Some(macro_manual_schema_value_getter),
             true,
             None,
@@ -452,6 +452,54 @@ fn component_macro_registers_virtual_fields() {
         .query::<(&f32,)>(entity, "MacroPosition", &["x"])
         .unwrap();
     assert_eq!(*x, 0.0);
+}
+
+#[test]
+fn component_macro_registers_exact_field_types() {
+    let mut scene = Scene::new();
+    let component_entity = scene.add_entity();
+    scene
+        .add_component(component_entity, "MacroComponent".to_owned())
+        .unwrap();
+    let hooks_entity = scene.add_entity();
+    scene
+        .add_component(hooks_entity, "MacroCustomHooksComponent".to_owned())
+        .unwrap();
+    let position_entity = scene.add_entity();
+    scene
+        .add_component(position_entity, "MacroPosition".to_owned())
+        .unwrap();
+
+    assert_eq!(
+        scene
+            .get_component_field_type(component_entity, "MacroComponent", "my_int")
+            .unwrap(),
+        FieldType::I32
+    );
+    assert_eq!(
+        scene
+            .get_component_field_type(component_entity, "MacroComponent", "my_string")
+            .unwrap(),
+        FieldType::String
+    );
+    assert_eq!(
+        scene
+            .get_component_field_type(hooks_entity, "MacroCustomHooksComponent", "value")
+            .unwrap(),
+        FieldType::Usize
+    );
+    assert_eq!(
+        scene
+            .get_component_field_type(position_entity, "MacroPosition", "x")
+            .unwrap(),
+        FieldType::F32
+    );
+    assert_eq!(
+        scene
+            .get_component_field_type(position_entity, "MacroPosition", "position")
+            .unwrap(),
+        FieldType::Blob
+    );
 }
 
 #[test]

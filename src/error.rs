@@ -20,6 +20,7 @@ pub enum ComponentError {
     NoCreator(PluginError),
     NoDestroyer(PluginError),
     FieldParsing,
+    FieldValueParsing,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

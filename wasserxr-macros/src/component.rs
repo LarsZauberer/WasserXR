@@ -574,9 +574,20 @@ fn component_field_type(ty: &Type) -> proc_macro2::TokenStream {
     };
 
     match segment.ident.to_string().as_str() {
-        "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64" | "u128"
-        | "usize" => quote! { ::wasserxr::scene::component::FieldType::Long },
-        "f32" | "f64" => quote! { ::wasserxr::scene::component::FieldType::Float },
+        "i8" => quote! { ::wasserxr::scene::component::FieldType::I8 },
+        "i16" => quote! { ::wasserxr::scene::component::FieldType::I16 },
+        "i32" => quote! { ::wasserxr::scene::component::FieldType::I32 },
+        "i64" => quote! { ::wasserxr::scene::component::FieldType::I64 },
+        "i128" => quote! { ::wasserxr::scene::component::FieldType::I128 },
+        "isize" => quote! { ::wasserxr::scene::component::FieldType::Isize },
+        "u8" => quote! { ::wasserxr::scene::component::FieldType::U8 },
+        "u16" => quote! { ::wasserxr::scene::component::FieldType::U16 },
+        "u32" => quote! { ::wasserxr::scene::component::FieldType::U32 },
+        "u64" => quote! { ::wasserxr::scene::component::FieldType::U64 },
+        "u128" => quote! { ::wasserxr::scene::component::FieldType::U128 },
+        "usize" => quote! { ::wasserxr::scene::component::FieldType::Usize },
+        "f32" => quote! { ::wasserxr::scene::component::FieldType::F32 },
+        "f64" => quote! { ::wasserxr::scene::component::FieldType::F64 },
         "char" => quote! { ::wasserxr::scene::component::FieldType::Char },
         "String" => quote! { ::wasserxr::scene::component::FieldType::String },
         _ => quote! { ::wasserxr::scene::component::FieldType::Blob },
