@@ -1,5 +1,6 @@
 pub mod component;
 pub(crate) mod entity;
+pub mod logging;
 pub(crate) mod plugin;
 pub mod query;
 pub(crate) mod serialization;
@@ -13,6 +14,7 @@ use query::{SceneQuery, SceneQueryMut};
 use system::System;
 
 use crate::error::{PluginError, SceneError};
+use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
 
@@ -33,7 +35,13 @@ pub struct Scene {
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
 
+    // Deferred Calls
     deferred_calls: Vec<DeferredCall>,
+
+    // Logging
+    log_manager: LogManager,
+
+    // Flags
     is_ticking: bool,
     should_exit: bool,
 }
@@ -47,7 +55,14 @@ impl Default for Scene {
             plugins,
             systems: HashMap::new(),
             components: HashMap::new(),
+
+            // Deferred Calls
             deferred_calls: Vec::new(),
+
+            // Logging
+            log_manager: LogManager::new("WasserXR".to_owned()),
+
+            // Flags
             is_ticking: false,
             should_exit: false,
         }
@@ -377,6 +392,16 @@ impl Scene {
             Some(system) => Ok(system.get_priority()),
             None => {
                 log::warn!("System `{}` was not found for priority lookup", system_id);
+                Err(SceneError::SystemNotFound)
+            }
+        }
+    }
+
+    pub fn get_system_plugin_id(&self, system_id: &str) -> Result<&str, SceneError> {
+        match self.systems.get(system_id) {
+            Some(system) => Ok(system.get_plugin_id()),
+            None => {
+                log::warn!("System `{}` was not found for plugin lookup", system_id);
                 Err(SceneError::SystemNotFound)
             }
         }
@@ -751,6 +776,31 @@ impl Scene {
         let mut fields = component.get_fields();
         fields.sort();
         Ok(fields)
+    }
+
+    pub fn get_entity_component_plugin_id(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+    ) -> Result<&str, SceneError> {
+        let Some(entity_components) = self.components.get(&entity_id) else {
+            log::warn!(
+                "Entity `{}` was not found for component plugin lookup",
+                entity_id
+            );
+            return Err(SceneError::EntityNotFound);
+        };
+
+        let Some(component) = entity_components.get(component_id) else {
+            log::warn!(
+                "Component `{}` was not found on entity `{}` for plugin lookup",
+                component_id,
+                entity_id
+            );
+            return Err(SceneError::ComponentNotFound);
+        };
+
+        Ok(component.get_plugin_id())
     }
 
     pub fn get_component_field_type(
@@ -1513,6 +1563,31 @@ mod tests {
     }
 
     #[test]
+    fn scene_get_entity_component_plugin_id() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.get_entity_component_plugin_id(entity, "scene_counter"),
+            Ok("")
+        );
+    }
+
+    #[test]
+    fn scene_get_entity_component_plugin_id_rejects_missing_component() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+
+        assert_eq!(
+            scene.get_entity_component_plugin_id(entity, "missing"),
+            Err(SceneError::ComponentNotFound)
+        );
+    }
+
+    #[test]
     fn scene_get_component_field_type() {
         let mut scene = Scene::new();
         let entity = scene.add_entity();
@@ -1638,6 +1713,26 @@ mod tests {
             .unwrap();
 
         assert_eq!(scene.get_system_priority("scene_cleanup_system"), Ok(7));
+    }
+
+    #[test]
+    fn scene_get_system_plugin_id() {
+        let mut scene = Scene::new();
+        scene
+            .add_system("scene_cleanup_system".to_owned(), 7)
+            .unwrap();
+
+        assert_eq!(scene.get_system_plugin_id("scene_cleanup_system"), Ok(""));
+    }
+
+    #[test]
+    fn scene_get_system_plugin_id_rejects_missing_system() {
+        let scene = Scene::new();
+
+        assert_eq!(
+            scene.get_system_plugin_id("missing"),
+            Err(SceneError::SystemNotFound)
+        );
     }
 
     #[test]

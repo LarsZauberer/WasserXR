@@ -14,6 +14,7 @@ log = "0.4.32"
 serde = { version = "1.0.228", features = ["derive"] }
 wasserxr-macros = { path = "wasserxr-macros" }
 uuid = { version = "1.23.2", features = ["serde", "v7"] }
+chrono = "0.4.45"
 
 [build-dependencies]
 cbindgen = "0.29"
