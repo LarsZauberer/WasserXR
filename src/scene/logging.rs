@@ -42,6 +42,22 @@ impl LogEntry {
             message,
         }
     }
+
+    pub fn get_level(&self) -> LogLevel {
+        self.level
+    }
+
+    pub fn get_message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn get_logger(&self) -> &str {
+        &self.logger
+    }
+
+    pub fn get_timestamp(&self) -> &DateTime<Local> {
+        &self.timestamp
+    }
 }
 
 impl Display for LogEntry {
