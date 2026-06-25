@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use chrono::{DateTime, Local};
 
@@ -57,30 +57,38 @@ impl Display for LogEntry {
 
 #[derive(Clone)]
 pub struct LogManager {
-    logs: RefCell<Ring<LogEntry>>,
-    current_logger: RefCell<String>,
+    inner: Rc<RefCell<LogState>>,
+}
+
+struct LogState {
+    logs: Ring<LogEntry>,
+    current_logger: String,
 }
 
 impl LogManager {
     pub fn new(logger: String) -> Self {
         Self {
-            logs: RefCell::new(Ring::new(300)),
-            current_logger: RefCell::new(logger),
+            inner: Rc::new(RefCell::new(LogState {
+                logs: Ring::new(300),
+                current_logger: logger,
+            })),
         }
     }
 
     pub fn set_logger(&self, name: String) {
-        *self.current_logger.borrow_mut() = name;
+        self.inner.borrow_mut().current_logger = name;
     }
 
     pub fn log(&self, level: LogLevel, message: String) {
-        let entry = LogEntry::new(level, self.current_logger.borrow().clone(), message);
-        self.logs.borrow_mut().push(entry);
+        let mut inner = self.inner.borrow_mut();
+        let entry = LogEntry::new(level, inner.current_logger.clone(), message);
+        inner.logs.push(entry);
     }
 
     pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
-        self.logs
+        self.inner
             .borrow()
+            .logs
             .iter()
             .cloned()
             .collect::<Vec<_>>()
@@ -103,6 +111,10 @@ impl Scene {
 
     pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
         self.log_manager.iter_logs()
+    }
+
+    pub(crate) fn log_manager(&self) -> LogManager {
+        self.log_manager.clone()
     }
 }
 

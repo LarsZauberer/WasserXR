@@ -69,7 +69,7 @@ impl Component {
         let data = unsafe { (creator)() };
         scene.reset_logger();
 
-        let mut schema = Schema::new();
+        let mut schema = Schema::with_logger(scene.log_manager());
         scene.set_logger(id.clone());
         unsafe {
             schema_creator(&mut schema as *mut Schema);
@@ -165,24 +165,16 @@ impl Component {
         self.schema.get_field_type(id)
     }
 
-    pub(crate) fn render_field(&self, id: &str, scene: &Scene) -> Result<String, ComponentError> {
-        unsafe { self.schema.render_field(id, self.data, scene, &self.id) }
+    pub(crate) fn render_field(&self, id: &str) -> Result<String, ComponentError> {
+        unsafe { self.schema.render_field(id, self.data, &self.id) }
     }
 
-    pub(crate) fn parse_field(
-        &self,
-        id: &str,
-        input: &str,
-        scene: &Scene,
-    ) -> Result<(), ComponentError> {
+    pub(crate) fn parse_field(&self, id: &str, input: &str) -> Result<(), ComponentError> {
         if !self.schema.is_mutable(id)? {
             return Err(ComponentError::FieldNotMutable);
         }
 
-        unsafe {
-            self.schema
-                .parse_field(id, self.data, input, scene, &self.id)
-        }
+        unsafe { self.schema.parse_field(id, self.data, input, &self.id) }
     }
 
     pub(crate) fn get_id(&self) -> &str {

@@ -961,7 +961,7 @@ impl Scene {
         let component = self.get_component(entity_id, component_id)?;
 
         component
-            .render_field(field_id, self)
+            .render_field(field_id)
             .map_err(SceneError::ComponentFieldError)
     }
 
@@ -975,7 +975,7 @@ impl Scene {
         let component = self.get_component(entity_id, component_id)?;
 
         component
-            .parse_field(field_id, input, self)
+            .parse_field(field_id, input)
             .map_err(SceneError::ComponentFieldError)
     }
 
