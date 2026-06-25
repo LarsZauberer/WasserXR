@@ -5,7 +5,10 @@ pub mod serialized_bytes;
 
 use std::ffi::c_void;
 
-use crate::{error::ComponentError, scene::plugin::Plugin};
+use crate::{
+    error::ComponentError,
+    scene::{Scene, plugin::Plugin},
+};
 
 pub use field::Getter;
 pub use field::{Deserializer, Serializer};
@@ -36,7 +39,7 @@ pub(crate) struct Component {
 }
 
 impl Component {
-    pub(crate) fn new(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
+    pub(crate) fn new(id: String, plugin: &Plugin, scene: &Scene) -> Result<Self, ComponentError> {
         let plugin_id = plugin.get_id().to_owned();
 
         let creator_symbol = "wxr_create_".to_owned() + &id;
@@ -46,29 +49,34 @@ impl Component {
         let creator: Creator = plugin
             .get_symbol::<Creator>(&creator_symbol)
             .map_err(|error| {
-                log::debug!("Component `{}` has no creator function", id);
+                crate::debug!(scene, "Component `{}` has no creator function", id);
                 ComponentError::NoCreator(error)
             })?;
 
         let destroyer: Destroyer = plugin.get_symbol(&destroyer_symbol).map_err(|error| {
-            log::debug!("Component `{}` has no destroyer function", id);
+            crate::debug!(scene, "Component `{}` has no destroyer function", id);
             ComponentError::NoDestroyer(error)
         })?;
 
         let schema_creator: SchemaCreator = plugin
             .get_symbol::<SchemaCreator>(&schema_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("Component `{}` has no schema function", id);
+                crate::debug!(scene, "Component `{}` has no schema function", id);
                 default_schema
             });
 
+        scene.set_logger(id.clone());
         let data = unsafe { (creator)() };
+        scene.reset_logger();
+
         let mut schema = Schema::new();
+        scene.set_logger(id.clone());
         unsafe {
             schema_creator(&mut schema as *mut Schema);
         }
+        scene.reset_logger();
 
-        log::info!("Component `{}` created", id);
+        crate::info!(scene, "Component `{}` created", id);
         Ok(Self {
             id,
             plugin_id,
@@ -80,27 +88,37 @@ impl Component {
         })
     }
 
-    pub(crate) unsafe fn get_field_ptr(&self, id: &str) -> Result<*mut c_void, ComponentError> {
+    pub(crate) unsafe fn get_field_ptr(
+        &self,
+        id: &str,
+        scene: &Scene,
+    ) -> Result<*mut c_void, ComponentError> {
         let getter = self.schema.get_getter(id)?;
 
-        Ok(unsafe { getter(self.data) })
+        scene.set_logger(self.id.clone());
+        let field_ptr = unsafe { getter(self.data) };
+        scene.reset_logger();
+
+        Ok(field_ptr)
     }
 
     pub(crate) fn is_field_mutable(&self, id: &str) -> Result<bool, ComponentError> {
         self.schema.is_mutable(id)
     }
 
-    pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
+    pub(crate) fn serialize(&self, entity_id: uuid::Uuid, scene: &Scene) -> ComponentData {
         let fields = self
             .schema
             .get_fields()
             .into_iter()
             .filter_map(|field_id| {
                 let serializer = self.schema.get_serializer(field_id).ok()?;
-                let value = unsafe { serializer(self.data as *const c_void).into_vec() };
+                scene.set_logger(self.id.clone());
+                let value = unsafe { serializer(self.data as *const c_void) };
+                scene.reset_logger();
                 Some(FieldData {
                     name: field_id.to_owned(),
-                    value,
+                    value: unsafe { value.into_vec() },
                 })
             })
             .collect();
@@ -112,19 +130,26 @@ impl Component {
         }
     }
 
-    pub(crate) fn deserialize(id: String, plugin: &Plugin) -> Result<Self, ComponentError> {
-        Self::new(id, plugin)
+    pub(crate) fn deserialize(
+        id: String,
+        plugin: &Plugin,
+        scene: &Scene,
+    ) -> Result<Self, ComponentError> {
+        Self::new(id, plugin, scene)
     }
 
-    pub(crate) fn deserialize_fields(&mut self, fields: Vec<FieldData>) {
+    pub(crate) fn deserialize_fields(&mut self, fields: Vec<FieldData>, scene: &Scene) {
         for field in fields {
             let Ok(deserializer) = self.schema.get_deserializer(&field.name) else {
                 continue;
             };
 
+            let value = SerializedBytes::from_vec(field.value);
+            scene.set_logger(self.id.clone());
             unsafe {
-                deserializer(self.data, SerializedBytes::from_vec(field.value));
+                deserializer(self.data, value);
             }
+            scene.reset_logger();
         }
     }
 
@@ -140,16 +165,24 @@ impl Component {
         self.schema.get_field_type(id)
     }
 
-    pub(crate) fn render_field(&self, id: &str) -> Result<String, ComponentError> {
-        unsafe { self.schema.render_field(id, self.data) }
+    pub(crate) fn render_field(&self, id: &str, scene: &Scene) -> Result<String, ComponentError> {
+        unsafe { self.schema.render_field(id, self.data, scene, &self.id) }
     }
 
-    pub(crate) fn parse_field(&self, id: &str, input: &str) -> Result<(), ComponentError> {
+    pub(crate) fn parse_field(
+        &self,
+        id: &str,
+        input: &str,
+        scene: &Scene,
+    ) -> Result<(), ComponentError> {
         if !self.schema.is_mutable(id)? {
             return Err(ComponentError::FieldNotMutable);
         }
 
-        unsafe { self.schema.parse_field(id, self.data, input) }
+        unsafe {
+            self.schema
+                .parse_field(id, self.data, input, scene, &self.id)
+        }
     }
 
     pub(crate) fn get_id(&self) -> &str {
@@ -166,7 +199,6 @@ impl Drop for Component {
         unsafe {
             (self.destroyer)(self.data);
         }
-        log::info!("Component `{}` destroyed", self.id);
     }
 }
 
@@ -268,8 +300,9 @@ mod tests {
 
     #[test]
     fn component_new_with_static_symbols() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(component.get_id(), "unit_counter");
         assert_eq!(component.get_plugin_id(), "");
@@ -277,70 +310,77 @@ mod tests {
 
     #[test]
     fn component_get_field_ptr_existing_field() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
-        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
 
         assert_eq!(unsafe { *(field as *const i64) }, 5);
     }
 
     #[test]
     fn component_get_field_ptr_allows_raw_mutation() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
-        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
         unsafe {
             *(field as *mut i64) = 11;
         }
 
-        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
         assert_eq!(unsafe { *(field as *const i64) }, 11);
     }
 
     #[test]
     fn component_reports_field_mutability() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
         assert!(component.is_field_mutable("value").unwrap());
     }
 
     #[test]
     fn component_serialize_round_trip() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("unit_counter".to_owned(), &plugin).unwrap();
-        let field = unsafe { component.get_field_ptr("value").unwrap() };
+        let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
+        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
         unsafe {
             *(field as *mut i64) = 12;
         }
 
-        let data = component.serialize(uuid::Uuid::now_v7());
-        let mut deserialized = Component::deserialize("unit_counter".to_owned(), &plugin).unwrap();
-        deserialized.deserialize_fields(data.fields);
+        let data = component.serialize(uuid::Uuid::now_v7(), &scene);
+        let mut deserialized =
+            Component::deserialize("unit_counter".to_owned(), &plugin, &scene).unwrap();
+        deserialized.deserialize_fields(data.fields, &scene);
 
-        let field = unsafe { deserialized.get_field_ptr("value").unwrap() };
+        let field = unsafe { deserialized.get_field_ptr("value", &scene).unwrap() };
         assert_eq!(unsafe { *(field as *const i64) }, 12);
     }
 
     #[test]
     fn component_get_field_ptr_missing_field() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let component = Component::new("schema_less_counter".to_owned(), &plugin).unwrap();
+        let component = Component::new("schema_less_counter".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(
-            unsafe { component.get_field_ptr("value") },
+            unsafe { component.get_field_ptr("value", &scene) },
             Err(ComponentError::FieldNotFound)
         );
     }
 
     #[test]
     fn component_new_without_creator() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
 
         assert!(matches!(
-            Component::new("missing_creator".to_owned(), &plugin),
+            Component::new("missing_creator".to_owned(), &plugin, &scene),
             Err(ComponentError::NoCreator(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_create_missing_creator"
         ));
@@ -348,10 +388,11 @@ mod tests {
 
     #[test]
     fn component_new_without_destroyer() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
 
         assert!(matches!(
-            Component::new("missing_destroyer".to_owned(), &plugin),
+            Component::new("missing_destroyer".to_owned(), &plugin, &scene),
             Err(ComponentError::NoDestroyer(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_destroy_missing_destroyer"
         ));
@@ -359,11 +400,12 @@ mod tests {
 
     #[test]
     fn component_drop_existing_component() {
+        let scene = Scene::new();
         DROP_COUNTER_DESTROYED.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
 
         {
-            let _component = Component::new("drop_counter".to_owned(), &plugin).unwrap();
+            let _component = Component::new("drop_counter".to_owned(), &plugin, &scene).unwrap();
         }
 
         assert_eq!(DROP_COUNTER_DESTROYED.load(Ordering::SeqCst), 1);

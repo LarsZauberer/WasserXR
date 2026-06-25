@@ -31,7 +31,12 @@ pub(crate) struct System {
 }
 
 impl System {
-    pub(crate) fn new(id: String, plugin: &Plugin, priority: usize) -> Result<Self, SystemError> {
+    pub(crate) fn new(
+        id: String,
+        plugin: &Plugin,
+        priority: usize,
+        scene: &Scene,
+    ) -> Result<Self, SystemError> {
         let plugin_id = plugin.get_id().to_owned();
 
         let runner_symbol = "wxr_system_".to_owned() + &id;
@@ -43,37 +48,37 @@ impl System {
         let runner: Runner = plugin
             .get_symbol::<Runner>(&runner_symbol)
             .map_err(|error| {
-                log::debug!("System `{}` has no runner function", id);
+                crate::debug!(scene, "System `{}` has no runner function", id);
                 SystemError::NoSystemFunction(error)
             })?;
 
         let groups: usize = if let Ok(ptr) = plugin.get_symbol::<*const usize>(&groups_symbol) {
             unsafe { ptr.read() }
         } else {
-            log::debug!("System `{}` has no group amount", id);
+            crate::debug!(scene, "System `{}` has no group amount", id);
             0
         };
 
         let selector: Selector = plugin
             .get_symbol::<Selector>(&selector_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("System `{}` has no selector function", id);
+                crate::debug!(scene, "System `{}` has no selector function", id);
                 default_selector
             });
         let attacher: Attacher = plugin
             .get_symbol::<Attacher>(&attacher_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("System `{}` has no attacher function", id);
+                crate::debug!(scene, "System `{}` has no attacher function", id);
                 noop_attacher_detacher
             });
         let detacher: Detacher = plugin
             .get_symbol::<Detacher>(&detacher_symbol)
             .unwrap_or_else(|_| {
-                log::debug!("System `{}` has no detacher function", id);
+                crate::debug!(scene, "System `{}` has no detacher function", id);
                 noop_attacher_detacher
             });
 
-        log::info!("System `{}` created", id);
+        crate::info!(scene, "System `{}` created", id);
         Ok(Self {
             id,
             plugin_id,
@@ -93,8 +98,12 @@ impl System {
         }
     }
 
-    pub(crate) fn deserialize(data: SystemData, plugin: &Plugin) -> Result<Self, SystemError> {
-        Self::new(data.id, plugin, data.priority)
+    pub(crate) fn deserialize(
+        data: SystemData,
+        plugin: &Plugin,
+        scene: &Scene,
+    ) -> Result<Self, SystemError> {
+        Self::new(data.id, plugin, data.priority, scene)
     }
 
     pub(crate) fn get_plugin_id(&self) -> &str {
@@ -178,8 +187,9 @@ mod tests {
 
     #[test]
     fn system_new_with_all_symbols() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let system = System::new("system_with_groups".to_owned(), &plugin, 7).unwrap();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 7, &scene).unwrap();
 
         assert_eq!(system.get_id(), "system_with_groups");
         assert_eq!(system.get_plugin_id(), "");
@@ -201,8 +211,9 @@ mod tests {
 
     #[test]
     fn system_new_without_optional_symbols() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let system = System::new("system_with_defaults".to_owned(), &plugin, 1).unwrap();
+        let system = System::new("system_with_defaults".to_owned(), &plugin, 1, &scene).unwrap();
 
         assert_eq!(system.get_groups(), 0);
         assert_eq!(
@@ -213,10 +224,11 @@ mod tests {
 
     #[test]
     fn system_new_without_runner() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
 
         assert!(matches!(
-            System::new("missing_runner".to_owned(), &plugin, 1),
+            System::new("missing_runner".to_owned(), &plugin, 1, &scene),
             Err(SystemError::NoSystemFunction(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_system_missing_runner"
         ));
@@ -224,10 +236,11 @@ mod tests {
 
     #[test]
     fn system_serialize_round_trip() {
+        let scene = Scene::new();
         let plugin = Plugin::new_static();
-        let system = System::new("system_with_defaults".to_owned(), &plugin, 7).unwrap();
+        let system = System::new("system_with_defaults".to_owned(), &plugin, 7, &scene).unwrap();
 
-        let deserialized = System::deserialize(system.serialize(), &plugin).unwrap();
+        let deserialized = System::deserialize(system.serialize(), &plugin, &scene).unwrap();
 
         assert_eq!(deserialized.get_id(), "system_with_defaults");
         assert_eq!(deserialized.get_priority(), 7);
@@ -235,9 +248,10 @@ mod tests {
 
     #[test]
     fn system_get_attacher_when_called() {
+        let scene = Scene::new();
         SYSTEM_ATTACH_COUNT.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
-        let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 1, &scene).unwrap();
 
         unsafe {
             (system.get_attacher())(std::ptr::null_mut());
@@ -248,9 +262,10 @@ mod tests {
 
     #[test]
     fn system_get_detacher_when_called() {
+        let scene = Scene::new();
         SYSTEM_DETACH_COUNT.store(0, Ordering::SeqCst);
         let plugin = Plugin::new_static();
-        let system = System::new("system_with_groups".to_owned(), &plugin, 1).unwrap();
+        let system = System::new("system_with_groups".to_owned(), &plugin, 1, &scene).unwrap();
 
         unsafe {
             (system.get_detacher())(std::ptr::null_mut());

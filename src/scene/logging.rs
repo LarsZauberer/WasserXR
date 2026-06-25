@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{cell::RefCell, fmt::Display};
 
 use chrono::{DateTime, Local};
 
@@ -57,46 +57,51 @@ impl Display for LogEntry {
 
 #[derive(Clone)]
 pub struct LogManager {
-    logs: Ring<LogEntry>,
-    current_logger: String,
+    logs: RefCell<Ring<LogEntry>>,
+    current_logger: RefCell<String>,
 }
 
 impl LogManager {
     pub fn new(logger: String) -> Self {
         Self {
-            logs: Ring::new(300),
-            current_logger: logger,
+            logs: RefCell::new(Ring::new(300)),
+            current_logger: RefCell::new(logger),
         }
     }
 
-    pub fn set_logger(&mut self, name: String) {
-        self.current_logger = name;
+    pub fn set_logger(&self, name: String) {
+        *self.current_logger.borrow_mut() = name;
     }
 
-    pub fn log(&mut self, level: LogLevel, message: String) {
-        let entry = LogEntry::new(level, self.current_logger.clone(), message);
-        self.logs.push(entry);
+    pub fn log(&self, level: LogLevel, message: String) {
+        let entry = LogEntry::new(level, self.current_logger.borrow().clone(), message);
+        self.logs.borrow_mut().push(entry);
     }
 
-    pub fn iter_logs(&self) -> std::collections::vec_deque::Iter<'_, LogEntry> {
-        self.logs.iter()
+    pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
+        self.logs
+            .borrow()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
 
 impl Scene {
-    pub fn set_logger(&mut self, logger: String) {
+    pub fn set_logger(&self, logger: String) {
         self.log_manager.set_logger(logger);
     }
 
-    pub fn reset_logger(&mut self) {
+    pub fn reset_logger(&self) {
         self.log_manager.set_logger("WasserXR".to_owned());
     }
 
-    pub fn log(&mut self, level: LogLevel, message: String) {
+    pub fn log(&self, level: LogLevel, message: String) {
         self.log_manager.log(level, message);
     }
 
-    pub fn iter_logs(&self) -> std::collections::vec_deque::Iter<'_, LogEntry> {
+    pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
         self.log_manager.iter_logs()
     }
 }

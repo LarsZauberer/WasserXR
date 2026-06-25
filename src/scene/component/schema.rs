@@ -2,9 +2,12 @@ use std::{collections::HashMap, ffi::c_void};
 
 use crate::{
     error::ComponentError,
-    scene::component::{
-        field::{Deserializer, Field, Getter, Serializer},
-        field_type::FieldType,
+    scene::{
+        Scene,
+        component::{
+            field::{Deserializer, Field, Getter, Serializer},
+            field_type::FieldType,
+        },
     },
 };
 
@@ -28,57 +31,41 @@ impl Schema {
         deserializer: Option<Deserializer>,
     ) {
         let field = Field::new(type_hint, getter, mutable, serializer, deserializer);
-        log::debug!("Schema field `{}` added", id);
         self.fields.insert(id, field);
     }
 
     pub(crate) fn get_getter(&self, id: &str) -> Result<Getter, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_getter(),
-            None => {
-                log::debug!("Schema field `{}` was not found for read", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
     pub(crate) fn is_mutable(&self, id: &str) -> Result<bool, ComponentError> {
         match self.fields.get(id) {
             Some(field) => Ok(field.is_mutable()),
-            None => {
-                log::debug!("Schema field `{}` was not found for mutability lookup", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
     pub(crate) fn get_serializer(&self, id: &str) -> Result<Serializer, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_serializer(),
-            None => {
-                log::debug!("Schema field `{}` was not found for serialization", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
     pub(crate) fn get_deserializer(&self, id: &str) -> Result<Deserializer, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_deserializer(),
-            None => {
-                log::debug!("Schema field `{}` was not found for deserialization", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
     pub(crate) fn get_field_type(&self, id: &str) -> Result<FieldType, ComponentError> {
         match self.fields.get(id) {
             Some(field) => Ok(field.get_type()),
-            None => {
-                log::debug!("Schema field `{}` was not found for type lookup", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
@@ -86,17 +73,18 @@ impl Schema {
         &self,
         id: &str,
         data: *mut c_void,
+        scene: &Scene,
+        logger: &str,
     ) -> Result<String, ComponentError> {
         match self.fields.get(id) {
             Some(field) => {
                 let getter = field.get_getter()?;
+                scene.set_logger(logger.to_owned());
                 let field_ptr = unsafe { getter(data) };
+                scene.reset_logger();
                 unsafe { field.render(field_ptr) }
             }
-            None => {
-                log::debug!("Schema field `{}` was not found for render", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 
@@ -105,17 +93,18 @@ impl Schema {
         id: &str,
         data: *mut c_void,
         input: &str,
+        scene: &Scene,
+        logger: &str,
     ) -> Result<(), ComponentError> {
         match self.fields.get(id) {
             Some(field) => {
                 let getter = field.get_getter()?;
+                scene.set_logger(logger.to_owned());
                 let field_ptr = unsafe { getter(data) };
+                scene.reset_logger();
                 unsafe { field.parse(field_ptr, input) }
             }
-            None => {
-                log::debug!("Schema field `{}` was not found for parse", id);
-                Err(ComponentError::FieldNotFound)
-            }
+            None => Err(ComponentError::FieldNotFound),
         }
     }
 

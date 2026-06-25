@@ -25,11 +25,9 @@ impl Plugin {
                     CStr::from_ptr(error).to_string_lossy().into_owned()
                 }
             };
-            log::error!("Plugin `{}` could not be loaded: {}", path, error);
             return Err(PluginError::LinkingError(error));
         }
 
-        log::info!("Plugin `{}` opened", path);
         Ok(Self {
             path: Some(path),
             fd,
@@ -37,7 +35,6 @@ impl Plugin {
     }
 
     pub(crate) fn new_static() -> Self {
-        log::info!("Static plugin initialized");
         Self {
             path: None,
             fd: libc::RTLD_DEFAULT,
@@ -56,18 +53,15 @@ impl Plugin {
         assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
 
         let Ok(symbol_cstring) = CString::new(symbol.to_owned()) else {
-            log::error!("Symbol name contains a null byte");
             return Err(PluginError::InvalidSymbol);
         };
 
         // Safety: Will return either null or will return the function pointer
         let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
         if ptr.is_null() {
-            log::debug!("Symbol `{}` was not found", symbol);
             return Err(PluginError::MissingSymbol(symbol.to_owned()));
         }
         let func: T = unsafe { std::mem::transmute_copy(&ptr) };
-        log::debug!("Symbol `{}` resolved", symbol);
         Ok(func)
     }
 
@@ -79,35 +73,25 @@ impl Plugin {
     }
 
     fn create_c_string(data: String) -> Result<CString, PluginError> {
-        CString::new(data).map_err(|_| {
-            log::error!("Plugin path contains a null byte");
-            PluginError::InvalidSymbol
-        })
+        CString::new(data).map_err(|_| PluginError::InvalidSymbol)
     }
-}
 
-impl Drop for Plugin {
-    fn drop(&mut self) {
+    pub(crate) fn close(&mut self) -> Result<bool, PluginError> {
         if self.fd.is_null() {
-            return;
+            return Ok(true);
         }
 
-        let Some(path) = &self.path else {
-            return;
+        let Some(path) = self.path.clone() else {
+            return Ok(true);
         };
 
         unsafe {
             libc::dlclose(self.fd);
         }
+        self.fd = std::ptr::null_mut();
 
         // Check if it is really unloaded (dlclose doesn't necessarily unload the library)
-        let Ok(path_cstring) = Self::create_c_string(path.clone()) else {
-            log::warn!(
-                "Failed to check if the plugin `{}` is truely unloaded",
-                path
-            );
-            return;
-        };
+        let path_cstring = Self::create_c_string(path)?;
         unsafe {
             let still_loaded: *mut c_void =
                 libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW | libc::RTLD_NOLOAD);
@@ -116,14 +100,17 @@ impl Drop for Plugin {
                 // Failed to unload
                 // Still has to close the new handle
                 libc::dlclose(still_loaded);
-                log::warn!(
-                    "Plugin `{}` failed to be unloaded. It is still in kernel memory. You cannot load old systems, components should have been removed and new systems and components will not be loaded from this plugin. Still threads spawned by the plugin could still be running. Furthermore, when you load the plugin again, it will not load a new version. Make sure that at the end of a plugin lifetime no threads are running anymore.",
-                    path
-                );
+                Ok(false)
             } else {
-                log::info!("Plugin `{}` closed", path);
+                Ok(true)
             }
         }
+    }
+}
+
+impl Drop for Plugin {
+    fn drop(&mut self) {
+        let _ = self.close();
     }
 }
 

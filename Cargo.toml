@@ -10,7 +10,6 @@ resolver = "3"
 [dependencies]
 bincode = { version = "2.0.1", features = ["serde"] }
 libc = "0.2.186"
-log = "0.4.32"
 serde = { version = "1.0.228", features = ["derive"] }
 wasserxr-macros = { path = "wasserxr-macros" }
 uuid = { version = "1.23.2", features = ["serde", "v7"] }

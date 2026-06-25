@@ -42,10 +42,7 @@ impl Field {
     pub fn get_getter(&self) -> Result<Getter, ComponentError> {
         match self.getter {
             Some(getter) => Ok(getter),
-            None => {
-                log::debug!("Schema field has no getter function");
-                Err(ComponentError::FieldNoGetter)
-            }
+            None => Err(ComponentError::FieldNoGetter),
         }
     }
 
@@ -56,20 +53,14 @@ impl Field {
     pub fn get_serializer(&self) -> Result<Serializer, ComponentError> {
         match self.serializer {
             Some(serializer) => Ok(serializer),
-            None => {
-                log::debug!("Schema field has no serializer function");
-                Err(ComponentError::FieldNoSerializer)
-            }
+            None => Err(ComponentError::FieldNoSerializer),
         }
     }
 
     pub fn get_deserializer(&self) -> Result<Deserializer, ComponentError> {
         match self.deserializer {
             Some(deserializer) => Ok(deserializer),
-            None => {
-                log::debug!("Schema field has no deserializer function");
-                Err(ComponentError::FieldNoDeserializer)
-            }
+            None => Err(ComponentError::FieldNoDeserializer),
         }
     }
 

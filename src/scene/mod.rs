@@ -8,7 +8,6 @@ pub(crate) mod system;
 
 use component::{Component, FieldType};
 use entity::Entity;
-use log::{error, warn};
 use plugin::Plugin;
 use query::{SceneQuery, SceneQueryMut};
 use system::System;
@@ -69,6 +68,20 @@ impl Default for Scene {
     }
 }
 
+impl Drop for Scene {
+    fn drop(&mut self) {
+        let components = std::mem::take(&mut self.components);
+
+        for entity_components in components.into_values() {
+            for (component_id, component) in entity_components {
+                self.set_logger(component_id);
+                drop(component);
+                self.reset_logger();
+            }
+        }
+    }
+}
+
 impl Scene {
     pub fn new() -> Self {
         Self::default()
@@ -88,7 +101,7 @@ impl Scene {
         }
 
         // Plugins will stay as they are
-        log::info!("Scene reset");
+        crate::info!(self, "Scene reset");
         Ok(())
     }
 
@@ -103,7 +116,7 @@ impl Scene {
             .flat_map(|(entity_id, components)| {
                 components
                     .values()
-                    .map(|component| component.serialize(*entity_id))
+                    .map(|component| component.serialize(*entity_id, self))
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -125,7 +138,11 @@ impl Scene {
         for entity_data in scene_data.entities {
             let entity_id = entity_data.id;
             if self.entities.contains_key(&entity_id) {
-                log::warn!("Entity `{}` is duplicated in serialized scene", entity_id);
+                crate::warn!(
+                    self,
+                    "Entity `{}` is duplicated in serialized scene",
+                    entity_id
+                );
                 continue;
             }
 
@@ -137,7 +154,8 @@ impl Scene {
         for system_data in scene_data.systems {
             let system_id = system_data.id.clone();
             if let Err(error) = self.add_system_from_data(system_data) {
-                log::warn!(
+                crate::warn!(
+                    self,
                     "System `{}` could not be deserialized: {:?}",
                     system_id,
                     error
@@ -150,7 +168,8 @@ impl Scene {
             let entity_id = component_data.entity_id;
 
             if let Err(error) = self.add_component_from_data(component_data) {
-                log::warn!(
+                crate::warn!(
+                    self,
                     "Component `{}` on entity `{}` could not be deserialized: {:?}",
                     component_id,
                     entity_id,
@@ -196,14 +215,30 @@ impl Scene {
 
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
-            log::warn!("Plugin `{}` is already loaded", path);
+            crate::warn!(self, "Plugin `{}` is already loaded", path);
             return Err(SceneError::PluginAlreadyLoaded);
         }
 
-        let plugin = Plugin::new(path.to_owned()).map_err(SceneError::PluginLoading)?;
+        let plugin = match Plugin::new(path.to_owned()) {
+            Ok(plugin) => plugin,
+            Err(error) => {
+                match &error {
+                    PluginError::LinkingError(message) => {
+                        crate::error!(self, "Plugin `{}` could not be loaded: {}", path, message);
+                    }
+                    PluginError::InvalidSymbol => {
+                        crate::error!(self, "Plugin path contains a null byte");
+                    }
+                    PluginError::MissingSymbol(symbol) => {
+                        crate::error!(self, "Plugin `{}` missed symbol `{}`", path, symbol);
+                    }
+                }
+                return Err(SceneError::PluginLoading(error));
+            }
+        };
         self.plugins.insert(path.to_owned(), plugin);
 
-        log::info!("Plugin `{}` loaded", path);
+        crate::info!(self, "Plugin `{}` loaded", path);
         Ok(())
     }
 
@@ -215,12 +250,12 @@ impl Scene {
         }
 
         if path.is_empty() {
-            log::warn!("Static plugin cannot be unloaded");
+            crate::warn!(self, "Static plugin cannot be unloaded");
             return Err(SceneError::StaticPluginUnload);
         }
 
         if !self.plugins.contains_key(path) {
-            log::warn!("Plugin `{}` is not loaded", path);
+            crate::warn!(self, "Plugin `{}` is not loaded", path);
             return Err(SceneError::PluginNotFound);
         }
 
@@ -254,9 +289,35 @@ impl Scene {
         }
 
         // Remove the plugin itself
-        self.plugins.remove(path);
+        if let Some(mut plugin) = self.plugins.remove(path) {
+            match plugin.close() {
+                Ok(true) => {}
+                Ok(false) => {
+                    crate::warn!(
+                        self,
+                        "Plugin `{}` failed to be unloaded. It is still in kernel memory. You cannot load old systems, components should have been removed and new systems and components will not be loaded from this plugin. Still threads spawned by the plugin could still be running. Furthermore, when you load the plugin again, it will not load a new version. Make sure that at the end of a plugin lifetime no threads are running anymore.",
+                        path
+                    );
+                }
+                Err(PluginError::InvalidSymbol) => {
+                    crate::warn!(
+                        self,
+                        "Failed to check if the plugin `{}` is truely unloaded",
+                        path
+                    );
+                }
+                Err(error) => {
+                    crate::warn!(
+                        self,
+                        "Failed to check if the plugin `{}` is truely unloaded: {:?}",
+                        path,
+                        error
+                    );
+                }
+            }
+        }
 
-        log::info!("Plugin `{}` unloaded", path);
+        crate::info!(self, "Plugin `{}` unloaded", path);
         Ok(())
     }
 
@@ -265,7 +326,7 @@ impl Scene {
         let uuid = entity.get_id();
         self.entities.insert(uuid, entity);
         self.components.insert(uuid, HashMap::new());
-        log::info!("Entity `{}` added", uuid);
+        crate::info!(self, "Entity `{}` added", uuid);
         uuid
     }
 
@@ -277,23 +338,32 @@ impl Scene {
 
     pub fn remove_entity(&mut self, id: Uuid) -> Result<(), SceneError> {
         let Some(_) = self.entities.remove(&id) else {
-            log::warn!("Entity `{}` was not found for removal", id);
+            crate::warn!(self, "Entity `{}` was not found for removal", id);
             return Err(SceneError::EntityNotFound);
         };
 
         let Some(components) = self.components.remove(&id) else {
-            log::error!(
+            crate::error!(
+                self,
                 "Entity `{}` had no components carrier associated. This is a bug. Please report it",
                 id
             );
             return Ok(());
         };
 
-        for component_id in components.keys() {
-            log::info!("Component `{}` removed from entity `{}`", component_id, id);
+        for (component_id, component) in components {
+            self.set_logger(component_id.clone());
+            drop(component);
+            self.reset_logger();
+            crate::info!(
+                self,
+                "Component `{}` removed from entity `{}`",
+                component_id,
+                id
+            );
         }
 
-        log::info!("Entity `{}` removed", id);
+        crate::info!(self, "Entity `{}` removed", id);
         Ok(())
     }
 
@@ -301,20 +371,22 @@ impl Scene {
         match self.entities.get(&id) {
             Some(entity) => Ok(entity),
             None => {
-                log::warn!("Entity `{}` was not found", id);
+                crate::warn!(self, "Entity `{}` was not found", id);
                 Err(SceneError::EntityNotFound)
             }
         }
     }
 
     fn get_entity_mut(&mut self, id: Uuid) -> Result<&mut Entity, SceneError> {
-        match self.entities.get_mut(&id) {
-            Some(entity) => Ok(entity),
-            None => {
-                log::warn!("Entity `{}` was not found", id);
-                Err(SceneError::EntityNotFound)
-            }
+        if !self.entities.contains_key(&id) {
+            crate::warn!(self, "Entity `{}` was not found", id);
+            return Err(SceneError::EntityNotFound);
         }
+
+        Ok(self
+            .entities
+            .get_mut(&id)
+            .expect("entity was checked before mutable lookup"))
     }
 
     pub fn get_entity_name(&self, id: Uuid) -> Result<&str, SceneError> {
@@ -325,7 +397,7 @@ impl Scene {
     pub fn set_entity_name(&mut self, id: Uuid, name: String) -> Result<(), SceneError> {
         let entity = self.get_entity_mut(id)?;
         entity.set_name(name);
-        log::info!("Entity `{}` renamed", id);
+        crate::info!(self, "Entity `{}` renamed", id);
         Ok(())
     }
 
@@ -336,26 +408,29 @@ impl Scene {
     fn add_system_from_data(&mut self, data: SystemData) -> Result<(), SceneError> {
         let id = data.id.clone();
         if self.systems.contains_key(&id) {
-            log::warn!("System `{}` already exists", id);
+            crate::warn!(self, "System `{}` already exists", id);
             return Err(SceneError::SystemAlreadyExists);
         }
 
         let system: Option<System> = self
             .plugins_dynamic_first()
-            .find_map(|plugin| System::deserialize(data.clone(), plugin).ok());
+            .find_map(|plugin| System::deserialize(data.clone(), plugin, self).ok());
 
         match system {
             Some(system) => {
+                let system_id = system.get_id().to_owned();
                 let attacher = system.get_attacher();
+                self.set_logger(system_id.clone());
                 unsafe {
                     attacher(self as *mut Scene);
                 }
-                log::info!("System `{}` added", system.get_id());
+                self.reset_logger();
+                crate::info!(self, "System `{}` added", system_id);
                 self.systems.insert(id, system);
                 Ok(())
             }
             None => {
-                log::warn!("System `{}` could not be created", id);
+                crate::warn!(self, "System `{}` could not be created", id);
                 Err(SceneError::SystemCreation)
             }
         }
@@ -369,15 +444,17 @@ impl Scene {
         }
 
         let Some(system) = self.systems.remove(id) else {
-            log::warn!("System `{}` was not found for removal", id);
+            crate::warn!(self, "System `{}` was not found for removal", id);
             return Err(SceneError::SystemNotFound);
         };
 
         let detacher = system.get_detacher();
+        self.set_logger(id.to_owned());
         unsafe {
             detacher(self as *mut Scene);
         }
-        log::info!("System `{}` removed", id);
+        self.reset_logger();
+        crate::info!(self, "System `{}` removed", id);
         Ok(())
     }
 
@@ -391,7 +468,11 @@ impl Scene {
         match self.systems.get(system_id) {
             Some(system) => Ok(system.get_priority()),
             None => {
-                log::warn!("System `{}` was not found for priority lookup", system_id);
+                crate::warn!(
+                    self,
+                    "System `{}` was not found for priority lookup",
+                    system_id
+                );
                 Err(SceneError::SystemNotFound)
             }
         }
@@ -401,7 +482,11 @@ impl Scene {
         match self.systems.get(system_id) {
             Some(system) => Ok(system.get_plugin_id()),
             None => {
-                log::warn!("System `{}` was not found for plugin lookup", system_id);
+                crate::warn!(
+                    self,
+                    "System `{}` was not found for plugin lookup",
+                    system_id
+                );
                 Err(SceneError::SystemNotFound)
             }
         }
@@ -425,7 +510,8 @@ impl Scene {
 
         // Check if entity exists
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::debug!(
+            crate::debug!(
+                self,
                 "Entity `{}` was not found for component addition",
                 entity_id
             );
@@ -434,7 +520,8 @@ impl Scene {
 
         // Check if this component already exists
         if entity_components.contains_key(&component_id) {
-            log::debug!(
+            crate::debug!(
+                self,
                 "Component `{}` already exists on entity `{}`",
                 component_id,
                 entity_id
@@ -443,13 +530,15 @@ impl Scene {
         }
 
         // Build the plugin
-        let Some(component) = self
+        let Some(mut component) = self
             .plugins_dynamic_first()
-            .find_map(|plugin| Component::deserialize(component_id.clone(), plugin).ok())
+            .find_map(|plugin| Component::deserialize(component_id.clone(), plugin, self).ok())
         else {
-            log::warn!("Component `{}` could not be created", component_id);
+            crate::warn!(self, "Component `{}` could not be created", component_id);
             return Err(SceneError::ComponentCreation);
         };
+
+        component.deserialize_fields(data.fields, self);
 
         let entity_components = self
             .components
@@ -458,11 +547,8 @@ impl Scene {
         let component_id_for_log = component_id.clone();
         entity_components.insert(component_id, component);
 
-        if let Some(component) = entity_components.get_mut(&component_id_for_log) {
-            component.deserialize_fields(data.fields);
-        }
-
-        log::info!(
+        crate::info!(
+            self,
             "Component `{}` added to entity `{}`",
             component_id_for_log,
             entity_id
@@ -477,13 +563,18 @@ impl Scene {
     ) -> Result<(), SceneError> {
         // Check if entity exists
         let Some(entity_components) = self.components.get_mut(&entity_id) else {
-            log::warn!("Entity `{}` was not found for component removal", entity_id);
+            crate::warn!(
+                self,
+                "Entity `{}` was not found for component removal",
+                entity_id
+            );
             return Err(SceneError::EntityNotFound);
         };
 
         // Check if this component already exists
-        let Some(_) = entity_components.remove(component_id) else {
-            log::warn!(
+        let Some(component) = entity_components.remove(component_id) else {
+            crate::warn!(
+                self,
                 "Component `{}` was not found on entity `{}` for removal",
                 component_id,
                 entity_id
@@ -491,7 +582,12 @@ impl Scene {
             return Err(SceneError::ComponentAlreadyExists);
         };
 
-        log::info!(
+        self.set_logger(component_id.to_owned());
+        drop(component);
+        self.reset_logger();
+
+        crate::info!(
+            self,
             "Component `{}` removed from entity `{}`",
             component_id,
             entity_id
@@ -501,7 +597,8 @@ impl Scene {
 
     pub fn get_entity_components(&self, entity_id: Uuid) -> Result<Vec<String>, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Entity `{}` was not found for component list lookup",
                 entity_id
             );
@@ -535,17 +632,17 @@ impl Scene {
             .collect();
         let serialization_data = self.serialize().inspect_err(|err| match err {
             SceneError::Serialization(msg) => {
-                error!("Scene serialization failed: {}", msg);
+                crate::error!(self, "Scene serialization failed: {}", msg);
             }
             _ => {
-                error!("Failed to serialize the scene: {:?}", err);
+                crate::error!(self, "Failed to serialize the scene: {:?}", err);
             }
         })?;
 
         // Remove the plugins
         for plugin in &plugins {
             if self.unload_plugin(plugin).is_err() {
-                error!("Failed to unload the plugin: {}", plugin);
+                crate::error!(self, "Failed to unload the plugin: {}", plugin);
             }
         }
 
@@ -553,12 +650,17 @@ impl Scene {
         for plugin in plugins {
             match self.load_plugin(plugin) {
                 Err(SceneError::PluginLoading(PluginError::InvalidSymbol)) => {
-                    error!(
+                    crate::error!(
+                        self,
                         "Symbol has a null byte during the plugin reloading! This is a bug! Please report this!"
                     );
                 }
                 Err(SceneError::PluginLoading(PluginError::LinkingError(err))) => {
-                    error!("Plugin has a linking error while hotreloading: {}", err);
+                    crate::error!(
+                        self,
+                        "Plugin has a linking error while hotreloading: {}",
+                        err
+                    );
                 }
                 _ => {}
             }
@@ -568,21 +670,23 @@ impl Scene {
         self.deserialize(&serialization_data)
             .inspect_err(|err| match err {
                 SceneError::Deserialization(msg) => {
-                    error!("Scene deserialization failed: {}", msg);
+                    crate::error!(self, "Scene deserialization failed: {}", msg);
                 }
                 _ => {
-                    error!("Failed to deserialize the scene: {:?}", err);
+                    crate::error!(self, "Failed to deserialize the scene: {:?}", err);
                 }
             })?;
 
         Ok(())
     }
 
-    fn run_system(&mut self, groups: usize, selector: Selector, runner: Runner) {
+    fn run_system(&mut self, system_id: &str, groups: usize, selector: Selector, runner: Runner) {
         let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
 
         for i in self.entities.keys() {
+            self.set_logger(system_id.to_owned());
             let selection = unsafe { selector(self as *const Scene, i.as_bytes() as *const u8) };
+            self.reset_logger();
             if selection >= 0
                 && let Some(group) = entities.get_mut(selection as usize)
             {
@@ -596,9 +700,11 @@ impl Scene {
         let entities: Vec<*const *const u8> = entities.iter().map(|group| group.as_ptr()).collect();
         let entities_ptr = entities.as_ptr();
 
+        self.set_logger(system_id.to_owned());
         unsafe {
             runner(self as *mut Scene, entities_ptr, sizes_ptr);
         }
+        self.reset_logger();
     }
 
     fn run_deferred_calls(&mut self) {
@@ -608,17 +714,20 @@ impl Scene {
             match deferred_call {
                 DeferredCall::Reload => {
                     if self.reload().is_err() {
-                        warn!("Reload Failed! The scene has maybe been partially been reloaded.");
+                        crate::warn!(
+                            self,
+                            "Reload Failed! The scene has maybe been partially been reloaded."
+                        );
                     }
                 }
                 DeferredCall::UnloadPlugin(plugin_id) => {
                     if self.unload_plugin(&plugin_id).is_err() {
-                        warn!("Deferred unload of plugin `{}` failed", plugin_id);
+                        crate::warn!(self, "Deferred unload of plugin `{}` failed", plugin_id);
                     }
                 }
                 DeferredCall::RemoveSystem(system_id) => {
                     if self.remove_system(&system_id).is_err() {
-                        warn!("Deferred removal of system `{}` failed", system_id);
+                        crate::warn!(self, "Deferred removal of system `{}` failed", system_id);
                     }
                 }
             }
@@ -645,7 +754,7 @@ impl Scene {
             let runner = system.get_runner();
 
             self.is_ticking = true;
-            self.run_system(groups, selector, runner);
+            self.run_system(&system_id, groups, selector, runner);
             self.is_ticking = false;
 
             self.run_deferred_calls();
@@ -658,12 +767,17 @@ impl Scene {
 
     fn get_component(&self, entity_id: Uuid, component_id: &str) -> Result<&Component, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!("Entity `{}` was not found for component lookup", entity_id);
+            crate::warn!(
+                self,
+                "Entity `{}` was not found for component lookup",
+                entity_id
+            );
             return Err(SceneError::EntityNotFound);
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Component `{}` was not found on entity `{}`",
                 component_id,
                 entity_id
@@ -684,7 +798,8 @@ impl Scene {
         fields
             .iter()
             .map(|field| {
-                unsafe { component.get_field_ptr(field) }.map_err(SceneError::ComponentFieldError)
+                unsafe { component.get_field_ptr(field, self) }
+                    .map_err(SceneError::ComponentFieldError)
             })
             .collect()
     }
@@ -757,7 +872,8 @@ impl Scene {
         component_id: &str,
     ) -> Result<Vec<String>, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Entity `{}` was not found for component field list lookup",
                 entity_id
             );
@@ -765,7 +881,8 @@ impl Scene {
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Component `{}` was not found on entity `{}` for field list lookup",
                 component_id,
                 entity_id
@@ -784,7 +901,8 @@ impl Scene {
         component_id: &str,
     ) -> Result<&str, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Entity `{}` was not found for component plugin lookup",
                 entity_id
             );
@@ -792,7 +910,8 @@ impl Scene {
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Component `{}` was not found on entity `{}` for plugin lookup",
                 component_id,
                 entity_id
@@ -810,7 +929,8 @@ impl Scene {
         field_id: &str,
     ) -> Result<FieldType, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Entity `{}` was not found for component field type lookup",
                 entity_id
             );
@@ -818,7 +938,8 @@ impl Scene {
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            log::warn!(
+            crate::warn!(
+                self,
                 "Component `{}` was not found on entity `{}` for field type lookup",
                 component_id,
                 entity_id
@@ -840,7 +961,7 @@ impl Scene {
         let component = self.get_component(entity_id, component_id)?;
 
         component
-            .render_field(field_id)
+            .render_field(field_id, self)
             .map_err(SceneError::ComponentFieldError)
     }
 
@@ -854,7 +975,7 @@ impl Scene {
         let component = self.get_component(entity_id, component_id)?;
 
         component
-            .parse_field(field_id, input)
+            .parse_field(field_id, input, self)
             .map_err(SceneError::ComponentFieldError)
     }
 

@@ -746,7 +746,6 @@ dependencies = [
  "cbindgen",
  "chrono",
  "libc",
- "log",
  "serde",
  "uuid",
  "wasserxr-macros",
