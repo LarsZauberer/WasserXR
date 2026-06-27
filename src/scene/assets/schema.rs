@@ -5,20 +5,17 @@ use crate::{
     scene::{
         assets::field::{Field, Getter},
         component::FieldType,
-        logging::LogManager,
     },
 };
 
 pub struct Schema {
     fields: HashMap<String, Field>,
-    log_manager: LogManager,
 }
 
 impl Default for Schema {
     fn default() -> Self {
         Self {
             fields: HashMap::new(),
-            log_manager: LogManager::new("WasserXR".to_owned()),
         }
     }
 }
@@ -29,44 +26,22 @@ impl Schema {
         Schema::default()
     }
 
-    pub(crate) fn with_logger(log_manager: LogManager) -> Self {
-        Self {
-            fields: HashMap::new(),
-            log_manager,
-        }
-    }
-
     pub fn add_field(&mut self, id: String, type_hint: FieldType, getter: Option<Getter>) {
         let field = Field::new(type_hint, getter);
-        crate::debug!(self.log_manager, "Asset schema field `{}` added", id);
         self.fields.insert(id, field);
     }
 
     pub(crate) fn get_getter(&self, id: &str) -> Result<Getter, AssetError> {
         match self.fields.get(id) {
-            Some(field) => field.get_getter(&self.log_manager),
-            None => {
-                crate::debug!(
-                    self.log_manager,
-                    "Asset schema field `{}` was not found for read",
-                    id
-                );
-                Err(AssetError::FieldNotFound)
-            }
+            Some(field) => field.get_getter(),
+            None => Err(AssetError::FieldNotFound),
         }
     }
 
     pub fn get_field_type(&self, id: &str) -> Result<FieldType, AssetError> {
         match self.fields.get(id) {
             Some(field) => Ok(field.get_type()),
-            None => {
-                crate::debug!(
-                    self.log_manager,
-                    "Asset schema field `{}` was not found for type lookup",
-                    id
-                );
-                Err(AssetError::FieldNotFound)
-            }
+            None => Err(AssetError::FieldNotFound),
         }
     }
 

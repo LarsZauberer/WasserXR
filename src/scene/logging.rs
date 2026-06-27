@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::{cell::RefCell, fmt::Display};
 
 use chrono::{DateTime, Local};
 
@@ -73,38 +73,30 @@ impl Display for LogEntry {
 
 #[derive(Clone)]
 pub struct LogManager {
-    inner: Rc<RefCell<LogState>>,
-}
-
-struct LogState {
-    logs: Ring<LogEntry>,
+    logs: RefCell<Ring<LogEntry>>,
     current_logger: String,
 }
 
 impl LogManager {
     pub fn new(logger: String) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(LogState {
-                logs: Ring::new(300),
-                current_logger: logger,
-            })),
+            logs: RefCell::new(Ring::new(300)),
+            current_logger: logger,
         }
     }
 
-    pub fn set_logger(&self, name: String) {
-        self.inner.borrow_mut().current_logger = name;
+    pub fn set_logger(&mut self, name: String) {
+        self.current_logger = name;
     }
 
     pub fn log(&self, level: LogLevel, message: String) {
-        let mut inner = self.inner.borrow_mut();
-        let entry = LogEntry::new(level, inner.current_logger.clone(), message);
-        inner.logs.push(entry);
+        let entry = LogEntry::new(level, self.current_logger.clone(), message);
+        self.logs.borrow_mut().push(entry);
     }
 
     pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
-        self.inner
+        self.logs
             .borrow()
-            .logs
             .iter()
             .cloned()
             .collect::<Vec<_>>()
@@ -113,11 +105,11 @@ impl LogManager {
 }
 
 impl Scene {
-    pub fn set_logger(&self, logger: String) {
+    pub fn set_logger(&mut self, logger: String) {
         self.log_manager.set_logger(logger);
     }
 
-    pub fn reset_logger(&self) {
+    pub fn reset_logger(&mut self) {
         self.log_manager.set_logger("WasserXR".to_owned());
     }
 
@@ -127,10 +119,6 @@ impl Scene {
 
     pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
         self.log_manager.iter_logs()
-    }
-
-    pub(crate) fn log_manager(&self) -> LogManager {
-        self.log_manager.clone()
     }
 }
 

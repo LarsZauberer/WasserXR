@@ -1,9 +1,6 @@
 use std::ffi::c_void;
 
-use crate::{
-    error::AssetError,
-    scene::{component::FieldType, logging::LogManager},
-};
+use crate::{error::AssetError, scene::component::FieldType};
 
 pub type Getter = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 
@@ -22,13 +19,10 @@ impl Field {
         self.type_hint
     }
 
-    pub fn get_getter(&self, log_manager: &LogManager) -> Result<Getter, AssetError> {
+    pub fn get_getter(&self) -> Result<Getter, AssetError> {
         match self.getter {
             Some(getter) => Ok(getter),
-            None => {
-                crate::debug!(log_manager, "Asset schema field has no getter function");
-                Err(AssetError::FieldNoGetter)
-            }
+            None => Err(AssetError::FieldNoGetter),
         }
     }
 }
@@ -41,10 +35,6 @@ mod tests {
         std::ptr::null_mut()
     }
 
-    fn test_log_manager() -> LogManager {
-        LogManager::new("WasserXR".to_owned())
-    }
-
     #[test]
     fn field_new() {
         let field = Field::new(FieldType::String, Some(test_getter));
@@ -54,23 +44,18 @@ mod tests {
 
     #[test]
     fn field_get_getter_when_present() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, Some(test_getter));
 
         assert_eq!(
-            field.get_getter(&log_manager).unwrap() as usize,
+            field.get_getter().unwrap() as usize,
             test_getter as *const () as usize
         );
     }
 
     #[test]
     fn field_get_getter_when_missing() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None);
 
-        assert_eq!(
-            field.get_getter(&log_manager),
-            Err(AssetError::FieldNoGetter)
-        );
+        assert_eq!(field.get_getter(), Err(AssetError::FieldNoGetter));
     }
 }

@@ -65,16 +65,12 @@ impl Component {
                 default_schema
             });
 
-        scene.set_logger(id.clone());
         let data = unsafe { (creator)() };
-        scene.reset_logger();
 
-        let mut schema = Schema::with_logger(scene.log_manager());
-        scene.set_logger(id.clone());
+        let mut schema = Schema::default();
         unsafe {
             schema_creator(&mut schema as *mut Schema);
         }
-        scene.reset_logger();
 
         crate::info!(scene, "Component `{}` created", id);
         Ok(Self {
@@ -88,16 +84,10 @@ impl Component {
         })
     }
 
-    pub(crate) unsafe fn get_field_ptr(
-        &self,
-        id: &str,
-        scene: &Scene,
-    ) -> Result<*mut c_void, ComponentError> {
+    pub(crate) unsafe fn get_field_ptr(&self, id: &str) -> Result<*mut c_void, ComponentError> {
         let getter = self.schema.get_getter(id)?;
 
-        scene.set_logger(self.id.clone());
         let field_ptr = unsafe { getter(self.data) };
-        scene.reset_logger();
 
         Ok(field_ptr)
     }
@@ -106,16 +96,14 @@ impl Component {
         self.schema.is_mutable(id)
     }
 
-    pub(crate) fn serialize(&self, entity_id: uuid::Uuid, scene: &Scene) -> ComponentData {
+    pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
         let fields = self
             .schema
             .get_fields()
             .into_iter()
             .filter_map(|field_id| {
                 let serializer = self.schema.get_serializer(field_id).ok()?;
-                scene.set_logger(self.id.clone());
                 let value = unsafe { serializer(self.data as *const c_void) };
-                scene.reset_logger();
                 Some(FieldData {
                     name: field_id.to_owned(),
                     value: unsafe { value.into_vec() },
@@ -138,18 +126,16 @@ impl Component {
         Self::new(id, plugin, scene)
     }
 
-    pub(crate) fn deserialize_fields(&mut self, fields: Vec<FieldData>, scene: &Scene) {
+    pub(crate) fn deserialize_fields(&mut self, fields: Vec<FieldData>) {
         for field in fields {
             let Ok(deserializer) = self.schema.get_deserializer(&field.name) else {
                 continue;
             };
 
             let value = SerializedBytes::from_vec(field.value);
-            scene.set_logger(self.id.clone());
             unsafe {
                 deserializer(self.data, value);
             }
-            scene.reset_logger();
         }
     }
 
@@ -166,7 +152,7 @@ impl Component {
     }
 
     pub(crate) fn render_field(&self, id: &str) -> Result<String, ComponentError> {
-        unsafe { self.schema.render_field(id, self.data, &self.id) }
+        unsafe { self.schema.render_field(id, self.data) }
     }
 
     pub(crate) fn parse_field(&self, id: &str, input: &str) -> Result<(), ComponentError> {
@@ -174,7 +160,7 @@ impl Component {
             return Err(ComponentError::FieldNotMutable);
         }
 
-        unsafe { self.schema.parse_field(id, self.data, input, &self.id) }
+        unsafe { self.schema.parse_field(id, self.data, input) }
     }
 
     pub(crate) fn get_id(&self) -> &str {
@@ -306,7 +292,7 @@ mod tests {
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
-        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
 
         assert_eq!(unsafe { *(field as *const i64) }, 5);
     }
@@ -317,12 +303,12 @@ mod tests {
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
 
-        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
         unsafe {
             *(field as *mut i64) = 11;
         }
 
-        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
         assert_eq!(unsafe { *(field as *const i64) }, 11);
     }
 
@@ -340,17 +326,17 @@ mod tests {
         let scene = Scene::new();
         let plugin = Plugin::new_static();
         let component = Component::new("unit_counter".to_owned(), &plugin, &scene).unwrap();
-        let field = unsafe { component.get_field_ptr("value", &scene).unwrap() };
+        let field = unsafe { component.get_field_ptr("value").unwrap() };
         unsafe {
             *(field as *mut i64) = 12;
         }
 
-        let data = component.serialize(uuid::Uuid::now_v7(), &scene);
+        let data = component.serialize(uuid::Uuid::now_v7());
         let mut deserialized =
             Component::deserialize("unit_counter".to_owned(), &plugin, &scene).unwrap();
-        deserialized.deserialize_fields(data.fields, &scene);
+        deserialized.deserialize_fields(data.fields);
 
-        let field = unsafe { deserialized.get_field_ptr("value", &scene).unwrap() };
+        let field = unsafe { deserialized.get_field_ptr("value").unwrap() };
         assert_eq!(unsafe { *(field as *const i64) }, 12);
     }
 
@@ -361,7 +347,7 @@ mod tests {
         let component = Component::new("schema_less_counter".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(
-            unsafe { component.get_field_ptr("value", &scene) },
+            unsafe { component.get_field_ptr("value") },
             Err(ComponentError::FieldNotFound)
         );
     }

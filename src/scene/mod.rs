@@ -74,30 +74,6 @@ impl Default for Scene {
     }
 }
 
-impl Drop for Scene {
-    fn drop(&mut self) {
-        let assets = std::mem::take(&mut self.assets);
-
-        for (asset_type, assets) in assets {
-            for asset in assets.into_values() {
-                self.set_logger(asset_type.clone());
-                drop(asset);
-                self.reset_logger();
-            }
-        }
-
-        let components = std::mem::take(&mut self.components);
-
-        for entity_components in components.into_values() {
-            for (component_id, component) in entity_components {
-                self.set_logger(component_id);
-                drop(component);
-                self.reset_logger();
-            }
-        }
-    }
-}
-
 impl Scene {
     pub fn new() -> Self {
         Self::default()
@@ -134,7 +110,7 @@ impl Scene {
             .flat_map(|(entity_id, components)| {
                 components
                     .values()
-                    .map(|component| component.serialize(*entity_id, self))
+                    .map(|component| component.serialize(*entity_id))
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -382,9 +358,7 @@ impl Scene {
         };
 
         for (component_id, component) in components {
-            self.set_logger(component_id.clone());
             drop(component);
-            self.reset_logger();
             crate::info!(
                 self,
                 "Component `{}` removed from entity `{}`",
@@ -568,7 +542,7 @@ impl Scene {
             return Err(SceneError::ComponentCreation);
         };
 
-        component.deserialize_fields(data.fields, self);
+        component.deserialize_fields(data.fields);
 
         let entity_components = self
             .components
@@ -612,9 +586,7 @@ impl Scene {
             return Err(SceneError::ComponentAlreadyExists);
         };
 
-        self.set_logger(component_id.to_owned());
         drop(component);
-        self.reset_logger();
 
         crate::info!(
             self,
@@ -711,12 +683,11 @@ impl Scene {
     }
 
     fn run_system(&mut self, system_id: &str, groups: usize, selector: Selector, runner: Runner) {
+        self.set_logger(system_id.to_owned());
         let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
 
         for i in self.entities.keys() {
-            self.set_logger(system_id.to_owned());
             let selection = unsafe { selector(self as *const Scene, i.as_bytes() as *const u8) };
-            self.reset_logger();
             if selection >= 0
                 && let Some(group) = entities.get_mut(selection as usize)
             {
@@ -730,7 +701,6 @@ impl Scene {
         let entities: Vec<*const *const u8> = entities.iter().map(|group| group.as_ptr()).collect();
         let entities_ptr = entities.as_ptr();
 
-        self.set_logger(system_id.to_owned());
         unsafe {
             runner(self as *mut Scene, entities_ptr, sizes_ptr);
         }
@@ -828,8 +798,7 @@ impl Scene {
         fields
             .iter()
             .map(|field| {
-                unsafe { component.get_field_ptr(field, self) }
-                    .map_err(SceneError::ComponentFieldError)
+                unsafe { component.get_field_ptr(field) }.map_err(SceneError::ComponentFieldError)
             })
             .collect()
     }
@@ -955,7 +924,7 @@ impl Scene {
             .asset_types
             .get(asset_type)
             .ok_or(SceneError::AssetError(AssetError::AssetTypeNotFound))?
-            .create_asset(data_string, self)
+            .create_asset(data_string)
             .map_err(SceneError::AssetError)?;
 
         self.assets
@@ -1014,7 +983,7 @@ impl Scene {
         fields
             .iter()
             .map(|field| {
-                unsafe { asset_type_data.get_field_ptr(asset, field, self) }
+                unsafe { asset_type_data.get_field_ptr(asset, field) }
                     .map_err(SceneError::AssetError)
             })
             .collect()

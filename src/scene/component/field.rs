@@ -2,10 +2,7 @@ use std::ffi::c_void;
 
 use crate::{
     error::ComponentError,
-    scene::{
-        component::{field_type::FieldType, serialized_bytes::SerializedBytes},
-        logging::LogManager,
-    },
+    scene::component::{field_type::FieldType, serialized_bytes::SerializedBytes},
 };
 
 pub type Getter = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -42,13 +39,10 @@ impl Field {
         self.type_hint
     }
 
-    pub fn get_getter(&self, log_manager: &LogManager) -> Result<Getter, ComponentError> {
+    pub fn get_getter(&self) -> Result<Getter, ComponentError> {
         match self.getter {
             Some(getter) => Ok(getter),
-            None => {
-                crate::debug!(log_manager, "Schema field has no getter function");
-                Err(ComponentError::FieldNoGetter)
-            }
+            None => Err(ComponentError::FieldNoGetter),
         }
     }
 
@@ -56,26 +50,17 @@ impl Field {
         self.mutable
     }
 
-    pub fn get_serializer(&self, log_manager: &LogManager) -> Result<Serializer, ComponentError> {
+    pub fn get_serializer(&self) -> Result<Serializer, ComponentError> {
         match self.serializer {
             Some(serializer) => Ok(serializer),
-            None => {
-                crate::debug!(log_manager, "Schema field has no serializer function");
-                Err(ComponentError::FieldNoSerializer)
-            }
+            None => Err(ComponentError::FieldNoSerializer),
         }
     }
 
-    pub fn get_deserializer(
-        &self,
-        log_manager: &LogManager,
-    ) -> Result<Deserializer, ComponentError> {
+    pub fn get_deserializer(&self) -> Result<Deserializer, ComponentError> {
         match self.deserializer {
             Some(deserializer) => Ok(deserializer),
-            None => {
-                crate::debug!(log_manager, "Schema field has no deserializer function");
-                Err(ComponentError::FieldNoDeserializer)
-            }
+            None => Err(ComponentError::FieldNoDeserializer),
         }
     }
 
@@ -160,7 +145,6 @@ fn parse_char(input: &str) -> Result<char, ComponentError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::logging::LogManager;
     use std::ffi::c_void;
 
     unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
@@ -172,10 +156,6 @@ mod tests {
     }
 
     unsafe extern "C" fn test_deserializer(_data: *mut c_void, _value: SerializedBytes) {}
-
-    fn test_log_manager() -> LogManager {
-        LogManager::new("WasserXR".to_owned())
-    }
 
     #[test]
     fn field_new() {
@@ -193,24 +173,19 @@ mod tests {
 
     #[test]
     fn field_get_getter_when_present() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, Some(test_getter), false, None, None);
 
         assert_eq!(
-            field.get_getter(&log_manager).unwrap() as usize,
+            field.get_getter().unwrap() as usize,
             test_getter as *const () as usize
         );
     }
 
     #[test]
     fn field_get_getter_when_missing() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None, false, None, None);
 
-        assert_eq!(
-            field.get_getter(&log_manager),
-            Err(ComponentError::FieldNoGetter)
-        );
+        assert_eq!(field.get_getter(), Err(ComponentError::FieldNoGetter));
     }
 
     #[test]
@@ -229,44 +204,40 @@ mod tests {
 
     #[test]
     fn field_get_serializer_when_present() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None, false, Some(test_serializer), None);
 
         assert_eq!(
-            field.get_serializer(&log_manager).unwrap() as usize,
+            field.get_serializer().unwrap() as usize,
             test_serializer as *const () as usize
         );
     }
 
     #[test]
     fn field_get_serializer_when_missing() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None, false, None, Some(test_deserializer));
 
         assert_eq!(
-            field.get_serializer(&log_manager),
+            field.get_serializer(),
             Err(ComponentError::FieldNoSerializer)
         );
     }
 
     #[test]
     fn field_get_deserializer_when_present() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None, false, None, Some(test_deserializer));
 
         assert_eq!(
-            field.get_deserializer(&log_manager).unwrap() as usize,
+            field.get_deserializer().unwrap() as usize,
             test_deserializer as *const () as usize
         );
     }
 
     #[test]
     fn field_get_deserializer_when_missing() {
-        let log_manager = test_log_manager();
         let field = Field::new(FieldType::Blob, None, false, Some(test_serializer), None);
 
         assert_eq!(
-            field.get_deserializer(&log_manager),
+            field.get_deserializer(),
             Err(ComponentError::FieldNoDeserializer)
         );
     }

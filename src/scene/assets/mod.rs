@@ -50,12 +50,10 @@ impl AssetType {
             AssetError::NoDestroyer(error)
         })?;
 
-        let mut schema = Schema::with_logger(scene.log_manager());
-        scene.set_logger(id.clone());
+        let mut schema = Schema::default();
         unsafe {
             schema_creator(&mut schema as *mut Schema);
         }
-        scene.reset_logger();
 
         crate::info!(scene, "Asset type `{}` created", id);
         Ok(Self {
@@ -67,16 +65,10 @@ impl AssetType {
         })
     }
 
-    pub(crate) fn create_asset(
-        &self,
-        data_string: &str,
-        scene: &Scene,
-    ) -> Result<Asset, AssetError> {
+    pub(crate) fn create_asset(&self, data_string: &str) -> Result<Asset, AssetError> {
         let data_string = CString::new(data_string).map_err(|_| AssetError::InvalidAsset)?;
 
-        scene.set_logger(self.id.clone());
         let data = unsafe { (self.creator)(data_string.as_ptr()) };
-        scene.reset_logger();
 
         if data.is_null() {
             return Err(AssetError::InvalidAsset);
@@ -89,11 +81,8 @@ impl AssetType {
         &self,
         asset: &Asset,
         field: &str,
-        scene: &Scene,
     ) -> Result<*mut c_void, AssetError> {
-        scene.set_logger(self.id.clone());
         let field_ptr = unsafe { self.schema.get_field_ptr(field, asset.data()) };
-        scene.reset_logger();
 
         field_ptr
     }
@@ -206,9 +195,9 @@ mod tests {
         let scene = Scene::new();
         let plugin = Plugin::new_static();
         let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
-        let asset = asset_type.create_asset("path", &scene).unwrap();
+        let asset = asset_type.create_asset("path").unwrap();
 
-        let field = unsafe { asset_type.get_field_ptr(&asset, "value", &scene).unwrap() };
+        let field = unsafe { asset_type.get_field_ptr(&asset, "value").unwrap() };
 
         assert_eq!(unsafe { *(field as *const i64) }, 5);
     }
@@ -220,7 +209,7 @@ mod tests {
         let asset_type = AssetType::new("null_asset".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(
-            asset_type.create_asset("path", &scene).err(),
+            asset_type.create_asset("path").err(),
             Some(AssetError::InvalidAsset)
         );
     }
@@ -261,7 +250,7 @@ mod tests {
             let scene = Scene::new();
             let plugin = Plugin::new_static();
             let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
-            let _asset = asset_type.create_asset("path", &scene).unwrap();
+            let _asset = asset_type.create_asset("path").unwrap();
         }
 
         assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 1);
