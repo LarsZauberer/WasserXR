@@ -63,8 +63,13 @@ pub(crate) fn expand_asset_type_creator(
         #[unsafe(export_name = #creator_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #creator_ident(
+            scene: *mut ::wasserxr::scene::Scene,
             data: *const ::std::ffi::c_char,
         ) -> *mut ::std::ffi::c_void {
+            if scene.is_null() {
+                return ::std::ptr::null_mut();
+            }
+
             if data.is_null() {
                 return ::std::ptr::null_mut();
             }
@@ -73,7 +78,7 @@ pub(crate) fn expand_asset_type_creator(
                 return ::std::ptr::null_mut();
             };
 
-            match #user_creator(data) {
+            match #user_creator(unsafe { &mut *scene }, data) {
                 Some(asset) => {
                     let asset: #asset_type = asset;
                     Box::into_raw(Box::new(asset)) as *mut ::std::ffi::c_void
@@ -153,7 +158,10 @@ fn create_destroyer_function(asset_ident: &Ident, asset_id: &str) -> proc_macro2
     quote! {
         #[unsafe(export_name = #destroyer_name)]
         #[allow(non_snake_case)]
-        pub unsafe extern "C" fn #destroyer_ident(ptr: *mut ::std::ffi::c_void) {
+        pub unsafe extern "C" fn #destroyer_ident(
+            _scene: *mut ::wasserxr::scene::Scene,
+            ptr: *mut ::std::ffi::c_void,
+        ) {
             unsafe {
                 drop(Box::from_raw(ptr as *mut #asset_ident));
             }

@@ -133,7 +133,7 @@ pub fn asset_type(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Wraps `fn create(data: &str) -> Option<AssetType>` as an asset creator.
+/// Wraps `fn create(scene: &mut Scene, data: &str) -> Option<AssetType>` as an asset creator.
 ///
 /// The macro exports `wxr_asset_create_<AssetType>` and maps `None` or invalid
 /// C strings to a null pointer.

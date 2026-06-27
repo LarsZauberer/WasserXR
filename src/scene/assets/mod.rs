@@ -11,8 +11,8 @@ use crate::{
 pub use field::{Field, Getter};
 pub use schema::Schema;
 
-pub(crate) type Creator = unsafe extern "C" fn(*const c_char) -> *mut c_void;
-pub(crate) type Destroyer = unsafe extern "C" fn(*mut c_void);
+pub(crate) type Creator = unsafe extern "C" fn(*mut Scene, *const c_char) -> *mut c_void;
+pub(crate) type Destroyer = unsafe extern "C" fn(*mut Scene, *mut c_void);
 pub(crate) type SchemaCreator = unsafe extern "C" fn(*mut Schema);
 
 pub(crate) struct AssetType {
@@ -65,16 +65,38 @@ impl AssetType {
         })
     }
 
-    pub(crate) fn create_asset(&self, data_string: &str) -> Result<Asset, AssetError> {
+    #[cfg(test)]
+    pub(crate) fn create_asset(
+        &self,
+        scene: &mut Scene,
+        data_string: &str,
+    ) -> Result<Asset, AssetError> {
+        Self::create_asset_with(scene, data_string, self.creator, self.destroyer)
+    }
+
+    pub(crate) fn create_asset_with(
+        scene: &mut Scene,
+        data_string: &str,
+        creator: Creator,
+        destroyer: Destroyer,
+    ) -> Result<Asset, AssetError> {
         let data_string = CString::new(data_string).map_err(|_| AssetError::InvalidAsset)?;
 
-        let data = unsafe { (self.creator)(data_string.as_ptr()) };
+        let data = unsafe { creator(scene as *mut Scene, data_string.as_ptr()) };
 
         if data.is_null() {
             return Err(AssetError::InvalidAsset);
         }
 
-        Ok(Asset::new(data, self.destroyer))
+        Ok(Asset::new(data, destroyer))
+    }
+
+    pub(crate) fn creator(&self) -> Creator {
+        self.creator
+    }
+
+    pub(crate) fn destroyer(&self) -> Destroyer {
+        self.destroyer
     }
 
     pub(crate) unsafe fn get_field_ptr(
@@ -109,12 +131,10 @@ impl Asset {
     fn data(&self) -> *mut c_void {
         self.data
     }
-}
 
-impl Drop for Asset {
-    fn drop(&mut self) {
+    pub(crate) fn destroy(self, scene: &mut Scene) {
         unsafe {
-            (self.destroyer)(self.data);
+            (self.destroyer)(scene as *mut Scene, self.data);
         }
     }
 }
@@ -141,7 +161,10 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_create_unit_asset(_data: *const c_char) -> *mut c_void {
+    unsafe extern "C" fn wxr_asset_create_unit_asset(
+        _scene: *mut Scene,
+        _data: *const c_char,
+    ) -> *mut c_void {
         Box::into_raw(Box::new(TestAsset { value: 5 })) as *mut c_void
     }
 
@@ -153,7 +176,7 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_destroy_unit_asset(data: *mut c_void) {
+    unsafe extern "C" fn wxr_asset_destroy_unit_asset(_scene: *mut Scene, data: *mut c_void) {
         DROP_COUNT.fetch_add(1, Ordering::Relaxed);
         unsafe {
             drop(Box::from_raw(data as *mut TestAsset));
@@ -161,7 +184,10 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_create_null_asset(_data: *const c_char) -> *mut c_void {
+    unsafe extern "C" fn wxr_asset_create_null_asset(
+        _scene: *mut Scene,
+        _data: *const c_char,
+    ) -> *mut c_void {
         std::ptr::null_mut()
     }
 
@@ -169,15 +195,18 @@ mod tests {
     unsafe extern "C" fn wxr_asset_schema_null_asset(_schema: *mut Schema) {}
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_destroy_null_asset(_data: *mut c_void) {}
+    unsafe extern "C" fn wxr_asset_destroy_null_asset(_scene: *mut Scene, _data: *mut c_void) {}
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_create_missing_schema(_data: *const c_char) -> *mut c_void {
+    unsafe extern "C" fn wxr_asset_create_missing_schema(
+        _scene: *mut Scene,
+        _data: *const c_char,
+    ) -> *mut c_void {
         std::ptr::null_mut()
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_destroy_missing_schema(_data: *mut c_void) {}
+    unsafe extern "C" fn wxr_asset_destroy_missing_schema(_scene: *mut Scene, _data: *mut c_void) {}
 
     #[test]
     fn asset_type_new_with_static_symbols() {
@@ -192,24 +221,25 @@ mod tests {
     #[test]
     fn asset_type_create_asset() {
         let _guard = ASSET_TEST_LOCK.lock().unwrap();
-        let scene = Scene::new();
+        let mut scene = Scene::new();
         let plugin = Plugin::new_static();
         let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
-        let asset = asset_type.create_asset("path").unwrap();
+        let asset = asset_type.create_asset(&mut scene, "path").unwrap();
 
         let field = unsafe { asset_type.get_field_ptr(&asset, "value").unwrap() };
 
         assert_eq!(unsafe { *(field as *const i64) }, 5);
+        asset.destroy(&mut scene);
     }
 
     #[test]
     fn asset_type_create_asset_rejects_null_asset() {
-        let scene = Scene::new();
+        let mut scene = Scene::new();
         let plugin = Plugin::new_static();
         let asset_type = AssetType::new("null_asset".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(
-            asset_type.create_asset("path").err(),
+            asset_type.create_asset(&mut scene, "path").err(),
             Some(AssetError::InvalidAsset)
         );
     }
@@ -247,10 +277,11 @@ mod tests {
         let _guard = ASSET_TEST_LOCK.lock().unwrap();
         DROP_COUNT.store(0, Ordering::Relaxed);
         {
-            let scene = Scene::new();
+            let mut scene = Scene::new();
             let plugin = Plugin::new_static();
             let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
-            let _asset = asset_type.create_asset("path").unwrap();
+            let asset = asset_type.create_asset(&mut scene, "path").unwrap();
+            asset.destroy(&mut scene);
         }
 
         assert_eq!(DROP_COUNT.load(Ordering::Relaxed), 1);

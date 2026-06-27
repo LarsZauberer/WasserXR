@@ -26,7 +26,7 @@ pub struct MacroFileAsset {
 }
 
 #[asset_type_creator(MacroFileAsset)]
-fn create_macro_file_asset(path: &str) -> Option<MacroFileAsset> {
+fn create_macro_file_asset(_scene: &mut Scene, path: &str) -> Option<MacroFileAsset> {
     CREATE_COUNT.fetch_add(1, Ordering::Relaxed);
     let content = fs::read_to_string(path).ok()?;
     let bytes = content.len();

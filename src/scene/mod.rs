@@ -74,6 +74,12 @@ impl Default for Scene {
     }
 }
 
+impl Drop for Scene {
+    fn drop(&mut self) {
+        self.clear_assets();
+    }
+}
+
 impl Scene {
     pub fn new() -> Self {
         Self::default()
@@ -871,7 +877,7 @@ impl Scene {
         for (asset_type, assets) in assets {
             for asset in assets.into_values() {
                 self.set_logger(asset_type.clone());
-                drop(asset);
+                asset.destroy(self);
                 self.reset_logger();
             }
         }
@@ -881,7 +887,7 @@ impl Scene {
         if let Some(assets) = self.assets.remove(asset_type) {
             for asset in assets.into_values() {
                 self.set_logger(asset_type.to_owned());
-                drop(asset);
+                asset.destroy(self);
                 self.reset_logger();
             }
         }
@@ -920,11 +926,15 @@ impl Scene {
 
         self.ensure_asset_type(asset_type)?;
 
-        let asset = self
-            .asset_types
-            .get(asset_type)
-            .ok_or(SceneError::AssetError(AssetError::AssetTypeNotFound))?
-            .create_asset(data_string)
+        let (creator, destroyer) = {
+            let asset_type_data = self
+                .asset_types
+                .get(asset_type)
+                .ok_or(SceneError::AssetError(AssetError::AssetTypeNotFound))?;
+            (asset_type_data.creator(), asset_type_data.destroyer())
+        };
+
+        let asset = AssetType::create_asset_with(self, data_string, creator, destroyer)
             .map_err(SceneError::AssetError)?;
 
         self.assets
