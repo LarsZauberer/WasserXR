@@ -618,6 +618,12 @@ impl Scene {
         Ok(components)
     }
 
+    pub fn get_entity_with_component(&self, component_id: &str) -> Option<Uuid> {
+        self.get_entities()
+            .into_iter()
+            .find(|entity_id| self.has_component(*entity_id, component_id))
+    }
+
     pub fn has_component(&self, entity_id: Uuid, component_id: &str) -> bool {
         self.components
             .get(&entity_id)
@@ -1615,6 +1621,21 @@ mod tests {
             scene.get_entity_components(entity).unwrap(),
             vec!["scene_counter"]
         );
+    }
+
+    #[test]
+    fn scene_get_entity_with_component() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.get_entity_with_component("scene_counter"),
+            Some(entity)
+        );
+        assert_eq!(scene.get_entity_with_component("missing"), None);
     }
 
     #[test]
