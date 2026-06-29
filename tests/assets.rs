@@ -97,6 +97,52 @@ fn asset_query_reuses_cached_asset() {
 }
 
 #[test]
+fn ensure_asset_loaded_allows_read_only_asset_query() {
+    let _guard = ASSET_TEST_LOCK.lock().unwrap();
+    CREATE_COUNT.store(0, Ordering::Relaxed);
+
+    let path = temp_asset_file("loaded", "loaded content");
+    let mut scene = Scene::new();
+
+    scene.ensure_asset_loaded("MacroFileAsset", &path).unwrap();
+
+    let (content,) = scene
+        .asset_query_loaded::<(&String,)>("MacroFileAsset", &path, &["content"])
+        .unwrap();
+
+    assert_eq!(content, "loaded content");
+    assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn asset_query_loaded_allows_multiple_shared_asset_borrows() {
+    let _guard = ASSET_TEST_LOCK.lock().unwrap();
+    CREATE_COUNT.store(0, Ordering::Relaxed);
+
+    let first_path = temp_asset_file("first-loaded", "first content");
+    let second_path = temp_asset_file("second-loaded", "second content");
+    let mut scene = Scene::new();
+
+    scene
+        .ensure_asset_loaded("MacroFileAsset", &first_path)
+        .unwrap();
+    scene
+        .ensure_asset_loaded("MacroFileAsset", &second_path)
+        .unwrap();
+
+    let (first_content,) = scene
+        .asset_query_loaded::<(&String,)>("MacroFileAsset", &first_path, &["content"])
+        .unwrap();
+    let (second_bytes,) = scene
+        .asset_query_loaded::<(&usize,)>("MacroFileAsset", &second_path, &["bytes"])
+        .unwrap();
+
+    assert_eq!(first_content, "first content");
+    assert_eq!(*second_bytes, "second content".len());
+    assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
+}
+
+#[test]
 fn asset_query_supports_tuple_fields() {
     let _guard = ASSET_TEST_LOCK.lock().unwrap();
     CREATE_COUNT.store(0, Ordering::Relaxed);

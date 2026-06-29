@@ -921,7 +921,11 @@ impl Scene {
         Ok(())
     }
 
-    fn ensure_asset(&mut self, asset_type: &str, data_string: &str) -> Result<(), SceneError> {
+    pub fn ensure_asset_loaded(
+        &mut self,
+        asset_type: &str,
+        data_string: &str,
+    ) -> Result<(), SceneError> {
         if self
             .assets
             .get(asset_type)
@@ -1005,8 +1009,8 @@ impl Scene {
             .collect()
     }
 
-    pub fn asset_query<'scene, Q>(
-        &'scene mut self,
+    pub fn asset_query_loaded<'scene, Q>(
+        &'scene self,
         asset_type: &str,
         data_string: &str,
         fields: &[&str],
@@ -1018,10 +1022,21 @@ impl Scene {
             return Err(SceneError::AssetError(AssetError::FieldParsing));
         }
 
-        self.ensure_asset(asset_type, data_string)?;
-
         let field_ptrs = unsafe { self.get_asset_field_ptrs(asset_type, data_string, fields)? };
         unsafe { Q::fetch(&field_ptrs) }
+    }
+
+    pub fn asset_query<'scene, Q>(
+        &'scene mut self,
+        asset_type: &str,
+        data_string: &str,
+        fields: &[&str],
+    ) -> Result<Q, SceneError>
+    where
+        Q: SceneQuery<'scene>,
+    {
+        self.ensure_asset_loaded(asset_type, data_string)?;
+        self.asset_query_loaded(asset_type, data_string, fields)
     }
 
     pub fn get_component_fields(
