@@ -142,6 +142,7 @@ unsafe extern "C" fn macro_custom_value_deserializer(ptr: *mut c_void, data: Ser
 #[virtual_field(y: f32, getter = macro_position_y)]
 #[derive(Default)]
 pub struct MacroPosition {
+    #[mutable]
     position: [f32; 3],
 }
 
@@ -498,8 +499,35 @@ fn component_macro_registers_exact_field_types() {
         scene
             .get_component_field_type(position_entity, "MacroPosition", "position")
             .unwrap(),
-        FieldType::Blob
+        FieldType::F32Vec3
     );
+}
+
+#[test]
+fn component_macro_parses_mutable_vector_field() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroPosition".to_owned())
+        .unwrap();
+
+    scene
+        .parse_field(entity, "MacroPosition", "position", "1.0,2.0,3.0")
+        .unwrap();
+
+    let (position,) = scene
+        .query::<(&[f32; 3],)>(entity, "MacroPosition", &["position"])
+        .unwrap();
+    assert_eq!(*position, [1.0, 2.0, 3.0]);
+
+    scene
+        .parse_field(entity, "MacroPosition", "position", "4.0, 5.0, 6.0")
+        .unwrap();
+
+    let (position,) = scene
+        .query::<(&[f32; 3],)>(entity, "MacroPosition", &["position"])
+        .unwrap();
+    assert_eq!(*position, [4.0, 5.0, 6.0]);
 }
 
 #[test]

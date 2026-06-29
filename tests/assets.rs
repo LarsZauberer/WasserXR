@@ -9,7 +9,7 @@ use std::{
 use wasserxr::{
     asset_type, asset_type_creator,
     error::{AssetError, SceneError},
-    scene::Scene,
+    scene::{Scene, assets::Schema, component::FieldType},
 };
 
 static ASSET_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -19,6 +19,7 @@ static CREATE_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub struct MacroFileAsset {
     content: String,
     bytes: usize,
+    position: [f64; 2],
 
     #[none]
     #[allow(dead_code)]
@@ -34,6 +35,7 @@ fn create_macro_file_asset(_scene: &mut Scene, path: &str) -> Option<MacroFileAs
     Some(MacroFileAsset {
         content,
         bytes,
+        position: [1.0, 2.0],
         hidden: "hidden".to_owned(),
     })
 }
@@ -156,6 +158,14 @@ fn asset_query_supports_tuple_fields() {
 
     assert_eq!(content, "tuple content");
     assert_eq!(*bytes, "tuple content".len());
+}
+
+#[test]
+fn asset_macro_registers_vector_field_type() {
+    let mut schema = Schema::default();
+    unsafe { wxr_asset_schema_MacroFileAsset(&mut schema) };
+
+    assert_eq!(schema.get_field_type("position"), Ok(FieldType::F64Vec2));
 }
 
 #[test]

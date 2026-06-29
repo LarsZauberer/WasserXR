@@ -14,6 +14,10 @@ pub enum FieldType {
     Usize,
     F32,
     F64,
+    F32Vec2,
+    F32Vec3,
+    F64Vec2,
+    F64Vec3,
     Char,
     String,
 

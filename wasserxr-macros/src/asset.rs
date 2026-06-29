@@ -232,6 +232,10 @@ fn create_getter_functions(
 }
 
 fn asset_field_type(ty: &Type) -> proc_macro2::TokenStream {
+    if let Some(field_type) = array_field_type(ty) {
+        return field_type;
+    }
+
     let Type::Path(path) = ty else {
         return quote! { ::wasserxr::scene::component::FieldType::Blob };
     };
@@ -258,5 +262,31 @@ fn asset_field_type(ty: &Type) -> proc_macro2::TokenStream {
         "char" => quote! { ::wasserxr::scene::component::FieldType::Char },
         "String" => quote! { ::wasserxr::scene::component::FieldType::String },
         _ => quote! { ::wasserxr::scene::component::FieldType::Blob },
+    }
+}
+
+fn array_field_type(ty: &Type) -> Option<proc_macro2::TokenStream> {
+    let Type::Array(array) = ty else {
+        return None;
+    };
+    let Type::Path(element) = array.elem.as_ref() else {
+        return None;
+    };
+    let syn::Expr::Lit(length) = &array.len else {
+        return None;
+    };
+    let syn::Lit::Int(length) = &length.lit else {
+        return None;
+    };
+
+    match (
+        element.path.segments.last()?.ident.to_string().as_str(),
+        length.base10_parse::<usize>().ok()?,
+    ) {
+        ("f32", 2) => Some(quote! { ::wasserxr::scene::component::FieldType::F32Vec2 }),
+        ("f32", 3) => Some(quote! { ::wasserxr::scene::component::FieldType::F32Vec3 }),
+        ("f64", 2) => Some(quote! { ::wasserxr::scene::component::FieldType::F64Vec2 }),
+        ("f64", 3) => Some(quote! { ::wasserxr::scene::component::FieldType::F64Vec3 }),
+        _ => None,
     }
 }

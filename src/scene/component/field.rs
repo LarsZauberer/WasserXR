@@ -87,6 +87,10 @@ impl Field {
             FieldType::Usize => unsafe { (*(ptr as *const usize)).to_string() },
             FieldType::F32 => unsafe { (*(ptr as *const f32)).to_string() },
             FieldType::F64 => unsafe { (*(ptr as *const f64)).to_string() },
+            FieldType::F32Vec2 => unsafe { render_vector(&*(ptr as *const [f32; 2])) },
+            FieldType::F32Vec3 => unsafe { render_vector(&*(ptr as *const [f32; 3])) },
+            FieldType::F64Vec2 => unsafe { render_vector(&*(ptr as *const [f64; 2])) },
+            FieldType::F64Vec3 => unsafe { render_vector(&*(ptr as *const [f64; 3])) },
             FieldType::Char => unsafe { (*(ptr as *const char)).to_string() },
             FieldType::String => unsafe { (*(ptr as *const String)).clone() },
             FieldType::Blob => format!("{ptr:p}"),
@@ -116,6 +120,10 @@ impl Field {
             FieldType::Usize => unsafe { *(ptr as *mut usize) = parse_value(input)? },
             FieldType::F32 => unsafe { *(ptr as *mut f32) = parse_value(input)? },
             FieldType::F64 => unsafe { *(ptr as *mut f64) = parse_value(input)? },
+            FieldType::F32Vec2 => unsafe { *(ptr as *mut [f32; 2]) = parse_vector(input)? },
+            FieldType::F32Vec3 => unsafe { *(ptr as *mut [f32; 3]) = parse_vector(input)? },
+            FieldType::F64Vec2 => unsafe { *(ptr as *mut [f64; 2]) = parse_vector(input)? },
+            FieldType::F64Vec3 => unsafe { *(ptr as *mut [f64; 3]) = parse_vector(input)? },
             FieldType::Char => unsafe { *(ptr as *mut char) = parse_char(input)? },
             FieldType::String => unsafe { *(ptr as *mut String) = input.to_owned() },
             FieldType::Blob => return Err(ComponentError::FieldValueParsing),
@@ -127,6 +135,27 @@ impl Field {
 
 fn parse_value<T: std::str::FromStr>(input: &str) -> Result<T, ComponentError> {
     input.parse().map_err(|_| ComponentError::FieldValueParsing)
+}
+
+fn render_vector<T: ToString, const N: usize>(value: &[T; N]) -> String {
+    value
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn parse_vector<T: std::str::FromStr, const N: usize>(
+    input: &str,
+) -> Result<[T; N], ComponentError> {
+    let values = input
+        .split(',')
+        .map(|part| parse_value(part.trim()))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    values
+        .try_into()
+        .map_err(|_| ComponentError::FieldValueParsing)
 }
 
 fn parse_char(input: &str) -> Result<char, ComponentError> {
@@ -281,6 +310,49 @@ mod tests {
         unsafe { field.parse(ptr, "2.25") }.unwrap();
 
         assert_eq!(value, 2.25);
+    }
+
+    #[test]
+    fn field_render_and_parse_f32_vector() {
+        let field = Field::new(FieldType::F32Vec3, None, true, None, None);
+        let mut value = [1.5f32, 2.5, 3.5];
+        let ptr = &mut value as *mut [f32; 3] as *mut c_void;
+
+        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "1.5, 2.5, 3.5");
+        unsafe { field.parse(ptr, "4.0, 5.0, 6.0") }.unwrap();
+        assert_eq!(value, [4.0, 5.0, 6.0]);
+
+        unsafe { field.parse(ptr, "7.0,8.0,9.0") }.unwrap();
+        assert_eq!(value, [7.0, 8.0, 9.0]);
+    }
+
+    #[test]
+    fn field_render_and_parse_f64_vector() {
+        let field = Field::new(FieldType::F64Vec2, None, true, None, None);
+        let mut value = [1.5f64, 2.5];
+        let ptr = &mut value as *mut [f64; 2] as *mut c_void;
+
+        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "1.5, 2.5");
+        unsafe { field.parse(ptr, "3.0,4.0") }.unwrap();
+
+        assert_eq!(value, [3.0, 4.0]);
+    }
+
+    #[test]
+    fn field_parse_vector_rejects_invalid_input() {
+        let field = Field::new(FieldType::F32Vec2, None, true, None, None);
+        let mut value = [1.0f32, 2.0];
+        let ptr = &mut value as *mut [f32; 2] as *mut c_void;
+
+        assert_eq!(
+            unsafe { field.parse(ptr, "3.0") },
+            Err(ComponentError::FieldValueParsing)
+        );
+        assert_eq!(
+            unsafe { field.parse(ptr, "3.0, invalid") },
+            Err(ComponentError::FieldValueParsing)
+        );
+        assert_eq!(value, [1.0, 2.0]);
     }
 
     #[test]
