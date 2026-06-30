@@ -796,12 +796,6 @@ impl Scene {
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            crate::warn!(
-                self,
-                "Component `{}` was not found on entity `{}`",
-                component_id,
-                entity_id
-            );
             return Err(SceneError::ComponentNotFound);
         };
 
