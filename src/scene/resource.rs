@@ -49,16 +49,16 @@ impl Scene {
         }
     }
 
-    pub fn get_resource<T>(&self, name: String) -> Result<&T, SceneError> {
+    pub fn get_resource<T>(&self, name: &str) -> Result<&T, SceneError> {
         self.resources
-            .get(&name)
+            .get(name)
             .map(Resource::get)
             .ok_or(SceneError::ResourceNotFound)
     }
 
-    pub fn get_mut_resource<T>(&mut self, name: String) -> Result<&mut T, SceneError> {
+    pub fn get_mut_resource<T>(&mut self, name: &str) -> Result<&mut T, SceneError> {
         self.resources
-            .get_mut(&name)
+            .get_mut(name)
             .map(Resource::get_mut)
             .ok_or(SceneError::ResourceNotFound)
     }
@@ -107,14 +107,9 @@ mod tests {
         let mut scene = Scene::new();
 
         scene.add_resource("counter".to_owned(), 1usize).unwrap();
-        *scene
-            .get_mut_resource::<usize>("counter".to_owned())
-            .unwrap() = 2;
+        *scene.get_mut_resource::<usize>("counter").unwrap() = 2;
 
-        assert_eq!(
-            *scene.get_resource::<usize>("counter".to_owned()).unwrap(),
-            2
-        );
+        assert_eq!(*scene.get_resource::<usize>("counter").unwrap(), 2);
     }
 
     #[test]
@@ -133,7 +128,7 @@ mod tests {
         let scene = Scene::new();
 
         assert_eq!(
-            scene.get_resource::<usize>("missing".to_owned()),
+            scene.get_resource::<usize>("missing"),
             Err(SceneError::ResourceNotFound)
         );
     }
@@ -145,9 +140,6 @@ mod tests {
 
         scene.reload().unwrap();
 
-        assert_eq!(
-            *scene.get_resource::<usize>("counter".to_owned()).unwrap(),
-            1
-        );
+        assert_eq!(*scene.get_resource::<usize>("counter").unwrap(), 1);
     }
 }
