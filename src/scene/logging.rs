@@ -85,7 +85,7 @@ impl LogManager {
         Self {
             logs: RefCell::new(Ring::new(300)),
             current_logger: logger,
-            callbacks: vec![print_logger],
+            callbacks: Vec::new(),
         }
     }
 
