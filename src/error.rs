@@ -53,6 +53,7 @@ pub enum SceneError {
     PluginLoading(PluginError),
     SystemCreation,
     ComponentCreation,
+    ComponentCreatorFailed,
     Serialization(String),
     Deserialization(String),
     FileIo(String),

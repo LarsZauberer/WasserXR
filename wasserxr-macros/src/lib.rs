@@ -74,7 +74,7 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Turns a Rust component struct into the C ABI functions WasserXR needs.
 ///
-/// Use it on a named-field struct that implements `Default`:
+/// Use it on a named-field struct:
 ///
 /// ```ignore
 /// #[component(no_schema)]
@@ -90,7 +90,7 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The macro exports create, destroy, and schema functions for the component.
+/// The macro exports destroy and schema functions for the component.
 /// Use `#[component(no_schema)]` to skip schema generation and provide a custom
 /// `wxr_schema_<Component>` function yourself.
 /// Fields without field function attributes get generated getter, serializer,
@@ -107,6 +107,19 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
 
     component::expand(args, item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Wraps `fn create(scene: &mut Scene) -> Option<Component>` as a component creator.
+///
+/// The macro exports `wxr_create_<Component>` and maps `None` to a null pointer.
+#[proc_macro_attribute]
+pub fn component_creator(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as component::CreatorArgs);
+    let item = parse_macro_input!(item as ItemFn);
+
+    component::expand_component_creator(args, item)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }

@@ -547,12 +547,19 @@ impl Scene {
         }
 
         // Build the plugin
-        let Some(mut component) = self
+        let Some(component_symbols) = self
             .plugins_dynamic_first()
-            .find_map(|plugin| Component::deserialize(component_id.clone(), plugin, self).ok())
+            .find_map(|plugin| Component::symbols(&component_id, plugin, self).ok())
         else {
             crate::warn!(self, "Component `{}` could not be created", component_id);
             return Err(SceneError::ComponentCreation);
+        };
+
+        let Some(mut component) =
+            Component::create_with(component_id.clone(), component_symbols, self)
+        else {
+            crate::warn!(self, "Component creator for `{}` failed", component_id);
+            return Err(SceneError::ComponentCreatorFailed);
         };
 
         component.deserialize_fields(data.fields);
@@ -1293,17 +1300,17 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_counter() -> *mut c_void {
+    unsafe extern "C" fn wxr_create_scene_counter(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(SceneCounter { value: 1 })) as *mut c_void
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_pair() -> *mut c_void {
+    unsafe extern "C" fn wxr_create_scene_pair(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(ScenePair { a: 1, b: 2 })) as *mut c_void
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_octet() -> *mut c_void {
+    unsafe extern "C" fn wxr_create_scene_octet(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(SceneOctet {
             values: [1, 2, 3, 4, 5, 6, 7, 8],
         })) as *mut c_void
@@ -1331,7 +1338,7 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_owner() -> *mut c_void {
+    unsafe extern "C" fn wxr_create_scene_owner(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(SceneOwner {
             value: SceneOwnedValue::default(),
         })) as *mut c_void
@@ -1345,7 +1352,7 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_order_component() -> *mut c_void {
+    unsafe extern "C" fn wxr_create_scene_order_component(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(SceneOrderComponent)) as *mut c_void
     }
 

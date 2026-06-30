@@ -1,6 +1,6 @@
 use quote::{format_ident, quote};
 use syn::{
-    Attribute, Error, Fields, Ident, ItemStruct, Meta, Path, Result, Token, Type,
+    Attribute, Error, Fields, Ident, ItemFn, ItemStruct, Meta, Path, Result, Token, Type,
     parse::{Parse, ParseStream},
 };
 
@@ -28,6 +28,21 @@ impl Parse for Args {
         }
 
         Ok(Args { no_schema: true })
+    }
+}
+
+pub(crate) struct CreatorArgs {
+    component_type: Path,
+}
+
+impl Parse for CreatorArgs {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let component_type = input.parse()?;
+        if !input.is_empty() {
+            return Err(input.error("`component_creator` only supports one component type"));
+        }
+
+        Ok(Self { component_type })
     }
 }
 
@@ -117,7 +132,6 @@ pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::To
     }
     let component_fields = parse_component_fields(&mut item)?;
 
-    let creator = create_creator_function(&component_ident, &component_id);
     let destroyer = create_destroyer_function(&component_ident, &component_id);
     let schema = if args.no_schema {
         quote! {}
@@ -133,12 +147,49 @@ pub(crate) fn expand(args: Args, mut item: ItemStruct) -> Result<proc_macro2::To
     Ok(quote! {
         #item
 
-        #creator
         #destroyer
         #schema
         #getters
         #serializers
         #deserializers
+    })
+}
+
+pub(crate) fn expand_component_creator(
+    args: CreatorArgs,
+    item: ItemFn,
+) -> Result<proc_macro2::TokenStream> {
+    let component_type = args.component_type;
+    let component_id = component_type
+        .segments
+        .last()
+        .ok_or_else(|| Error::new_spanned(&component_type, "component type path cannot be empty"))?
+        .ident
+        .to_string();
+    let creator_name = format!("wxr_create_{}", component_id);
+    let creator_ident = format_ident!("{}", creator_name);
+    let user_creator = item.sig.ident.clone();
+
+    Ok(quote! {
+        #item
+
+        #[unsafe(export_name = #creator_name)]
+        #[allow(non_snake_case)]
+        pub unsafe extern "C" fn #creator_ident(
+            scene: *mut ::wasserxr::scene::Scene,
+        ) -> *mut ::std::ffi::c_void {
+            if scene.is_null() {
+                return ::std::ptr::null_mut();
+            }
+
+            match #user_creator(unsafe { &mut *scene }) {
+                Some(component) => {
+                    let component: #component_type = component;
+                    Box::into_raw(Box::new(component)) as *mut ::std::ffi::c_void
+                }
+                None => ::std::ptr::null_mut(),
+            }
+        }
     })
 }
 
@@ -241,22 +292,6 @@ fn parse_field_function_attribute(attr: &Attribute, name: &str) -> Result<FieldF
             attr,
             format!("`{name}` expects no value or a custom function path"),
         )),
-    }
-}
-
-fn create_creator_function(
-    component_ident: &Ident,
-    component_id: &str,
-) -> proc_macro2::TokenStream {
-    let creator_name = format!("wxr_create_{}", component_id);
-    let creator_ident = format_ident!("{}", creator_name);
-
-    quote! {
-        #[unsafe(export_name = #creator_name)]
-        #[allow(non_snake_case)]
-        pub unsafe extern "C" fn #creator_ident() -> *mut ::std::ffi::c_void {
-            Box::into_raw(Box::new(#component_ident::default())) as *mut ::std::ffi::c_void
-        }
     }
 }
 

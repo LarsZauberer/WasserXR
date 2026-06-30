@@ -5,7 +5,7 @@ use std::{
 
 use uuid::Uuid;
 use wasserxr::{
-    attacher, component, detacher,
+    attacher, component, component_creator, detacher,
     error::{ComponentError, SceneError},
     scene::{
         Scene,
@@ -37,6 +37,12 @@ pub struct MacroComponent {
     hidden: i32,
 }
 
+#[component_creator(MacroComponent)]
+pub fn create_macro_component(scene: &mut Scene) -> Option<MacroComponent> {
+    let _ = scene.get_plugins();
+    Some(MacroComponent::default())
+}
+
 #[component]
 #[derive(Default)]
 pub struct MacroRoundTripComponent {
@@ -51,6 +57,11 @@ pub struct MacroRoundTripComponent {
     label: String,
 }
 
+#[component_creator(MacroRoundTripComponent)]
+pub fn create_macro_round_trip_component(_scene: &mut Scene) -> Option<MacroRoundTripComponent> {
+    Some(MacroRoundTripComponent::default())
+}
+
 #[component]
 #[derive(Default)]
 pub struct MacroCounter {
@@ -58,11 +69,21 @@ pub struct MacroCounter {
     value: i64,
 }
 
+#[component_creator(MacroCounter)]
+pub fn create_macro_counter(_scene: &mut Scene) -> Option<MacroCounter> {
+    Some(MacroCounter::default())
+}
+
 #[component]
 #[derive(Default)]
 pub struct MacroMarker {
     #[allow(dead_code)]
     value: i64,
+}
+
+#[component_creator(MacroMarker)]
+pub fn create_macro_marker(_scene: &mut Scene) -> Option<MacroMarker> {
+    Some(MacroMarker::default())
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -77,6 +98,11 @@ pub struct MacroOwnershipComponent {
     value: MacroOwnedValue,
 }
 
+#[component_creator(MacroOwnershipComponent)]
+pub fn create_macro_ownership_component(_scene: &mut Scene) -> Option<MacroOwnershipComponent> {
+    Some(MacroOwnershipComponent::default())
+}
+
 #[component(no_schema)]
 #[derive(Default)]
 pub struct MacroManualSchemaComponent {
@@ -84,11 +110,23 @@ pub struct MacroManualSchemaComponent {
     value: i32,
 }
 
+#[component_creator(MacroManualSchemaComponent)]
+pub fn create_macro_manual_schema_component(
+    _scene: &mut Scene,
+) -> Option<MacroManualSchemaComponent> {
+    Some(MacroManualSchemaComponent::default())
+}
+
 #[component(no_schema)]
 #[derive(Default)]
 pub struct MacroNoSchemaComponent {
     #[allow(dead_code)]
     value: i32,
+}
+
+#[component_creator(MacroNoSchemaComponent)]
+pub fn create_macro_no_schema_component(_scene: &mut Scene) -> Option<MacroNoSchemaComponent> {
+    Some(MacroNoSchemaComponent::default())
 }
 
 unsafe extern "C" fn macro_manual_schema_value_getter(ptr: *mut c_void) -> *mut c_void {
@@ -120,6 +158,13 @@ pub struct MacroCustomHooksComponent {
     value: usize,
 }
 
+#[component_creator(MacroCustomHooksComponent)]
+pub fn create_macro_custom_hooks_component(
+    _scene: &mut Scene,
+) -> Option<MacroCustomHooksComponent> {
+    Some(MacroCustomHooksComponent::default())
+}
+
 unsafe extern "C" fn macro_custom_value_getter(ptr: *mut c_void) -> *mut c_void {
     unsafe { &mut (*(ptr as *mut MacroCustomHooksComponent)).value as *mut usize as *mut c_void }
 }
@@ -144,6 +189,23 @@ unsafe extern "C" fn macro_custom_value_deserializer(ptr: *mut c_void, data: Ser
 pub struct MacroPosition {
     #[mutable]
     position: [f32; 3],
+}
+
+#[component_creator(MacroPosition)]
+pub fn create_macro_position(_scene: &mut Scene) -> Option<MacroPosition> {
+    Some(MacroPosition::default())
+}
+
+#[component]
+#[derive(Default)]
+pub struct MacroFailingComponent {
+    #[allow(dead_code)]
+    value: i32,
+}
+
+#[component_creator(MacroFailingComponent)]
+pub fn create_macro_failing_component(_scene: &mut Scene) -> Option<MacroFailingComponent> {
+    None
 }
 
 unsafe extern "C" fn macro_position_x(ptr: *mut c_void) -> *mut c_void {
@@ -393,6 +455,17 @@ fn component_macro_allows_missing_schema_function() {
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNotFound
         ))
+    );
+}
+
+#[test]
+fn component_macro_reports_failed_creator() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+
+    assert_eq!(
+        scene.add_component(entity, "MacroFailingComponent".to_owned()),
+        Err(SceneError::ComponentCreatorFailed)
     );
 }
 
