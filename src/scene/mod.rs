@@ -1125,6 +1125,32 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    pub fn is_component_field_mutable(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<bool, SceneError> {
+        let component = self.get_component(entity_id, component_id)?;
+
+        component
+            .is_field_mutable(field_id)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
+    pub fn is_component_field_string_parsable(
+        &self,
+        entity_id: Uuid,
+        component_id: &str,
+        field_id: &str,
+    ) -> Result<bool, SceneError> {
+        let component = self.get_component(entity_id, component_id)?;
+
+        component
+            .is_field_string_parsable(field_id)
+            .map_err(SceneError::ComponentFieldError)
+    }
+
     pub fn render_field(
         &self,
         entity_id: Uuid,
@@ -1953,6 +1979,67 @@ mod tests {
                 .get_component_field_type(entity, "scene_counter", "value")
                 .unwrap(),
             FieldType::I64
+        );
+    }
+
+    #[test]
+    fn scene_is_component_field_mutable() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.is_component_field_mutable(entity, "scene_pair", "a"),
+            Ok(true)
+        );
+        assert_eq!(
+            scene.is_component_field_mutable(entity, "scene_pair", "b"),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn scene_is_component_field_string_parsable() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_pair".to_owned())
+            .unwrap();
+        scene
+            .add_component(entity, "scene_owner".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.is_component_field_string_parsable(entity, "scene_pair", "a"),
+            Ok(true)
+        );
+        assert_eq!(
+            scene.is_component_field_string_parsable(entity, "scene_owner", "value"),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn scene_component_field_predicates_reject_missing_field() {
+        let mut scene = Scene::new();
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_counter".to_owned())
+            .unwrap();
+
+        assert_eq!(
+            scene.is_component_field_mutable(entity, "scene_counter", "missing"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNotFound
+            ))
+        );
+        assert_eq!(
+            scene.is_component_field_string_parsable(entity, "scene_counter", "missing"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNotFound
+            ))
         );
     }
 

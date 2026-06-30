@@ -50,6 +50,10 @@ impl Field {
         self.mutable
     }
 
+    pub fn is_string_parsable(&self) -> bool {
+        !matches!(self.type_hint, FieldType::Blob)
+    }
+
     pub fn get_serializer(&self) -> Result<Serializer, ComponentError> {
         match self.serializer {
             Some(serializer) => Ok(serializer),

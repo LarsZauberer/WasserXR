@@ -53,6 +53,13 @@ impl Schema {
         }
     }
 
+    pub(crate) fn is_string_parsable(&self, id: &str) -> Result<bool, ComponentError> {
+        match self.fields.get(id) {
+            Some(field) => Ok(field.is_string_parsable()),
+            None => Err(ComponentError::FieldNotFound),
+        }
+    }
+
     pub(crate) fn get_serializer(&self, id: &str) -> Result<Serializer, ComponentError> {
         match self.fields.get(id) {
             Some(field) => field.get_serializer(),

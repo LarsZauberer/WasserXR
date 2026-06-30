@@ -96,6 +96,10 @@ impl Component {
         self.schema.is_mutable(id)
     }
 
+    pub(crate) fn is_field_string_parsable(&self, id: &str) -> Result<bool, ComponentError> {
+        self.schema.is_string_parsable(id)
+    }
+
     pub(crate) fn serialize(&self, entity_id: uuid::Uuid) -> ComponentData {
         let fields = self
             .schema
