@@ -40,9 +40,11 @@ pub enum AssetError {
 pub enum SceneError {
     EntityNotFound,
     ComponentAlreadyExists,
+    ResourceAlreadyExists,
     SystemAlreadyExists,
     PluginAlreadyLoaded,
     SystemNotFound,
+    ResourceNotFound,
     PluginNotFound,
     StaticPluginUnload,
     ComponentNotFound,

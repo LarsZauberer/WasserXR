@@ -4,6 +4,7 @@ pub(crate) mod entity;
 pub mod logging;
 pub(crate) mod plugin;
 pub mod query;
+pub mod resource;
 pub(crate) mod serialization;
 pub(crate) mod system;
 
@@ -12,6 +13,7 @@ use component::{Component, FieldType};
 use entity::Entity;
 use plugin::Plugin;
 use query::{SceneQuery, SceneQueryMut};
+use resource::Resource;
 use system::System;
 
 use crate::error::{AssetError, PluginError, SceneError};
@@ -35,6 +37,7 @@ pub struct Scene {
     plugins: HashMap<String, Plugin>,
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
+    resources: HashMap<String, Resource>,
     asset_types: HashMap<String, AssetType>,
     assets: HashMap<String, HashMap<String, Asset>>,
 
@@ -58,6 +61,7 @@ impl Default for Scene {
             plugins,
             systems: HashMap::new(),
             components: HashMap::new(),
+            resources: HashMap::new(),
             asset_types: HashMap::new(),
             assets: HashMap::new(),
 
