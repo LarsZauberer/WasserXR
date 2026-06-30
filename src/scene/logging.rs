@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display};
+use std::{cell::RefCell, fmt::Display, fs::OpenOptions, io::Write};
 
 use chrono::{DateTime, Local};
 
@@ -141,6 +141,16 @@ impl Scene {
 
 pub fn print_logger(entry: &LogEntry) {
     println!("{}", entry);
+}
+
+pub fn file_logger(entry: &LogEntry) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("log.log")
+        .expect("failed to open log file");
+
+    writeln!(file, "{}", entry).expect("failed to write log entry");
 }
 
 #[macro_export]
