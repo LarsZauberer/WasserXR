@@ -134,7 +134,7 @@ impl Scene {
         self.log_manager.iter_logs()
     }
 
-    pub fn register_callback(&mut self, callback: LogCallback) {
+    pub fn register_callback_logger(&mut self, callback: LogCallback) {
         self.log_manager.register_callback(callback);
     }
 }
