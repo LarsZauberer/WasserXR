@@ -3,6 +3,7 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wasserxr::{
     attacher, component, component_creator, detacher,
@@ -86,7 +87,7 @@ pub fn create_macro_marker(_scene: &mut Scene) -> Option<MacroMarker> {
     Some(MacroMarker::default())
 }
 
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct MacroOwnedValue {
     value: String,
 }
@@ -525,7 +526,7 @@ fn component_macro_registers_virtual_fields() {
     let (x,) = loaded
         .query::<(&f32,)>(entity, "MacroPosition", &["x"])
         .unwrap();
-    assert_eq!(*x, 0.0);
+    assert_eq!(*x, 7.5);
 }
 
 #[test]

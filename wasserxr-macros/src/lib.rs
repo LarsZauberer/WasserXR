@@ -99,8 +99,10 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// attribute is present, only the requested functions are generated. Field
 /// function attributes can also take a custom function path, for example
 /// `#[getter(my_getter)]`. Use `#[none]` to register a field without generated
-/// field functions. Use `#[virtual_field(name: Type, getter = my_getter)]` to
-/// register a queryable field that is not stored directly in the struct.
+/// field functions. Generated serializers for complex fields use serde through
+/// bincode, so those field types must implement serde's serialize and
+/// deserialize traits. Use `#[virtual_field(name: Type, getter = my_getter)]`
+/// to register a queryable field that is not stored directly in the struct.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as component::Args);

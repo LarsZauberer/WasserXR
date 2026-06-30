@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use wasserxr::{component, component_creator, scene::Scene};
 
 #[component]
@@ -6,6 +7,7 @@ struct MyStruct {
     data: Data,
 }
 
+#[derive(Deserialize, Serialize)]
 struct Data {
     a: Vec<usize>,
     b: [f32; 3],

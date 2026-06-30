@@ -392,14 +392,11 @@ fn create_getter_option(component_id: &str, field: &Field) -> proc_macro2::Token
 
 fn create_serializer_option(component_id: &str, field: &Field) -> proc_macro2::TokenStream {
     match &field.serializer {
-        Some(FieldFunction::Generated)
-            if component_field_serialization_kind(&field.ty).is_some() =>
-        {
+        Some(FieldFunction::Generated) => {
             let field_ident = &field.ident;
             let serializer_ident = format_ident!("wxr_serialize_{}_{}", component_id, field_ident);
             quote! { Some(#serializer_ident) }
         }
-        Some(FieldFunction::Generated) => quote! { None },
         Some(FieldFunction::Custom(serializer)) => quote! {{
             let serializer: ::wasserxr::scene::component::Serializer = #serializer;
             Some(serializer)
@@ -410,15 +407,12 @@ fn create_serializer_option(component_id: &str, field: &Field) -> proc_macro2::T
 
 fn create_deserializer_option(component_id: &str, field: &Field) -> proc_macro2::TokenStream {
     match &field.deserializer {
-        Some(FieldFunction::Generated)
-            if component_field_serialization_kind(&field.ty).is_some() =>
-        {
+        Some(FieldFunction::Generated) => {
             let field_ident = &field.ident;
             let deserializer_ident =
                 format_ident!("wxr_deserialize_{}_{}", component_id, field_ident);
             quote! { Some(#deserializer_ident) }
         }
-        Some(FieldFunction::Generated) => quote! { None },
         Some(FieldFunction::Custom(deserializer)) => quote! {{
             let deserializer: ::wasserxr::scene::component::Deserializer = #deserializer;
             Some(deserializer)
@@ -469,14 +463,14 @@ fn create_serializer_functions(
     let serializers = fields
         .iter()
         .filter(|field| matches!(&field.serializer, Some(FieldFunction::Generated)))
-        .filter_map(|field| {
+        .map(|field| {
             let field_ident = &field.ident;
             let field_ty = &field.ty;
             let serializer_name = format!("wxr_serialize_{}_{}", component_id, field_ident);
             let serializer_ident = format_ident!("{}", serializer_name);
 
-            match component_field_serialization_kind(field_ty)? {
-                SerializationKind::Bytes => Some(quote! {
+            match component_field_serialization_kind(field_ty) {
+                SerializationKind::Bytes => quote! {
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -489,8 +483,8 @@ fn create_serializer_functions(
                             )
                         }
                     }
-                }),
-                SerializationKind::Char => Some(quote! {
+                },
+                SerializationKind::Char => quote! {
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -503,8 +497,8 @@ fn create_serializer_functions(
                             )
                         }
                     }
-                }),
-                SerializationKind::String => Some(quote! {
+                },
+                SerializationKind::String => quote! {
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -517,7 +511,19 @@ fn create_serializer_functions(
                             )
                         }
                     }
-                }),
+                },
+                SerializationKind::Bincode => quote! {
+                    #[unsafe(export_name = #serializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #serializer_ident(
+                        ptr: *const ::std::ffi::c_void,
+                    ) -> ::wasserxr::scene::component::SerializedBytes {
+                        unsafe {
+                            let value = &(*(ptr as *const #component_ident)).#field_ident;
+                            ::wasserxr::scene::component::SerializedBytes::from_serializable(value)
+                        }
+                    }
+                },
             }
         });
 
@@ -534,14 +540,14 @@ fn create_deserializer_functions(
     let deserializers = fields
         .iter()
         .filter(|field| matches!(&field.deserializer, Some(FieldFunction::Generated)))
-        .filter_map(|field| {
+        .map(|field| {
             let field_ident = &field.ident;
             let field_ty = &field.ty;
             let deserializer_name = format!("wxr_deserialize_{}_{}", component_id, field_ident);
             let deserializer_ident = format_ident!("{}", deserializer_name);
 
-            match component_field_serialization_kind(field_ty)? {
-                SerializationKind::Bytes => Some(quote! {
+            match component_field_serialization_kind(field_ty) {
+                SerializationKind::Bytes => quote! {
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -558,8 +564,8 @@ fn create_deserializer_functions(
                             }
                         }
                     }
-                }),
-                SerializationKind::Char => Some(quote! {
+                },
+                SerializationKind::Char => quote! {
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -575,8 +581,8 @@ fn create_deserializer_functions(
                             }
                         }
                     }
-                }),
-                SerializationKind::String => Some(quote! {
+                },
+                SerializationKind::String => quote! {
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -590,7 +596,21 @@ fn create_deserializer_functions(
                             }
                         }
                     }
-                }),
+                },
+                SerializationKind::Bincode => quote! {
+                    #[unsafe(export_name = #deserializer_name)]
+                    #[allow(non_snake_case)]
+                    pub unsafe extern "C" fn #deserializer_ident(
+                        ptr: *mut ::std::ffi::c_void,
+                        data: ::wasserxr::scene::component::SerializedBytes,
+                    ) {
+                        unsafe {
+                            if let Some(value) = data.into_deserializable::<#field_ty>() {
+                                (*(ptr as *mut #component_ident)).#field_ident = value;
+                            }
+                        }
+                    }
+                },
             }
         });
 
@@ -663,20 +683,23 @@ enum SerializationKind {
     Bytes,
     Char,
     String,
+    Bincode,
 }
 
-fn component_field_serialization_kind(ty: &Type) -> Option<SerializationKind> {
+fn component_field_serialization_kind(ty: &Type) -> SerializationKind {
     let Type::Path(path) = ty else {
-        return None;
+        return SerializationKind::Bincode;
     };
 
-    let segment = path.path.segments.last()?;
+    let Some(segment) = path.path.segments.last() else {
+        return SerializationKind::Bincode;
+    };
 
     match segment.ident.to_string().as_str() {
         "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64" | "u128"
-        | "usize" | "f32" | "f64" => Some(SerializationKind::Bytes),
-        "char" => Some(SerializationKind::Char),
-        "String" => Some(SerializationKind::String),
-        _ => None,
+        | "usize" | "f32" | "f64" => SerializationKind::Bytes,
+        "char" => SerializationKind::Char,
+        "String" => SerializationKind::String,
+        _ => SerializationKind::Bincode,
     }
 }
