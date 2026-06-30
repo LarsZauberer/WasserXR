@@ -232,6 +232,9 @@ impl Scene {
                     PluginError::MissingSymbol(symbol) => {
                         crate::error!(self, "Plugin `{}` missed symbol `{}`", path, symbol);
                     }
+                    PluginError::NotFound => {
+                        crate::error!(self, "Plugin `{}` could not be found", path);
+                    }
                 }
                 return Err(SceneError::PluginLoading(error));
             }

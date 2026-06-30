@@ -1,18 +1,31 @@
 use std::{
     ffi::{CStr, CString},
+    io::ErrorKind,
     os::raw::c_void,
+    path::PathBuf,
 };
+
+use uuid::Uuid;
 
 use crate::error::PluginError;
 
 pub(crate) struct Plugin {
     path: Option<String>,
+    fd_file_path: Option<PathBuf>,
     fd: *mut c_void,
 }
 
 impl Plugin {
     pub(crate) fn new(path: String) -> Result<Plugin, PluginError> {
-        let path_cstring = Self::create_c_string(path.clone())?;
+        let fd_file_path = std::env::temp_dir().join(Uuid::now_v7().to_string());
+        if let Err(error) = std::fs::copy(&path, &fd_file_path) {
+            return match error.kind() {
+                ErrorKind::NotFound => Err(PluginError::NotFound),
+                _ => Err(PluginError::LinkingError(error.to_string())),
+            };
+        }
+
+        let path_cstring = Self::create_c_string(fd_file_path.to_string_lossy().into_owned())?;
 
         // Open the library
         let fd: *mut c_void = unsafe { libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW) };
@@ -25,11 +38,13 @@ impl Plugin {
                     CStr::from_ptr(error).to_string_lossy().into_owned()
                 }
             };
+            let _ = std::fs::remove_file(fd_file_path);
             return Err(PluginError::LinkingError(error));
         }
 
         Ok(Self {
             path: Some(path),
+            fd_file_path: Some(fd_file_path),
             fd,
         })
     }
@@ -37,6 +52,7 @@ impl Plugin {
     pub(crate) fn new_static() -> Self {
         Self {
             path: None,
+            fd_file_path: None,
             fd: libc::RTLD_DEFAULT,
         }
     }
@@ -45,6 +61,7 @@ impl Plugin {
     pub(crate) fn new_test_dynamic(path: String) -> Self {
         Self {
             path: Some(path),
+            fd_file_path: None,
             fd: std::ptr::null_mut(),
         }
     }
@@ -81,7 +98,7 @@ impl Plugin {
             return Ok(true);
         }
 
-        let Some(path) = self.path.clone() else {
+        let Some(fd_file_path) = self.fd_file_path.take() else {
             return Ok(true);
         };
 
@@ -91,7 +108,7 @@ impl Plugin {
         self.fd = std::ptr::null_mut();
 
         // Check if it is really unloaded (dlclose doesn't necessarily unload the library)
-        let path_cstring = Self::create_c_string(path)?;
+        let path_cstring = Self::create_c_string(fd_file_path.to_string_lossy().into_owned())?;
         unsafe {
             let still_loaded: *mut c_void =
                 libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW | libc::RTLD_NOLOAD);
@@ -100,8 +117,10 @@ impl Plugin {
                 // Failed to unload
                 // Still has to close the new handle
                 libc::dlclose(still_loaded);
+                let _ = std::fs::remove_file(fd_file_path);
                 Ok(false)
             } else {
+                let _ = std::fs::remove_file(fd_file_path);
                 Ok(true)
             }
         }
@@ -120,6 +139,36 @@ mod tests {
 
     #[unsafe(no_mangle)]
     static TEST_DATA: usize = 5;
+
+    fn plugin_library_path() -> String {
+        let deps_dir = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_owned();
+        let prefix = format!("{}wasserxr_macros-", std::env::consts::DLL_PREFIX);
+        let suffix = format!(".{}", std::env::consts::DLL_EXTENSION);
+
+        let mut candidates: Vec<PathBuf> = std::fs::read_dir(&deps_dir)
+            .unwrap()
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let file_name = path.file_name()?.to_str()?;
+                if file_name.starts_with(&prefix) && file_name.ends_with(&suffix) {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        candidates.sort();
+
+        candidates
+            .pop()
+            .unwrap_or_else(|| panic!("missing test plugin library in {}", deps_dir.display()))
+            .to_string_lossy()
+            .into_owned()
+    }
 
     #[test]
     fn plugin_new_static() {
@@ -171,6 +220,60 @@ mod tests {
     fn plugin_new_for_missing_path() {
         let result = Plugin::new("/definitely/missing/wasserxr/test/plugin.so".to_owned());
 
-        assert!(matches!(result, Err(PluginError::LinkingError(_))));
+        assert!(matches!(result, Err(PluginError::NotFound)));
+    }
+
+    #[test]
+    fn plugin_new_loads_unique_temp_file() {
+        let path = plugin_library_path();
+
+        let first = Plugin::new(path.clone()).unwrap();
+        let second = Plugin::new(path.clone()).unwrap();
+
+        assert_eq!(first.get_id(), path);
+        assert_ne!(first.fd_file_path, second.fd_file_path);
+        assert!(first.fd_file_path.as_ref().unwrap().exists());
+        assert!(second.fd_file_path.as_ref().unwrap().exists());
+    }
+
+    #[test]
+    fn plugin_new_reloads_when_previous_copy_stays_loaded_by_thread() {
+        let path = plugin_library_path();
+        let mut plugin = Plugin::new(path.clone()).unwrap();
+        let first_fd_file_path = plugin.fd_file_path.clone().unwrap();
+        let thread_path = first_fd_file_path.clone();
+        let (ready_sender, ready_receiver) = std::sync::mpsc::channel();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel();
+
+        let thread = std::thread::spawn(move || {
+            let path_cstring = CString::new(thread_path.to_string_lossy().into_owned()).unwrap();
+            let fd: *mut c_void = unsafe { libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW) };
+            let loaded = !fd.is_null();
+            ready_sender.send(loaded).unwrap();
+
+            if loaded {
+                let _ = release_receiver.recv();
+                unsafe {
+                    libc::dlclose(fd);
+                }
+            }
+        });
+
+        let thread_loaded_copy = ready_receiver.recv().unwrap();
+        let close_result = plugin.close();
+        let reloaded = Plugin::new(path);
+        let reloaded_fd_file_path = reloaded
+            .as_ref()
+            .unwrap()
+            .fd_file_path
+            .as_ref()
+            .unwrap()
+            .clone();
+        let _ = release_sender.send(());
+        thread.join().unwrap();
+
+        assert!(thread_loaded_copy);
+        assert_eq!(close_result, Ok(false));
+        assert_ne!(first_fd_file_path, reloaded_fd_file_path);
     }
 }

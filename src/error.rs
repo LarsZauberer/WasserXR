@@ -2,6 +2,7 @@
 pub enum PluginError {
     LinkingError(String),
     MissingSymbol(String),
+    NotFound,
     InvalidSymbol,
 }
 
