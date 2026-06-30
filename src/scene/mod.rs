@@ -271,6 +271,18 @@ impl Scene {
             self.remove_system(&system_id)?;
         }
 
+        // Unload all the asset types that are still loaded with this plugin
+        let asset_types: Vec<String> = self
+            .asset_types
+            .values()
+            .filter(|asset_type| asset_type.get_plugin_id() == path)
+            .map(|asset_type| asset_type.get_id().to_owned())
+            .collect();
+
+        for asset_type in asset_types {
+            self.remove_asset_type(&asset_type);
+        }
+
         // Unload all the components that are still loaded with this plugin
         let components: Vec<(Uuid, String)> = self
             .components
@@ -286,18 +298,6 @@ impl Scene {
 
         for (entity, component_id) in components {
             self.remove_component(entity, &component_id)?;
-        }
-
-        // Unload all the asset types that are still loaded with this plugin
-        let asset_types: Vec<String> = self
-            .asset_types
-            .values()
-            .filter(|asset_type| asset_type.get_plugin_id() == path)
-            .map(|asset_type| asset_type.get_id().to_owned())
-            .collect();
-
-        for asset_type in asset_types {
-            self.remove_asset_type(&asset_type);
         }
 
         // Remove the plugin itself
@@ -1200,6 +1200,10 @@ mod tests {
         value: SceneOwnedValue,
     }
 
+    struct SceneOrderComponent;
+
+    struct SceneOrderAsset;
+
     unsafe extern "C" fn scene_counter_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut SceneCounter)).value as *mut i64 as *mut c_void }
     }
@@ -1308,6 +1312,19 @@ mod tests {
     }
 
     #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_create_scene_order_component() -> *mut c_void {
+        Box::into_raw(Box::new(SceneOrderComponent)) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_destroy_scene_order_component(data: *mut c_void) {
+        SCENE_UNLOAD_ORDER.lock().unwrap().push("component");
+        unsafe {
+            drop(Box::from_raw(data as *mut SceneOrderComponent));
+        }
+    }
+
+    #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_schema_scene_counter(schema: *mut Schema) {
         unsafe {
             (*schema).add_field(
@@ -1384,6 +1401,31 @@ mod tests {
         }
     }
 
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_asset_create_scene_order_asset(
+        _scene: *mut Scene,
+        _data_string: *const std::ffi::c_char,
+    ) -> *mut c_void {
+        Box::into_raw(Box::new(SceneOrderAsset)) as *mut c_void
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_asset_schema_scene_order_asset(
+        _schema: *mut crate::scene::assets::Schema,
+    ) {
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_asset_destroy_scene_order_asset(
+        _scene: *mut Scene,
+        data: *mut c_void,
+    ) {
+        SCENE_UNLOAD_ORDER.lock().unwrap().push("asset");
+        unsafe {
+            drop(Box::from_raw(data as *mut SceneOrderAsset));
+        }
+    }
+
     static SCENE_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -1397,6 +1439,8 @@ mod tests {
     static SCENE_RELOAD_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
     static SCENE_DEFERRED_REMOVE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
+        LazyLock::new(|| Mutex::new(Vec::new()));
+    static SCENE_UNLOAD_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
 
     fn set_scene_counter(scene: &mut Scene, entity: Uuid, value: i64) {
@@ -2148,6 +2192,30 @@ mod tests {
 
         assert_eq!(get_scene_counter(&scene, entity), 1);
         scene.remove_system("scene_cleanup_system").unwrap();
+    }
+
+    #[test]
+    fn scene_unload_plugin_destroys_assets_before_components() {
+        SCENE_UNLOAD_ORDER.lock().unwrap().clear();
+        let mut scene = Scene::new();
+        scene.plugins.insert(
+            "dynamic_order".to_owned(),
+            Plugin::new_test_dynamic("dynamic_order".to_owned()),
+        );
+        let entity = scene.add_entity();
+        scene
+            .add_component(entity, "scene_order_component".to_owned())
+            .unwrap();
+        scene
+            .ensure_asset_loaded("scene_order_asset", "asset")
+            .unwrap();
+
+        scene.unload_plugin("dynamic_order").unwrap();
+
+        assert_eq!(
+            *SCENE_UNLOAD_ORDER.lock().unwrap(),
+            vec!["asset", "component"]
+        );
     }
 
     #[test]
