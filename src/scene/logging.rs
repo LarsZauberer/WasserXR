@@ -4,6 +4,8 @@ use chrono::{DateTime, Local};
 
 use crate::{scene::Scene, utils::ring::Ring};
 
+pub type LogCallback = fn(&LogEntry);
+
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {
     DEBUG,
@@ -75,6 +77,7 @@ impl Display for LogEntry {
 pub struct LogManager {
     logs: RefCell<Ring<LogEntry>>,
     current_logger: String,
+    callbacks: Vec<LogCallback>,
 }
 
 impl LogManager {
@@ -82,6 +85,7 @@ impl LogManager {
         Self {
             logs: RefCell::new(Ring::new(300)),
             current_logger: logger,
+            callbacks: vec![print_logger],
         }
     }
 
@@ -91,6 +95,11 @@ impl LogManager {
 
     pub fn log(&self, level: LogLevel, message: String) {
         let entry = LogEntry::new(level, self.current_logger.clone(), message);
+
+        for i in &self.callbacks {
+            i(&entry)
+        }
+
         self.logs.borrow_mut().push(entry);
     }
 
@@ -101,6 +110,10 @@ impl LogManager {
             .cloned()
             .collect::<Vec<_>>()
             .into_iter()
+    }
+
+    pub fn register_callback(&mut self, callback: LogCallback) {
+        self.callbacks.push(callback);
     }
 }
 
@@ -120,6 +133,14 @@ impl Scene {
     pub fn iter_logs(&self) -> std::vec::IntoIter<LogEntry> {
         self.log_manager.iter_logs()
     }
+
+    pub fn register_callback(&mut self, callback: LogCallback) {
+        self.log_manager.register_callback(callback);
+    }
+}
+
+pub fn print_logger(entry: &LogEntry) {
+    println!("{}", entry);
 }
 
 #[macro_export]
