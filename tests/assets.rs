@@ -145,6 +145,34 @@ fn asset_query_loaded_allows_multiple_shared_asset_borrows() {
 }
 
 #[test]
+fn get_loaded_asset_data_strings_lists_loaded_assets() {
+    let _guard = ASSET_TEST_LOCK.lock().unwrap();
+    CREATE_COUNT.store(0, Ordering::Relaxed);
+
+    let first_path = temp_asset_file("list-first", "first content");
+    let second_path = temp_asset_file("list-second", "second content");
+    let mut expected = vec![first_path.clone(), second_path.clone()];
+    expected.sort();
+    let mut scene = Scene::new();
+
+    scene
+        .ensure_asset_loaded("MacroFileAsset", &second_path)
+        .unwrap();
+    scene
+        .ensure_asset_loaded("MacroFileAsset", &first_path)
+        .unwrap();
+
+    assert_eq!(
+        scene.get_loaded_asset_data_strings("MacroFileAsset"),
+        expected
+    );
+    assert_eq!(
+        scene.get_loaded_asset_data_strings("MissingAsset"),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
 fn asset_query_supports_tuple_fields() {
     let _guard = ASSET_TEST_LOCK.lock().unwrap();
     CREATE_COUNT.store(0, Ordering::Relaxed);

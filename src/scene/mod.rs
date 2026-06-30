@@ -16,6 +16,7 @@ use query::{SceneQuery, SceneQueryMut};
 use resource::Resource;
 use system::System;
 
+use crate::debug;
 use crate::error::{AssetError, PluginError, SceneError};
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
@@ -315,13 +316,6 @@ impl Scene {
                     crate::warn!(
                         self,
                         "Plugin `{}` failed to be unloaded. It is still in kernel memory. You cannot load old systems, components should have been removed and new systems and components will not be loaded from this plugin. Still threads spawned by the plugin could still be running. Furthermore, when you load the plugin again, it will not load a new version. Make sure that at the end of a plugin lifetime no threads are running anymore.",
-                        path
-                    );
-                }
-                Err(PluginError::InvalidSymbol) => {
-                    crate::warn!(
-                        self,
-                        "Failed to check if the plugin `{}` is truely unloaded",
                         path
                     );
                 }
@@ -973,6 +967,16 @@ impl Scene {
             data_string
         );
         Ok(())
+    }
+
+    pub fn get_loaded_asset_data_strings(&self, asset_type: &str) -> Vec<String> {
+        let Some(assets) = self.assets.get(asset_type) else {
+            return Vec::new();
+        };
+
+        let mut data_strings: Vec<String> = assets.keys().cloned().collect();
+        data_strings.sort();
+        data_strings
     }
 
     fn get_asset(&self, asset_type: &str, data_string: &str) -> Result<&Asset, SceneError> {
