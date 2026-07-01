@@ -29,6 +29,7 @@ use uuid::Uuid;
 
 enum DeferredCall {
     Reload,
+    Load(Vec<u8>),
     UnloadPlugin(String),
     RemoveSystem(String),
 }
@@ -193,6 +194,11 @@ impl Scene {
 
     pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SceneError> {
         let data = fs::read(path).map_err(|error| SceneError::FileIo(error.to_string()))?;
+        if self.is_ticking {
+            self.deferred_calls.push(DeferredCall::Load(data));
+            return Ok(());
+        }
+
         self.deserialize(&data)
     }
 
@@ -718,6 +724,14 @@ impl Scene {
                         crate::warn!(
                             self,
                             "Reload Failed! The scene has maybe been partially been reloaded."
+                        );
+                    }
+                }
+                DeferredCall::Load(data) => {
+                    if self.deserialize(&data).is_err() {
+                        crate::warn!(
+                            self,
+                            "Deferred scene load failed! The scene has maybe been partially loaded."
                         );
                     }
                 }
@@ -1453,6 +1467,8 @@ mod tests {
     static SCENE_DEFERRED_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SCENE_DEFERRED_REMOVE_TARGET_PRESENT: AtomicBool = AtomicBool::new(false);
     static SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT: AtomicBool = AtomicBool::new(false);
+    static SCENE_DEFERRED_LOAD_PATH: LazyLock<Mutex<Option<std::path::PathBuf>>> =
+        LazyLock::new(|| Mutex::new(None));
     static SCENE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
         LazyLock::new(|| Mutex::new(Vec::new()));
     static SCENE_RELOAD_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
@@ -1560,6 +1576,26 @@ mod tests {
             .lock()
             .unwrap()
             .push("reload-request");
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_load_request(
+        scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
+        let path = SCENE_DEFERRED_LOAD_PATH.lock().unwrap().clone().unwrap();
+        unsafe {
+            (&mut *scene).load(path).unwrap();
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn wxr_system_scene_loaded_marker(
+        _scene: *mut Scene,
+        _entities: *const *const *const u8,
+        _sizes: *const usize,
+    ) {
     }
 
     #[unsafe(no_mangle)]
@@ -2430,6 +2466,43 @@ mod tests {
             Ok(())
         );
         assert_eq!(scene.remove_system("scene_reload_request"), Ok(()));
+    }
+
+    #[test]
+    fn scene_tick_loads_when_requested_by_system() {
+        let mut saved = Scene::new();
+        let entity = saved.add_entity();
+        saved
+            .set_entity_name(entity, "Imported".to_owned())
+            .unwrap();
+        saved
+            .add_system("scene_loaded_marker".to_owned(), 1)
+            .unwrap();
+
+        let path = std::env::temp_dir().join(format!("wasserxr-load-{}.scene", Uuid::now_v7()));
+        saved.save(&path).unwrap();
+        *SCENE_DEFERRED_LOAD_PATH.lock().unwrap() = Some(path.clone());
+
+        let mut scene = Scene::new();
+        scene
+            .add_system("scene_load_request".to_owned(), 1)
+            .unwrap();
+
+        assert!(scene.tick());
+        let _ = std::fs::remove_file(&path);
+        *SCENE_DEFERRED_LOAD_PATH.lock().unwrap() = None;
+
+        assert_eq!(scene.get_entity_name(entity).unwrap(), "Imported");
+        assert!(
+            scene
+                .get_systems()
+                .contains(&"scene_loaded_marker".to_owned())
+        );
+        assert!(
+            !scene
+                .get_systems()
+                .contains(&"scene_load_request".to_owned())
+        );
     }
 
     #[test]
