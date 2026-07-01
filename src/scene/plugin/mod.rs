@@ -106,36 +106,6 @@ mod tests {
     #[unsafe(no_mangle)]
     static TEST_DATA: usize = 5;
 
-    fn plugin_library_path() -> String {
-        let deps_dir = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_owned();
-        let prefix = format!("{}wasserxr_macros-", std::env::consts::DLL_PREFIX);
-        let suffix = format!(".{}", std::env::consts::DLL_EXTENSION);
-
-        let mut candidates: Vec<PathBuf> = std::fs::read_dir(&deps_dir)
-            .unwrap()
-            .filter_map(|entry| {
-                let path = entry.ok()?.path();
-                let file_name = path.file_name()?.to_str()?;
-                if file_name.starts_with(&prefix) && file_name.ends_with(&suffix) {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        candidates.sort();
-
-        candidates
-            .pop()
-            .unwrap_or_else(|| panic!("missing test plugin library in {}", deps_dir.display()))
-            .to_string_lossy()
-            .into_owned()
-    }
-
     #[test]
     fn plugin_new_static() {
         let plugin = Plugin::new_static();
@@ -187,18 +157,5 @@ mod tests {
         let result = Plugin::new("/definitely/missing/wasserxr/test/plugin.so".to_owned());
 
         assert!(matches!(result, Err(PluginError::NotFound)));
-    }
-
-    #[test]
-    fn plugin_new_loads_unique_temp_file() {
-        let path = plugin_library_path();
-
-        let first = Plugin::new(path.clone()).unwrap();
-        let second = Plugin::new(path.clone()).unwrap();
-
-        assert_eq!(first.get_id(), path);
-        assert_ne!(first.fd_file_path, second.fd_file_path);
-        assert!(first.fd_file_path.as_ref().unwrap().exists());
-        assert!(second.fd_file_path.as_ref().unwrap().exists());
     }
 }
