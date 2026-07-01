@@ -309,26 +309,7 @@ impl Scene {
         }
 
         // Remove the plugin itself
-        if let Some(mut plugin) = self.plugins.remove(path) {
-            match plugin.close() {
-                Ok(true) => {}
-                Ok(false) => {
-                    crate::warn!(
-                        self,
-                        "Plugin `{}` failed to be unloaded. It is still in kernel memory. You cannot load old systems, components should have been removed and new systems and components will not be loaded from this plugin. Still threads spawned by the plugin could still be running. Furthermore, when you load the plugin again, it will not load a new version. Make sure that at the end of a plugin lifetime no threads are running anymore.",
-                        path
-                    );
-                }
-                Err(error) => {
-                    crate::warn!(
-                        self,
-                        "Failed to check if the plugin `{}` is truely unloaded: {:?}",
-                        path,
-                        error
-                    );
-                }
-            }
-        }
+        self.plugins.remove(path);
 
         crate::info!(self, "Plugin `{}` unloaded", path);
         Ok(())

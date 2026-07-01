@@ -1,8 +1,9 @@
+#[cfg(test)]
+use std::path::PathBuf;
 use std::{
     ffi::{CStr, CString},
     io::ErrorKind,
     os::raw::c_void,
-    path::PathBuf,
 };
 
 use uuid::Uuid;
@@ -11,6 +12,7 @@ use crate::error::PluginError;
 
 pub(crate) struct Plugin {
     path: Option<String>,
+    #[cfg(test)]
     fd_file_path: Option<PathBuf>,
     fd: *mut c_void,
 }
@@ -44,6 +46,7 @@ impl Plugin {
 
         Ok(Self {
             path: Some(path),
+            #[cfg(test)]
             fd_file_path: Some(fd_file_path),
             fd,
         })
@@ -52,6 +55,7 @@ impl Plugin {
     pub(crate) fn new_static() -> Self {
         Self {
             path: None,
+            #[cfg(test)]
             fd_file_path: None,
             fd: libc::RTLD_DEFAULT,
         }
@@ -61,6 +65,7 @@ impl Plugin {
     pub(crate) fn new_test_dynamic(path: String) -> Self {
         Self {
             path: Some(path),
+            #[cfg(test)]
             fd_file_path: None,
             fd: std::ptr::null_mut(),
         }
@@ -91,45 +96,6 @@ impl Plugin {
 
     fn create_c_string(data: String) -> Result<CString, PluginError> {
         CString::new(data).map_err(|_| PluginError::InvalidSymbol)
-    }
-
-    pub(crate) fn close(&mut self) -> Result<bool, PluginError> {
-        if self.fd.is_null() {
-            return Ok(true);
-        }
-
-        let Some(fd_file_path) = self.fd_file_path.take() else {
-            return Ok(true);
-        };
-
-        unsafe {
-            libc::dlclose(self.fd);
-        }
-        self.fd = std::ptr::null_mut();
-
-        // Check if it is really unloaded (dlclose doesn't necessarily unload the library)
-        let path_cstring = Self::create_c_string(fd_file_path.to_string_lossy().into_owned())?;
-        unsafe {
-            let still_loaded: *mut c_void =
-                libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW | libc::RTLD_NOLOAD);
-
-            if !still_loaded.is_null() {
-                // Failed to unload
-                // Still has to close the new handle
-                libc::dlclose(still_loaded);
-                let _ = std::fs::remove_file(fd_file_path);
-                Ok(false)
-            } else {
-                let _ = std::fs::remove_file(fd_file_path);
-                Ok(true)
-            }
-        }
-    }
-}
-
-impl Drop for Plugin {
-    fn drop(&mut self) {
-        let _ = self.close();
     }
 }
 
@@ -234,46 +200,5 @@ mod tests {
         assert_ne!(first.fd_file_path, second.fd_file_path);
         assert!(first.fd_file_path.as_ref().unwrap().exists());
         assert!(second.fd_file_path.as_ref().unwrap().exists());
-    }
-
-    #[test]
-    fn plugin_new_reloads_when_previous_copy_stays_loaded_by_thread() {
-        let path = plugin_library_path();
-        let mut plugin = Plugin::new(path.clone()).unwrap();
-        let first_fd_file_path = plugin.fd_file_path.clone().unwrap();
-        let thread_path = first_fd_file_path.clone();
-        let (ready_sender, ready_receiver) = std::sync::mpsc::channel();
-        let (release_sender, release_receiver) = std::sync::mpsc::channel();
-
-        let thread = std::thread::spawn(move || {
-            let path_cstring = CString::new(thread_path.to_string_lossy().into_owned()).unwrap();
-            let fd: *mut c_void = unsafe { libc::dlopen(path_cstring.as_ptr(), libc::RTLD_NOW) };
-            let loaded = !fd.is_null();
-            ready_sender.send(loaded).unwrap();
-
-            if loaded {
-                let _ = release_receiver.recv();
-                unsafe {
-                    libc::dlclose(fd);
-                }
-            }
-        });
-
-        let thread_loaded_copy = ready_receiver.recv().unwrap();
-        let close_result = plugin.close();
-        let reloaded = Plugin::new(path);
-        let reloaded_fd_file_path = reloaded
-            .as_ref()
-            .unwrap()
-            .fd_file_path
-            .as_ref()
-            .unwrap()
-            .clone();
-        let _ = release_sender.send(());
-        thread.join().unwrap();
-
-        assert!(thread_loaded_copy);
-        assert_eq!(close_result, Ok(false));
-        assert_ne!(first_fd_file_path, reloaded_fd_file_path);
     }
 }
