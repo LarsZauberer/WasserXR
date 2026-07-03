@@ -1,3 +1,4 @@
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
 /// Runtime type hint for a schema field.
 pub enum FieldType {

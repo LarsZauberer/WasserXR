@@ -4,13 +4,15 @@ use crate::scene::Scene;
 use std::collections::hash_map::Entry;
 use std::ffi::c_void;
 
+pub type ResourceDropper = unsafe extern "C" fn(*mut c_void);
+
 /// Type-erased value stored in a `Scene`.
 ///
 /// Resources are addressed by string name and keep their concrete Rust type
 /// outside the ECS component system.
 pub struct Resource {
     data: *mut c_void,
-    dropper: unsafe fn(*mut c_void),
+    dropper: ResourceDropper,
 }
 
 impl Resource {
@@ -20,6 +22,14 @@ impl Resource {
             data: Box::into_raw(Box::new(value)).cast(),
             dropper: drop_value::<T>,
         }
+    }
+
+    pub(crate) fn from_raw(data: *mut c_void, dropper: ResourceDropper) -> Self {
+        Self { data, dropper }
+    }
+
+    pub(crate) fn data(&self) -> *mut c_void {
+        self.data
     }
 
     /// Borrows the resource as `T`.
@@ -51,7 +61,7 @@ impl Drop for Resource {
     }
 }
 
-unsafe fn drop_value<T>(data: *mut c_void) {
+unsafe extern "C" fn drop_value<T>(data: *mut c_void) {
     unsafe {
         drop(Box::from_raw(data.cast::<T>()));
     }
@@ -73,6 +83,21 @@ impl Scene {
             Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
             Entry::Vacant(entry) => {
                 entry.insert(Resource::new(value));
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn add_raw_resource(
+        &mut self,
+        name: String,
+        data: *mut c_void,
+        dropper: ResourceDropper,
+    ) -> Result<(), SceneError> {
+        match self.resources.entry(name) {
+            Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
+            Entry::Vacant(entry) => {
+                entry.insert(Resource::from_raw(data, dropper));
                 Ok(())
             }
         }
@@ -101,6 +126,13 @@ impl Scene {
         self.resources
             .get_mut(name)
             .map(Resource::get_mut)
+            .ok_or(SceneError::ResourceNotFound)
+    }
+
+    pub(crate) fn get_raw_resource(&mut self, name: &str) -> Result<*mut c_void, SceneError> {
+        self.resources
+            .get_mut(name)
+            .map(|resource| resource.data())
             .ok_or(SceneError::ResourceNotFound)
     }
 }

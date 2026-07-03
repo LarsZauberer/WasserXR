@@ -7,7 +7,8 @@ use crate::{scene::Scene, utils::ring::Ring};
 /// Callback invoked for every log entry before the entry is stored.
 pub type LogCallback = fn(&LogEntry);
 
-#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Log severity used by WasserXR's scene logger.
 pub enum LogLevel {
     /// Detailed diagnostic message.

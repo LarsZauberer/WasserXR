@@ -43,6 +43,7 @@
 
 extern crate self as wasserxr;
 
+pub mod bindings;
 pub mod error;
 pub mod scene;
 /// Small utility modules used by the runtime and applications.

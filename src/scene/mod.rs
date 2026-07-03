@@ -1118,7 +1118,7 @@ impl Scene {
         Ok(asset)
     }
 
-    unsafe fn get_asset_field_ptrs(
+    pub(crate) unsafe fn get_asset_field_ptrs(
         &self,
         asset_type: &str,
         data_string: &str,

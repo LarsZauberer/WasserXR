@@ -6,4 +6,714 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/**
+ * C ABI error code for the latest failed WasserXR binding call.
+ */
+typedef enum WXRSceneError {
+  /**
+   * No error has been recorded for this thread.
+   */
+  WXRSceneError_NoError,
+  /**
+   * A required pointer argument was null.
+   */
+  WXRSceneError_NullPointer,
+  /**
+   * A C string argument was null or not valid UTF-8.
+   */
+  WXRSceneError_InvalidString,
+  /**
+   * The entity id is not present in the scene.
+   */
+  WXRSceneError_EntityNotFound,
+  /**
+   * The entity already has a component with this id.
+   */
+  WXRSceneError_ComponentAlreadyExists,
+  /**
+   * A resource with this name is already registered.
+   */
+  WXRSceneError_ResourceAlreadyExists,
+  /**
+   * A system with this id is already registered.
+   */
+  WXRSceneError_SystemAlreadyExists,
+  /**
+   * A plugin with this path is already loaded.
+   */
+  WXRSceneError_PluginAlreadyLoaded,
+  /**
+   * The system id is not present in the scene.
+   */
+  WXRSceneError_SystemNotFound,
+  /**
+   * The resource name is not present in the scene.
+   */
+  WXRSceneError_ResourceNotFound,
+  /**
+   * The plugin id or path is not present in the scene.
+   */
+  WXRSceneError_PluginNotFound,
+  /**
+   * The built-in static plugin cannot be unloaded.
+   */
+  WXRSceneError_StaticPluginUnload,
+  /**
+   * The component id is not present on the requested entity.
+   */
+  WXRSceneError_ComponentNotFound,
+  /**
+   * A component field operation failed.
+   */
+  WXRSceneError_ComponentFieldError,
+  /**
+   * An asset operation failed.
+   */
+  WXRSceneError_AssetError,
+  /**
+   * Loading a plugin failed.
+   */
+  WXRSceneError_PluginLoading,
+  /**
+   * A system could not be created from any loaded plugin.
+   */
+  WXRSceneError_SystemCreation,
+  /**
+   * Component symbols could not be resolved from any loaded plugin.
+   */
+  WXRSceneError_ComponentCreation,
+  /**
+   * The component creator returned a null pointer.
+   */
+  WXRSceneError_ComponentCreatorFailed,
+  /**
+   * Scene serialization failed.
+   */
+  WXRSceneError_Serialization,
+  /**
+   * Scene deserialization failed.
+   */
+  WXRSceneError_Deserialization,
+  /**
+   * Reading or writing a scene file failed.
+   */
+  WXRSceneError_FileIo,
+} WXRSceneError;
+
+/**
+ * Log severity used by WasserXR's scene logger.
+ */
+typedef enum LogLevel {
+  /**
+   * Detailed diagnostic message.
+   */
+  LogLevel_DEBUG,
+  /**
+   * Normal runtime information.
+   */
+  LogLevel_INFO,
+  /**
+   * Recoverable problem.
+   */
+  LogLevel_WARN,
+  /**
+   * Error condition.
+   */
+  LogLevel_ERROR,
+} LogLevel;
+
+/**
+ * Runtime type hint for a schema field.
+ */
+typedef enum FieldType {
+  /**
+   * `i8`
+   */
+  FieldType_I8,
+  /**
+   * `i16`
+   */
+  FieldType_I16,
+  /**
+   * `i32`
+   */
+  FieldType_I32,
+  /**
+   * `i64`
+   */
+  FieldType_I64,
+  /**
+   * `i128`
+   */
+  FieldType_I128,
+  /**
+   * `isize`
+   */
+  FieldType_Isize,
+  /**
+   * `u8`
+   */
+  FieldType_U8,
+  /**
+   * `u16`
+   */
+  FieldType_U16,
+  /**
+   * `u32`
+   */
+  FieldType_U32,
+  /**
+   * `u64`
+   */
+  FieldType_U64,
+  /**
+   * `u128`
+   */
+  FieldType_U128,
+  /**
+   * `usize`
+   */
+  FieldType_Usize,
+  /**
+   * `f32`
+   */
+  FieldType_F32,
+  /**
+   * `f64`
+   */
+  FieldType_F64,
+  /**
+   * `[f32; 2]`
+   */
+  FieldType_F32Vec2,
+  /**
+   * `[f32; 3]`
+   */
+  FieldType_F32Vec3,
+  /**
+   * `[f64; 2]`
+   */
+  FieldType_F64Vec2,
+  /**
+   * `[f64; 3]`
+   */
+  FieldType_F64Vec3,
+  /**
+   * `char`
+   */
+  FieldType_Char,
+  /**
+   * `String`
+   */
+  FieldType_String,
+  /**
+   * Opaque data that can be queried by pointer but cannot be text-parsed.
+   */
+  FieldType_Blob,
+} FieldType;
+
+/**
+ * Opaque C handle for an asset schema.
+ */
+typedef struct WXRAssetSchema WXRAssetSchema;
+
+/**
+ * Opaque C handle for a component schema.
+ */
+typedef struct WXRComponentSchema WXRComponentSchema;
+
+/**
+ * Opaque C handle for a scene log entry.
+ */
+typedef struct WXRLogEntry WXRLogEntry;
+
+/**
+ * Opaque C handle for `wasserxr::scene::Scene`.
+ */
+typedef struct WXRScene WXRScene;
+
+/**
+ * Owned array of log entry handles.
+ */
+typedef struct WXRLogEntryArray {
+  /**
+   * Pointer to the first log entry handle.
+   */
+  struct WXRLogEntry **ptr;
+  /**
+   * Number of log entries.
+   */
+  size_t len;
+} WXRLogEntryArray;
+
+/**
+ * Owned byte buffer returned by WasserXR bindings.
+ */
+typedef struct WXRBytes {
+  /**
+   * Pointer to the first byte.
+   */
+  uint8_t *ptr;
+  /**
+   * Number of initialized bytes.
+   */
+  size_t len;
+  /**
+   * Allocation capacity.
+   */
+  size_t cap;
+} WXRBytes;
+
+/**
+ * Owned array of C strings returned by WasserXR bindings.
+ */
+typedef struct WXRStringArray {
+  /**
+   * Pointer to the first C string pointer.
+   */
+  char **ptr;
+  /**
+   * Number of strings.
+   */
+  size_t len;
+} WXRStringArray;
+
+/**
+ * 16-byte entity UUID used by the C ABI.
+ */
+typedef struct WXREntity {
+  /**
+   * UUID bytes.
+   */
+  uint8_t bytes[16];
+} WXREntity;
+
+/**
+ * Owned array of entity ids returned by WasserXR bindings.
+ */
+typedef struct WXREntityArray {
+  /**
+   * Pointer to the first entity id.
+   */
+  struct WXREntity *ptr;
+  /**
+   * Number of entity ids.
+   */
+  size_t len;
+} WXREntityArray;
+
+/**
+ * C callback that destroys a raw resource pointer.
+ */
+typedef void (*WXRResourceDropper)(void*);
+
+/**
+ * C ABI function that returns a raw pointer to a component or asset field.
+ */
+typedef void *(*WXRGetter)(void*);
+
+/**
+ * Owned byte buffer passed over WasserXR's C ABI.
+ *
+ * `SerializedBytes` stores a leaked `Vec<u8>` as raw parts so generated
+ * serializers and deserializers can exchange bytes across an extern function
+ * boundary.
+ */
+typedef struct SerializedBytes {
+  /**
+   * Pointer to the first byte.
+   */
+  uint8_t *ptr;
+  /**
+   * Number of initialized bytes.
+   */
+  size_t len;
+  /**
+   * Allocation capacity of the original vector.
+   */
+  size_t cap;
+} SerializedBytes;
+
+/**
+ * C ABI function that serializes one component field into owned bytes.
+ */
+typedef struct SerializedBytes (*WXRSerializer)(const void*);
+
+/**
+ * C ABI function that writes serialized bytes back into one component field.
+ */
+typedef void (*WXRDeserializer)(void*, struct SerializedBytes);
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+/**
+ * Returns the latest error recorded by a WasserXR C binding on this thread.
+ */
+enum WXRSceneError wxr_error(void);
+
+/**
+ * Frees a C string returned by WasserXR bindings.
+ */
+void wxr_free_string(char *value);
+
+/**
+ * Writes a log entry to a scene.
+ */
+int32_t wxr_log(const struct WXRScene *scene, enum LogLevel level, const char *message);
+
+/**
+ * Sets the logger name used by future scene log entries.
+ */
+int32_t wxr_set_logger(struct WXRScene *scene, const char *logger);
+
+/**
+ * Returns a snapshot of stored scene log entries.
+ */
+struct WXRLogEntryArray wxr_iter_logs(const struct WXRScene *scene);
+
+/**
+ * Frees log entries returned by `wxr_iter_logs`.
+ */
+void wxr_free_log_entries(struct WXRLogEntryArray array);
+
+/**
+ * Returns a log entry severity.
+ */
+enum LogLevel wxr_log_entry_get_level(const struct WXRLogEntry *entry);
+
+/**
+ * Returns a log entry message as an owned C string.
+ */
+char *wxr_log_entry_get_message(const struct WXRLogEntry *entry);
+
+/**
+ * Returns a log entry logger name as an owned C string.
+ */
+char *wxr_log_entry_get_logger(const struct WXRLogEntry *entry);
+
+/**
+ * Returns a log entry Unix timestamp in seconds.
+ */
+long long wxr_log_entry_get_timestamp(const struct WXRLogEntry *entry);
+
+/**
+ * Formats a log entry using WasserXR's display formatter.
+ */
+char *wxr_render_log_entry(const struct WXRLogEntry *entry);
+
+/**
+ * Creates a new scene.
+ */
+struct WXRScene *wxr_create_scene(void);
+
+/**
+ * Destroys a scene created by `wxr_create_scene`.
+ */
+void wxr_destroy_scene(struct WXRScene *scene);
+
+/**
+ * Resets a scene.
+ */
+int32_t wxr_reset(struct WXRScene *scene);
+
+/**
+ * Serializes a scene into an owned byte buffer.
+ */
+struct WXRBytes wxr_serialize(const struct WXRScene *scene);
+
+/**
+ * Frees a byte buffer returned by WasserXR bindings.
+ */
+void wxr_free_bytes(struct WXRBytes bytes);
+
+/**
+ * Replaces a scene with serialized bytes.
+ */
+int32_t wxr_deserialize(struct WXRScene *scene, const uint8_t *data, size_t len);
+
+/**
+ * Saves a scene to a filesystem path.
+ */
+int32_t wxr_save(const struct WXRScene *scene, const char *path);
+
+/**
+ * Loads a scene from a filesystem path.
+ */
+int32_t wxr_load(struct WXRScene *scene, const char *path);
+
+/**
+ * Loads a dynamic plugin by path.
+ */
+int32_t wxr_load_plugin(struct WXRScene *scene, const char *path);
+
+/**
+ * Returns the sorted paths of dynamically loaded plugins.
+ */
+struct WXRStringArray wxr_get_plugins(const struct WXRScene *scene);
+
+/**
+ * Unloads a dynamic plugin by path.
+ */
+int32_t wxr_unload_plugin(struct WXRScene *scene, const char *path);
+
+/**
+ * Adds a new entity and returns its 16-byte id.
+ */
+struct WXREntity wxr_add_entity(struct WXRScene *scene);
+
+/**
+ * Returns all entity ids in sorted order.
+ */
+struct WXREntityArray wxr_get_entities(const struct WXRScene *scene);
+
+/**
+ * Frees an entity array returned by WasserXR bindings.
+ */
+void wxr_free_entities(struct WXREntityArray array);
+
+/**
+ * Frees a string array returned by WasserXR bindings.
+ */
+void wxr_free_strings(struct WXRStringArray array);
+
+/**
+ * Removes an entity and all components attached to it.
+ */
+int32_t wxr_remove_entity(struct WXRScene *scene, struct WXREntity entity);
+
+/**
+ * Returns an entity display name as an owned C string.
+ */
+char *wxr_get_entity_name(const struct WXRScene *scene, struct WXREntity entity);
+
+/**
+ * Sets an entity display name.
+ */
+int32_t wxr_set_entity_name(struct WXRScene *scene, struct WXREntity entity, const char *name);
+
+/**
+ * Adds a system by id and priority.
+ */
+int32_t wxr_add_system(struct WXRScene *scene, const char *id, size_t priority);
+
+/**
+ * Removes a system by id.
+ */
+int32_t wxr_remove_system(struct WXRScene *scene, const char *id);
+
+/**
+ * Returns all system ids in sorted order.
+ */
+struct WXRStringArray wxr_get_systems(const struct WXRScene *scene);
+
+/**
+ * Returns a system priority, or zero on failure.
+ */
+size_t wxr_get_system_priority(const struct WXRScene *scene, const char *id);
+
+/**
+ * Returns the plugin id that provided a system.
+ */
+char *wxr_get_system_plugin_id(const struct WXRScene *scene, const char *id);
+
+/**
+ * Adds a component to an entity by component id.
+ */
+int32_t wxr_add_component(struct WXRScene *scene, struct WXREntity entity, const char *id);
+
+/**
+ * Removes a component from an entity.
+ */
+int32_t wxr_remove_component(struct WXRScene *scene, struct WXREntity entity, const char *id);
+
+/**
+ * Returns component ids attached to an entity.
+ */
+struct WXRStringArray wxr_get_entity_components(const struct WXRScene *scene,
+                                                struct WXREntity entity);
+
+/**
+ * Returns the first entity with the component id, or a zero UUID if none exists.
+ */
+struct WXREntity wxr_get_entity_with_component(const struct WXRScene *scene,
+                                               const char *component_id);
+
+/**
+ * Returns 1 when an entity has the component id, otherwise 0.
+ */
+int32_t wxr_has_component(const struct WXRScene *scene,
+                          struct WXREntity entity,
+                          const char *component_id);
+
+/**
+ * Hot-reloads all dynamic plugins while preserving serializable scene state.
+ */
+int32_t wxr_reload(struct WXRScene *scene);
+
+/**
+ * Runs all systems once. Returns 1 to continue and 0 to stop.
+ */
+int32_t wxr_tick(struct WXRScene *scene);
+
+/**
+ * Ensures an asset is loaded.
+ */
+int32_t wxr_ensure_asset_loaded(struct WXRScene *scene,
+                                const char *asset_type,
+                                const char *data_string);
+
+/**
+ * Returns loaded data strings for an asset type.
+ */
+struct WXRStringArray wxr_get_loaded_asset_data_strings(const struct WXRScene *scene,
+                                                        const char *asset_type);
+
+/**
+ * Returns a raw pointer to one component field.
+ */
+void *wxr_query(const struct WXRScene *scene,
+                struct WXREntity entity,
+                const char *component_id,
+                const char *field_id);
+
+/**
+ * Loads an asset if needed and returns a raw pointer to one asset field.
+ */
+void *wxr_asset_query(struct WXRScene *scene,
+                      const char *asset_type,
+                      const char *data_string,
+                      const char *field_id);
+
+/**
+ * Returns component field ids for a component on an entity.
+ */
+struct WXRStringArray wxr_get_component_fields(const struct WXRScene *scene,
+                                               struct WXREntity entity,
+                                               const char *component_id);
+
+/**
+ * Returns the plugin id that provided a component on an entity.
+ */
+char *wxr_get_entity_component_plugin_id(const struct WXRScene *scene,
+                                         struct WXREntity entity,
+                                         const char *component_id);
+
+/**
+ * Returns a component field type hint.
+ */
+int32_t wxr_get_component_field_type(const struct WXRScene *scene,
+                                     struct WXREntity entity,
+                                     const char *component_id,
+                                     const char *field_id);
+
+/**
+ * Returns 1 when a component field is mutable, otherwise 0.
+ */
+int32_t wxr_is_component_field_mutable(const struct WXRScene *scene,
+                                       struct WXREntity entity,
+                                       const char *component_id,
+                                       const char *field_id);
+
+/**
+ * Returns 1 when a component field can be parsed from a string, otherwise 0.
+ */
+int32_t wxr_is_component_field_string_parsable(const struct WXRScene *scene,
+                                               struct WXREntity entity,
+                                               const char *component_id,
+                                               const char *field_id);
+
+/**
+ * Renders a component field as an owned C string.
+ */
+char *wxr_render_field(const struct WXRScene *scene,
+                       struct WXREntity entity,
+                       const char *component_id,
+                       const char *field_id);
+
+/**
+ * Parses a string into a component field.
+ */
+int32_t wxr_parse_field(struct WXRScene *scene,
+                        struct WXREntity entity,
+                        const char *component_id,
+                        const char *field_id,
+                        const char *input);
+
+/**
+ * Adds a raw C resource to the scene.
+ */
+int32_t wxr_add_resource(struct WXRScene *scene,
+                         const char *name,
+                         void *data,
+                         WXRResourceDropper dropper);
+
+/**
+ * Returns a raw C resource pointer by name.
+ */
+void *wxr_get_resource(struct WXRScene *scene, const char *name);
+
+/**
+ * Requests that the next `wxr_tick` return 0.
+ */
+int32_t wxr_should_exit(struct WXRScene *scene);
+
+/**
+ * Allocates an empty component schema.
+ */
+struct WXRComponentSchema *wxr_component_schema_new(void);
+
+/**
+ * Frees a component schema allocated by `wxr_component_schema_new`.
+ */
+void wxr_component_schema_free(struct WXRComponentSchema *schema);
+
+/**
+ * Adds a field definition to a component schema.
+ */
+int32_t wxr_component_schema_add_field(struct WXRComponentSchema *schema,
+                                       const char *id,
+                                       enum FieldType type_hint,
+                                       WXRGetter getter,
+                                       int32_t mutable_);
+
+/**
+ * Adds a serializable field definition to a component schema.
+ */
+int32_t wxr_component_schema_add_serialized_field(struct WXRComponentSchema *schema,
+                                                  const char *id,
+                                                  enum FieldType type_hint,
+                                                  WXRGetter getter,
+                                                  int32_t mutable_,
+                                                  WXRSerializer serializer,
+                                                  WXRDeserializer deserializer);
+
+/**
+ * Allocates an empty asset schema.
+ */
+struct WXRAssetSchema *wxr_asset_schema_new(void);
+
+/**
+ * Frees an asset schema allocated by `wxr_asset_schema_new`.
+ */
+void wxr_asset_schema_free(struct WXRAssetSchema *schema);
+
+/**
+ * Adds a field definition to an asset schema.
+ */
+int32_t wxr_asset_schema_add_field(struct WXRAssetSchema *schema,
+                                   const char *id,
+                                   enum FieldType type_hint,
+                                   WXRGetter getter);
+
+/**
+ * Resolves an asset path and returns the absolute path as an owned C string.
+ */
+char *wxr_get_asset_path(const char *path);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
+
 #endif  /* WASSERXR_H */
