@@ -1,3 +1,9 @@
+//! Procedural macros that generate WasserXR's C ABI plugin bindings.
+//!
+//! These macros let plugin authors write normal Rust systems, components, and
+//! asset types while emitting the `wxr_*` functions the runtime resolves from
+//! loaded plugins.
+
 mod asset;
 mod component;
 mod system;

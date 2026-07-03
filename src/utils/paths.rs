@@ -3,6 +3,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Resolves an asset path to an existing absolute path.
+///
+/// Absolute inputs must exist. Relative inputs are searched next to the current
+/// executable first and then in the current working directory.
+///
+/// # Examples
+///
+/// ```no_run
+/// let cargo_toml = wasserxr::utils::paths::get_asset_path("Cargo.toml");
+/// assert!(cargo_toml.is_some());
+/// ```
 pub fn get_asset_path(path: &str) -> Option<PathBuf> {
     let path = Path::new(path);
 

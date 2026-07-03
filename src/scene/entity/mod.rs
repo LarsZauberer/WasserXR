@@ -2,6 +2,7 @@ use uuid::Uuid;
 
 use crate::scene::serialization::EntityData;
 
+/// Entity identity and display name stored by a scene.
 pub struct Entity {
     id: Uuid,
     name: String,
@@ -17,18 +18,22 @@ impl Default for Entity {
 }
 
 impl Entity {
+    /// Creates an entity with a fresh UUID and an empty name.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Returns the stable entity id.
     pub fn get_id(&self) -> Uuid {
         self.id
     }
 
+    /// Returns the entity's display name.
     pub fn get_name(&self) -> &str {
         &self.name
     }
 
+    /// Replaces the entity's display name.
     pub fn set_name(&mut self, name: String) {
         self.name = name;
     }

@@ -2,6 +2,10 @@
 name = "wasserxr"
 version = "0.1.0"
 edition = "2024"
+description = "Dynamic ECS core for the WasserXR engine."
+readme = "README.md"
+repository = "https://github.com/LarsZauberer/WasserXR"
+license-file = "LICENSE.md"
 
 [workspace]
 members = [".", "wasserxr-macros"]
@@ -9,11 +13,11 @@ resolver = "3"
 
 [dependencies]
 bincode = { version = "2.0.1", features = ["serde"] }
+chrono = "0.4.45"
 libc = "0.2.186"
 serde = { version = "1.0.228", features = ["derive"] }
 wasserxr-macros = { path = "wasserxr-macros" }
 uuid = { version = "1.23.2", features = ["serde", "v7"] }
-chrono = "0.4.45"
 
 [build-dependencies]
 cbindgen = "0.29"

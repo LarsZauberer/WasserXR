@@ -150,6 +150,9 @@ fn create_groups_static(symbols: &SystemSymbols, group_count: usize) -> proc_mac
     let groups_ident = &symbols.groups_ident;
 
     quote! {
+        #[doc = "Generated WasserXR system group-count binding."]
+        #[doc = ""]
+        #[doc = "Stores how many entity groups this system selector can return."]
         #[unsafe(export_name = #groups_name)]
         static #groups_ident: usize = #group_count;
     }
@@ -164,6 +167,13 @@ fn create_selector_function(
     let component_groups = create_component_groups(entities);
 
     quote! {
+        #[doc = "Generated WasserXR system selector binding."]
+        #[doc = ""]
+        #[doc = "Returns the first matching entity group index for an entity, or -1 when no group matches."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`scene` must point to a valid `Scene`, and `entity` must point to 16 UUID bytes."]
         #[unsafe(export_name = #selector_name)]
         unsafe extern "C" fn #selector_ident(
             scene: *const ::wasserxr::scene::Scene,
@@ -200,6 +210,13 @@ fn create_runner_function(
     let groups_ident = &symbols.groups_ident;
 
     quote! {
+        #[doc = "Generated WasserXR system runner binding."]
+        #[doc = ""]
+        #[doc = "Converts raw grouped entity UUID pointers into Rust vectors and calls the annotated system function."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`scene` must point to a valid `Scene`. `entities` and `groups` must describe the group layout declared by the generated group-count binding."]
         #[unsafe(export_name = #runner_name)]
         unsafe extern "C" fn #runner_ident(
             scene: *mut ::wasserxr::scene::Scene,
@@ -256,6 +273,13 @@ fn expand_lifecycle(
     Ok(quote! {
         #item
 
+        #[doc = "Generated WasserXR system lifecycle binding."]
+        #[doc = ""]
+        #[doc = "Calls the annotated attach or detach lifecycle function."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`scene` must point to a valid `Scene`."]
         #[unsafe(export_name = #wrapper_name)]
         unsafe extern "C" fn #wrapper_ident(scene: *mut ::wasserxr::scene::Scene) {
             let scene = unsafe { &mut *scene };

@@ -60,6 +60,13 @@ pub(crate) fn expand_asset_type_creator(
     Ok(quote! {
         #item
 
+        #[doc = "Generated WasserXR asset creator binding."]
+        #[doc = ""]
+        #[doc = "Converts the C string data argument to `&str`, calls the annotated Rust creator, and returns an owned asset pointer or null."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`scene` must point to a valid `Scene`, and `data` must point to a valid nul-terminated UTF-8 C string."]
         #[unsafe(export_name = #creator_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #creator_ident(
@@ -156,6 +163,13 @@ fn create_destroyer_function(asset_ident: &Ident, asset_id: &str) -> proc_macro2
     let destroyer_ident = format_ident!("{}", destroyer_name);
 
     quote! {
+        #[doc = "Generated WasserXR asset destroyer binding."]
+        #[doc = ""]
+        #[doc = "Drops the asset pointer previously returned by the generated asset creator."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`ptr` must be a non-null pointer returned for this exact asset type and must not be destroyed twice."]
         #[unsafe(export_name = #destroyer_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #destroyer_ident(
@@ -188,6 +202,13 @@ fn create_schema_function(asset_id: &str, fields: &[Field]) -> proc_macro2::Toke
     });
 
     quote! {
+        #[doc = "Generated WasserXR asset schema binding."]
+        #[doc = ""]
+        #[doc = "Registers every queryable asset field and its getter in the provided schema."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`schema` must point to a valid mutable asset schema."]
         #[unsafe(export_name = #schema_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #schema_ident(
@@ -212,6 +233,13 @@ fn create_getter_functions(
         let getter_ident = format_ident!("{}", getter_name);
 
         quote! {
+            #[doc = "Generated WasserXR asset field getter binding."]
+            #[doc = ""]
+            #[doc = "Returns a raw pointer to one field on the asset value."]
+            #[doc = ""]
+            #[doc = "# Safety"]
+            #[doc = ""]
+            #[doc = "`ptr` must point to this exact asset type. The returned pointer is only valid while the asset is alive."]
             #[unsafe(export_name = #getter_name)]
             #[allow(non_snake_case)]
             pub unsafe extern "C" fn #getter_ident(

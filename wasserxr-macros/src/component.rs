@@ -173,6 +173,13 @@ pub(crate) fn expand_component_creator(
     Ok(quote! {
         #item
 
+        #[doc = "Generated WasserXR component creator binding."]
+        #[doc = ""]
+        #[doc = "Calls the annotated Rust creator and returns an owned component pointer or null."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`scene` must point to a valid `Scene`."]
         #[unsafe(export_name = #creator_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #creator_ident(
@@ -303,6 +310,13 @@ fn create_destroyer_function(
     let destroyer_ident = format_ident!("{}", destroyer_name);
 
     quote! {
+        #[doc = "Generated WasserXR component destroyer binding."]
+        #[doc = ""]
+        #[doc = "Drops the component pointer previously returned by the generated component creator."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`ptr` must be a non-null pointer returned for this exact component type and must not be destroyed twice."]
         #[unsafe(export_name = #destroyer_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #destroyer_ident(ptr: *mut ::std::ffi::c_void) {
@@ -362,6 +376,13 @@ fn create_schema_function(
     });
 
     quote! {
+        #[doc = "Generated WasserXR component schema binding."]
+        #[doc = ""]
+        #[doc = "Registers queryable component fields, mutability flags, and serialization hooks in the provided schema."]
+        #[doc = ""]
+        #[doc = "# Safety"]
+        #[doc = ""]
+        #[doc = "`schema` must point to a valid mutable component schema."]
         #[unsafe(export_name = #schema_name)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #schema_ident(
@@ -436,6 +457,13 @@ fn create_getter_functions(
             let getter_ident = format_ident!("{}", getter_name);
 
             quote! {
+                #[doc = "Generated WasserXR component field getter binding."]
+                #[doc = ""]
+                #[doc = "Returns a raw pointer to one field on the component value."]
+                #[doc = ""]
+                #[doc = "# Safety"]
+                #[doc = ""]
+                #[doc = "`ptr` must point to this exact component type. The returned pointer is only valid while the component is alive."]
                 #[unsafe(export_name = #getter_name)]
                 #[allow(non_snake_case)]
                 pub unsafe extern "C" fn #getter_ident(
@@ -471,6 +499,13 @@ fn create_serializer_functions(
 
             match component_field_serialization_kind(field_ty) {
                 SerializationKind::Bytes => quote! {
+                    #[doc = "Generated WasserXR component field serializer binding."]
+                    #[doc = ""]
+                    #[doc = "Serializes one numeric component field as little-endian bytes."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type."]
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -485,6 +520,13 @@ fn create_serializer_functions(
                     }
                 },
                 SerializationKind::Char => quote! {
+                    #[doc = "Generated WasserXR component field serializer binding."]
+                    #[doc = ""]
+                    #[doc = "Serializes one `char` component field as little-endian `u32` bytes."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type."]
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -499,6 +541,13 @@ fn create_serializer_functions(
                     }
                 },
                 SerializationKind::String => quote! {
+                    #[doc = "Generated WasserXR component field serializer binding."]
+                    #[doc = ""]
+                    #[doc = "Serializes one `String` component field as UTF-8 bytes."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type."]
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -513,6 +562,13 @@ fn create_serializer_functions(
                     }
                 },
                 SerializationKind::Bincode => quote! {
+                    #[doc = "Generated WasserXR component field serializer binding."]
+                    #[doc = ""]
+                    #[doc = "Serializes one component field with serde and bincode."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type, and the field type must serialize correctly."]
                     #[unsafe(export_name = #serializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #serializer_ident(
@@ -548,6 +604,13 @@ fn create_deserializer_functions(
 
             match component_field_serialization_kind(field_ty) {
                 SerializationKind::Bytes => quote! {
+                    #[doc = "Generated WasserXR component field deserializer binding."]
+                    #[doc = ""]
+                    #[doc = "Deserializes little-endian numeric bytes into one component field."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type, and `data` must be an owned `SerializedBytes` value."]
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -566,6 +629,13 @@ fn create_deserializer_functions(
                     }
                 },
                 SerializationKind::Char => quote! {
+                    #[doc = "Generated WasserXR component field deserializer binding."]
+                    #[doc = ""]
+                    #[doc = "Deserializes little-endian `u32` bytes into one `char` component field."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type, and `data` must be an owned `SerializedBytes` value."]
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -583,6 +653,13 @@ fn create_deserializer_functions(
                     }
                 },
                 SerializationKind::String => quote! {
+                    #[doc = "Generated WasserXR component field deserializer binding."]
+                    #[doc = ""]
+                    #[doc = "Deserializes UTF-8 bytes into one `String` component field."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type, and `data` must be an owned `SerializedBytes` value."]
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(
@@ -598,6 +675,13 @@ fn create_deserializer_functions(
                     }
                 },
                 SerializationKind::Bincode => quote! {
+                    #[doc = "Generated WasserXR component field deserializer binding."]
+                    #[doc = ""]
+                    #[doc = "Deserializes one component field with serde and bincode."]
+                    #[doc = ""]
+                    #[doc = "# Safety"]
+                    #[doc = ""]
+                    #[doc = "`ptr` must point to this exact component type, and `data` must be an owned `SerializedBytes` value for that field type."]
                     #[unsafe(export_name = #deserializer_name)]
                     #[allow(non_snake_case)]
                     pub unsafe extern "C" fn #deserializer_ident(

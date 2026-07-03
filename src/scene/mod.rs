@@ -1,9 +1,15 @@
+//! Scene runtime, ECS storage, plugin loading, and typed query APIs.
+
+/// Asset type schemas and asset field query support.
 pub mod assets;
+/// Component schemas, field metadata, and serialization byte buffers.
 pub mod component;
 pub(crate) mod entity;
+/// Scene logging types, callbacks, and exported log macros.
 pub mod logging;
 pub(crate) mod plugin;
 pub mod query;
+/// Type-erased scene resources.
 pub mod resource;
 pub(crate) mod serialization;
 pub(crate) mod system;
@@ -34,6 +40,19 @@ enum DeferredCall {
     RemoveSystem(String),
 }
 
+/// Runtime container for entities, components, systems, resources, plugins, and assets.
+///
+/// `Scene` is the main API entry point for applications and plugins.
+///
+/// # Examples
+///
+/// ```
+/// let mut scene = wasserxr::scene::Scene::new();
+/// let entity = scene.add_entity();
+///
+/// scene.set_entity_name(entity, "Player".to_owned()).unwrap();
+/// assert_eq!(scene.get_entity_name(entity).unwrap(), "Player");
+/// ```
 pub struct Scene {
     entities: HashMap<Uuid, Entity>,
     plugins: HashMap<String, Plugin>,
@@ -87,10 +106,14 @@ impl Drop for Scene {
 }
 
 impl Scene {
+    /// Creates an empty scene with the built-in static plugin registered.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Removes all assets, systems, entities, and components from the scene.
+    ///
+    /// Loaded plugins and resources stay registered.
     pub fn reset(&mut self) -> Result<(), SceneError> {
         self.clear_assets();
 
@@ -111,6 +134,9 @@ impl Scene {
         Ok(())
     }
 
+    /// Serializes entities, systems, and components into WasserXR scene bytes.
+    ///
+    /// Assets, resources, and loaded plugin handles are not serialized.
     pub fn serialize(&self) -> Result<Vec<u8>, SceneError> {
         let entities: Vec<_> = self.entities.values().map(Entity::serialize).collect();
 
@@ -136,6 +162,11 @@ impl Scene {
         .map_err(SceneError::Serialization)
     }
 
+    /// Replaces the scene state with serialized WasserXR scene bytes.
+    ///
+    /// This calls `reset` first, then recreates entities, systems, and
+    /// components from the decoded scene data. Invalid individual systems or
+    /// components are skipped with a warning.
     pub fn deserialize(&mut self, data: &[u8]) -> Result<(), SceneError> {
         self.reset()?;
 
@@ -187,11 +218,16 @@ impl Scene {
         Ok(())
     }
 
+    /// Writes serialized scene bytes to `path`.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), SceneError> {
         let data = self.serialize()?;
         fs::write(path, data).map_err(|error| SceneError::FileIo(error.to_string()))
     }
 
+    /// Loads serialized scene bytes from `path`.
+    ///
+    /// If called while a system is ticking, the load is deferred until the
+    /// current system runner returns.
     pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SceneError> {
         let data = fs::read(path).map_err(|error| SceneError::FileIo(error.to_string()))?;
         if self.is_ticking {
@@ -202,6 +238,9 @@ impl Scene {
         self.deserialize(&data)
     }
 
+    /// Returns sorted ids for dynamically loaded plugins.
+    ///
+    /// The built-in static plugin is intentionally omitted.
     pub fn get_plugins(&self) -> Vec<String> {
         let mut plugins: Vec<String> = self
             .plugins
@@ -224,6 +263,10 @@ impl Scene {
             )
     }
 
+    /// Loads a dynamic plugin from `path`.
+    ///
+    /// Plugin symbols are resolved lazily when systems, components, or asset
+    /// types are created.
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
             crate::warn!(self, "Plugin `{}` is already loaded", path);
@@ -256,6 +299,10 @@ impl Scene {
         Ok(())
     }
 
+    /// Unloads a dynamic plugin and removes its systems, asset types, and components.
+    ///
+    /// If called while a system is ticking, the unload is deferred until the
+    /// current system runner returns.
     pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
         if self.is_ticking {
             self.deferred_calls
@@ -321,6 +368,16 @@ impl Scene {
         Ok(())
     }
 
+    /// Adds a new entity and returns its id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scene = wasserxr::scene::Scene::new();
+    /// let entity = scene.add_entity();
+    ///
+    /// assert!(scene.get_entities().contains(&entity));
+    /// ```
     pub fn add_entity(&mut self) -> Uuid {
         let entity = Entity::new();
         let uuid = entity.get_id();
@@ -330,12 +387,14 @@ impl Scene {
         uuid
     }
 
+    /// Returns all entity ids in sorted order.
     pub fn get_entities(&self) -> Vec<Uuid> {
         let mut entities: Vec<Uuid> = self.entities.keys().copied().collect();
         entities.sort();
         entities
     }
 
+    /// Removes an entity and all of its components.
     pub fn remove_entity(&mut self, id: Uuid) -> Result<(), SceneError> {
         let Some(_) = self.entities.remove(&id) else {
             crate::warn!(self, "Entity `{}` was not found for removal", id);
@@ -387,11 +446,13 @@ impl Scene {
             .expect("entity was checked before mutable lookup"))
     }
 
+    /// Returns the display name for an entity.
     pub fn get_entity_name(&self, id: Uuid) -> Result<&str, SceneError> {
         let entity = self.get_entity(id)?;
         Ok(entity.get_name())
     }
 
+    /// Replaces the display name for an entity.
     pub fn set_entity_name(&mut self, id: Uuid, name: String) -> Result<(), SceneError> {
         let entity = self.get_entity_mut(id)?;
         entity.set_name(name);
@@ -399,6 +460,10 @@ impl Scene {
         Ok(())
     }
 
+    /// Adds a system by id and priority.
+    ///
+    /// The runtime looks for `wxr_system_<id>` and its companion binding
+    /// functions in loaded plugins. Higher priorities run earlier in `tick`.
     pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
         self.add_system_from_data(SystemData { id, priority })
     }
@@ -434,6 +499,10 @@ impl Scene {
         }
     }
 
+    /// Removes a system and calls its detach binding.
+    ///
+    /// If called while a system is ticking, the removal is deferred until the
+    /// current system runner returns.
     pub fn remove_system(&mut self, id: &str) -> Result<(), SceneError> {
         if self.is_ticking {
             self.deferred_calls
@@ -456,12 +525,14 @@ impl Scene {
         Ok(())
     }
 
+    /// Returns all system ids in sorted order.
     pub fn get_systems(&self) -> Vec<String> {
         let mut systems: Vec<String> = self.systems.keys().cloned().collect();
         systems.sort();
         systems
     }
 
+    /// Returns a system's priority.
     pub fn get_system_priority(&self, system_id: &str) -> Result<usize, SceneError> {
         match self.systems.get(system_id) {
             Some(system) => Ok(system.get_priority()),
@@ -476,6 +547,7 @@ impl Scene {
         }
     }
 
+    /// Returns the id of the plugin that provided a system.
     pub fn get_system_plugin_id(&self, system_id: &str) -> Result<&str, SceneError> {
         match self.systems.get(system_id) {
             Some(system) => Ok(system.get_plugin_id()),
@@ -490,6 +562,10 @@ impl Scene {
         }
     }
 
+    /// Adds a component to an entity by component id.
+    ///
+    /// The runtime resolves `wxr_create_<component>`, `wxr_destroy_<component>`,
+    /// and schema bindings from loaded plugins.
     pub fn add_component(
         &mut self,
         entity_id: Uuid,
@@ -561,6 +637,7 @@ impl Scene {
         Ok(())
     }
 
+    /// Removes a component from an entity.
     pub fn remove_component(
         &mut self,
         entity_id: Uuid,
@@ -598,6 +675,7 @@ impl Scene {
         Ok(())
     }
 
+    /// Returns sorted component ids attached to an entity.
     pub fn get_entity_components(&self, entity_id: Uuid) -> Result<Vec<String>, SceneError> {
         let Some(entity_components) = self.components.get(&entity_id) else {
             crate::warn!(
@@ -613,20 +691,26 @@ impl Scene {
         Ok(components)
     }
 
+    /// Returns the first entity that has `component_id`, if any.
     pub fn get_entity_with_component(&self, component_id: &str) -> Option<Uuid> {
         self.get_entities()
             .into_iter()
             .find(|entity_id| self.has_component(*entity_id, component_id))
     }
 
+    /// Returns whether an entity has a component with this id.
     pub fn has_component(&self, entity_id: Uuid, component_id: &str) -> bool {
         self.components
             .get(&entity_id)
             .is_some_and(|components| components.contains_key(component_id))
     }
 
-    /// This is reload the Scene immediately. It will serialize the current scene data, unload all
-    /// the plugins and reload them in. At the end it will deserialize the scene again.
+    /// Hot-reloads all dynamic plugins while preserving serializable scene state.
+    ///
+    /// The scene is serialized, dynamic plugins are unloaded and loaded again,
+    /// and then the serialized state is deserialized. If called while a system
+    /// is ticking, the reload is deferred until the current system runner
+    /// returns.
     pub fn reload(&mut self) -> Result<(), SceneError> {
         if self.is_ticking {
             self.deferred_calls.push(DeferredCall::Reload);
@@ -749,6 +833,10 @@ impl Scene {
         }
     }
 
+    /// Runs all systems once and processes deferred scene changes.
+    ///
+    /// Systems run from highest priority to lowest priority. Returns `false`
+    /// only when `should_exit` was requested during the tick.
     pub fn tick(&mut self) -> bool {
         let mut systems_sorted: Vec<&System> = self.systems.values().collect();
         systems_sorted.sort_by_key(|a| a.get_priority());
@@ -812,6 +900,20 @@ impl Scene {
             .collect()
     }
 
+    /// Borrows component fields as typed shared references.
+    ///
+    /// `fields` must have the same length and order as the requested tuple.
+    ///
+    /// SAFETY: this is a safe API over raw component storage. The requested
+    /// Rust reference types must match the schema field types exposed by the
+    /// component plugin. A wrong type can create invalid references.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let (health,) = scene.query::<(&i64,)>(entity, "Health", &["value"])?;
+    /// println!("{health}");
+    /// ```
     pub fn query<'scene, Q>(
         &'scene self,
         entity_id: Uuid,
@@ -831,6 +933,21 @@ impl Scene {
         unsafe { Q::fetch(&field_ptrs) }
     }
 
+    /// Borrows component fields as typed shared or mutable references.
+    ///
+    /// Mutable fields must be registered as mutable in the component schema,
+    /// and duplicate field names are rejected before references are created.
+    ///
+    /// SAFETY: this is a safe API over raw component storage. The requested
+    /// Rust reference types must match the schema field types exposed by the
+    /// component plugin. A wrong type can create invalid references.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let (health,) = scene.query_mut::<(&mut i64,)>(entity, "Health", &["value"])?;
+    /// *health += 1;
+    /// ```
     pub fn query_mut<'scene, Q>(
         &'scene mut self,
         entity_id: Uuid,
@@ -918,6 +1035,10 @@ impl Scene {
         Ok(())
     }
 
+    /// Ensures an asset of `asset_type` with `data_string` is loaded.
+    ///
+    /// If the asset already exists, this is a no-op. Otherwise the asset type
+    /// is registered on demand and its creator binding is called.
     pub fn ensure_asset_loaded(
         &mut self,
         asset_type: &str,
@@ -958,6 +1079,7 @@ impl Scene {
         Ok(())
     }
 
+    /// Returns sorted data strings for loaded assets of an asset type.
     pub fn get_loaded_asset_data_strings(&self, asset_type: &str) -> Vec<String> {
         let Some(assets) = self.assets.get(asset_type) else {
             return Vec::new();
@@ -1016,6 +1138,13 @@ impl Scene {
             .collect()
     }
 
+    /// Borrows fields from an already loaded asset as typed shared references.
+    ///
+    /// `fields` must have the same length and order as the requested tuple.
+    ///
+    /// SAFETY: this is a safe API over raw asset storage. The requested Rust
+    /// reference types must match the schema field types exposed by the asset
+    /// plugin. A wrong type can create invalid references.
     pub fn asset_query_loaded<'scene, Q>(
         &'scene self,
         asset_type: &str,
@@ -1033,6 +1162,16 @@ impl Scene {
         unsafe { Q::fetch(&field_ptrs) }
     }
 
+    /// Loads an asset if needed, then borrows its fields as typed shared references.
+    ///
+    /// SAFETY: this has the same raw-storage type requirements as
+    /// `asset_query_loaded`.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let (content,) = scene.asset_query::<(&String,)>("TextAsset", "story.txt", &["content"])?;
+    /// ```
     pub fn asset_query<'scene, Q>(
         &'scene mut self,
         asset_type: &str,
@@ -1046,6 +1185,7 @@ impl Scene {
         self.asset_query_loaded(asset_type, data_string, fields)
     }
 
+    /// Returns sorted field ids registered for a component on an entity.
     pub fn get_component_fields(
         &self,
         entity_id: Uuid,
@@ -1075,6 +1215,7 @@ impl Scene {
         Ok(fields)
     }
 
+    /// Returns the id of the plugin that provided a component on an entity.
     pub fn get_entity_component_plugin_id(
         &self,
         entity_id: Uuid,
@@ -1102,6 +1243,7 @@ impl Scene {
         Ok(component.get_plugin_id())
     }
 
+    /// Returns the runtime type hint for a component field.
     pub fn get_component_field_type(
         &self,
         entity_id: Uuid,
@@ -1132,6 +1274,7 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    /// Returns whether a component field can be borrowed mutably.
     pub fn is_component_field_mutable(
         &self,
         entity_id: Uuid,
@@ -1145,6 +1288,7 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    /// Returns whether a component field can be edited from a string.
     pub fn is_component_field_string_parsable(
         &self,
         entity_id: Uuid,
@@ -1158,6 +1302,10 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    /// Renders a component field as a string for UI or debugging.
+    ///
+    /// SAFETY: this calls the component's raw getter internally. The component
+    /// schema must report the real field type.
     pub fn render_field(
         &self,
         entity_id: Uuid,
@@ -1171,6 +1319,13 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    /// Parses a string and writes it into a component field.
+    ///
+    /// The field must have a getter, must not be `Blob`, and the input must
+    /// parse as the field's runtime type.
+    ///
+    /// SAFETY: this calls the component's raw getter internally. The component
+    /// schema must report the real field type.
     pub fn parse_field(
         &mut self,
         entity_id: Uuid,
@@ -1185,6 +1340,7 @@ impl Scene {
             .map_err(SceneError::ComponentFieldError)
     }
 
+    /// Requests that the next `tick` return `false`.
     pub fn should_exit(&mut self) {
         self.should_exit = true;
     }

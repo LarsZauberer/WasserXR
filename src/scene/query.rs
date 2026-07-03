@@ -38,7 +38,19 @@ use std::ffi::c_void;
 
 use crate::error::SceneError;
 
+/// Converts one raw component or asset field pointer into a shared query item.
+///
+/// # Safety
+///
+/// Implementations must only build references matching the real field type and
+/// lifetime provided by the owning scene.
 pub trait QueryItem<'scene>: Sized {
+    /// Builds a query item from a raw field pointer.
+    ///
+    /// # Safety
+    ///
+    /// `field` must point to a valid value of the type expected by the
+    /// implementation for at least `'scene`.
     unsafe fn fetch(field: *mut c_void) -> Result<Self, SceneError>;
 }
 
@@ -48,9 +60,23 @@ impl<'scene, T: 'scene> QueryItem<'scene> for &'scene T {
     }
 }
 
+/// Converts one raw component field pointer into a shared or mutable query item.
+///
+/// # Safety
+///
+/// Implementations must only build references matching the real field type and
+/// lifetime provided by the owning scene.
 pub trait QueryItemMut<'scene>: Sized {
+    /// Whether this query item needs the schema field to be marked mutable.
     const REQUIRES_MUTABLE: bool;
 
+    /// Builds a query item from a raw field pointer.
+    ///
+    /// # Safety
+    ///
+    /// `field` must point to a valid value of the type expected by the
+    /// implementation for at least `'scene`. Mutable implementations require
+    /// unique access.
     unsafe fn fetch(field: *mut c_void) -> Result<Self, SceneError>;
 }
 
@@ -70,19 +96,39 @@ impl<'scene, T: 'scene> QueryItemMut<'scene> for &'scene mut T {
     }
 }
 
+/// Tuple query assembled by `Scene::query` and asset query APIs.
+///
+/// Implemented for tuples from one to eight items.
 pub trait SceneQuery<'scene>: Sized {
+    /// Number of field names required by this query tuple.
     const FIELD_COUNT: usize;
 
+    /// Builds the final tuple from raw field pointers.
+    ///
+    /// # Safety
+    ///
+    /// Every pointer must match the corresponding tuple item type.
     unsafe fn fetch(fields: &[*mut c_void]) -> Result<Self, SceneError>;
 }
 
+/// Tuple query assembled by `Scene::query_mut`.
+///
+/// Implemented for tuples from one to eight shared or mutable references.
 pub trait SceneQueryMut<'scene>: Sized {
+    /// Number of field names required by this query tuple.
     const FIELD_COUNT: usize;
 
+    /// Calls `check` for every field position that will be mutably borrowed.
     fn for_each_mutable_field<Check>(fields: &[&str], check: Check) -> Result<(), SceneError>
     where
         Check: FnMut(&str) -> Result<(), SceneError>;
 
+    /// Builds the final tuple from raw field pointers.
+    ///
+    /// # Safety
+    ///
+    /// Every pointer must match the corresponding tuple item type. Mutable
+    /// references must be unique.
     unsafe fn fetch(fields: &[*mut c_void]) -> Result<Self, SceneError>;
 }
 

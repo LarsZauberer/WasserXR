@@ -5,11 +5,33 @@ use crate::{
     scene::component::{field_type::FieldType, serialized_bytes::SerializedBytes},
 };
 
+/// C ABI function that returns a raw pointer to a component field.
+///
+/// # Safety
+///
+/// The caller must pass a pointer to the component type the getter was
+/// generated for. Returning a pointer to the wrong type or to invalid storage
+/// makes later field reads undefined behavior.
 pub type Getter = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+
+/// C ABI function that serializes one component field into owned bytes.
+///
+/// # Safety
+///
+/// The caller must pass a pointer to the component type the serializer was
+/// generated for.
 pub type Serializer = unsafe extern "C" fn(*const c_void) -> SerializedBytes;
+
+/// C ABI function that writes serialized bytes back into one component field.
+///
+/// # Safety
+///
+/// The caller must pass a pointer to the component type the deserializer was
+/// generated for, and the bytes must have the format that deserializer expects.
 pub type Deserializer = unsafe extern "C" fn(*mut c_void, SerializedBytes);
 
 #[derive(Clone, Copy)]
+/// Runtime metadata for one component field.
 pub struct Field {
     type_hint: FieldType,
     getter: Option<Getter>,
@@ -19,6 +41,7 @@ pub struct Field {
 }
 
 impl Field {
+    /// Creates field metadata from a type hint and optional field binding functions.
     pub fn new(
         type_hint: FieldType,
         getter: Option<Getter>,
@@ -35,10 +58,12 @@ impl Field {
         }
     }
 
+    /// Returns the runtime type hint registered for this field.
     pub fn get_type(&self) -> FieldType {
         self.type_hint
     }
 
+    /// Returns the getter function, or `FieldNoGetter` if the schema has none.
     pub fn get_getter(&self) -> Result<Getter, ComponentError> {
         match self.getter {
             Some(getter) => Ok(getter),
@@ -46,14 +71,17 @@ impl Field {
         }
     }
 
+    /// Returns whether this field may be borrowed mutably through `Scene::query_mut`.
     pub fn is_mutable(&self) -> bool {
         self.mutable
     }
 
+    /// Returns whether this field can be parsed from text with `parse`.
     pub fn is_string_parsable(&self) -> bool {
         !matches!(self.type_hint, FieldType::Blob)
     }
 
+    /// Returns the serializer function, or `FieldNoSerializer` if the schema has none.
     pub fn get_serializer(&self) -> Result<Serializer, ComponentError> {
         match self.serializer {
             Some(serializer) => Ok(serializer),
@@ -61,6 +89,7 @@ impl Field {
         }
     }
 
+    /// Returns the deserializer function, or `FieldNoDeserializer` if the schema has none.
     pub fn get_deserializer(&self) -> Result<Deserializer, ComponentError> {
         match self.deserializer {
             Some(deserializer) => Ok(deserializer),
@@ -68,6 +97,8 @@ impl Field {
         }
     }
 
+    /// Renders the raw field value as a string according to this field's type hint.
+    ///
     /// # Safety
     ///
     /// `ptr` must point to a value matching this field's type hint.
@@ -101,6 +132,8 @@ impl Field {
         })
     }
 
+    /// Parses `input` and writes it into the raw field value.
+    ///
     /// # Safety
     ///
     /// `ptr` must point to a value matching this field's type hint.

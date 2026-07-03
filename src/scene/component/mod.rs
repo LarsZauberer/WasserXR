@@ -1,6 +1,11 @@
+//! Component schema support used by component plugins and scene queries.
+
 mod field;
+/// Runtime field type hints.
 pub mod field_type;
+/// Component schema storage.
 pub mod schema;
+/// ABI-safe serialized field bytes.
 pub mod serialized_bytes;
 
 use std::ffi::c_void;

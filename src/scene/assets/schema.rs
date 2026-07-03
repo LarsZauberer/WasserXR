@@ -8,6 +8,10 @@ use crate::{
     },
 };
 
+/// Runtime schema for one asset type.
+///
+/// Asset schemas are filled by generated `wxr_asset_schema_<Asset>` functions
+/// and later used by `Scene::asset_query`.
 pub struct Schema {
     fields: HashMap<String, Field>,
 }
@@ -26,6 +30,7 @@ impl Schema {
         Schema::default()
     }
 
+    /// Registers one asset field in the schema.
     pub fn add_field(&mut self, id: String, type_hint: FieldType, getter: Option<Getter>) {
         let field = Field::new(type_hint, getter);
         self.fields.insert(id, field);
@@ -38,6 +43,7 @@ impl Schema {
         }
     }
 
+    /// Returns the type hint for a registered asset field.
     pub fn get_field_type(&self, id: &str) -> Result<FieldType, AssetError> {
         match self.fields.get(id) {
             Some(field) => Ok(field.get_type()),
@@ -45,6 +51,7 @@ impl Schema {
         }
     }
 
+    /// Returns all registered field ids.
     pub fn get_fields(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }

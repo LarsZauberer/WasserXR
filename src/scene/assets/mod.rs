@@ -1,4 +1,8 @@
+//! Asset schema support used by asset plugins and scene asset queries.
+
+/// Asset field metadata.
 pub mod field;
+/// Asset schema storage.
 pub mod schema;
 
 use std::ffi::{CString, c_char, c_void};

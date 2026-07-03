@@ -4,12 +4,17 @@ use crate::scene::Scene;
 use std::collections::hash_map::Entry;
 use std::ffi::c_void;
 
+/// Type-erased value stored in a `Scene`.
+///
+/// Resources are addressed by string name and keep their concrete Rust type
+/// outside the ECS component system.
 pub struct Resource {
     data: *mut c_void,
     dropper: unsafe fn(*mut c_void),
 }
 
 impl Resource {
+    /// Stores any `'static` Rust value as a type-erased resource.
     pub fn new<T>(value: T) -> Self {
         Self {
             data: Box::into_raw(Box::new(value)).cast(),
@@ -17,10 +22,24 @@ impl Resource {
         }
     }
 
+    /// Borrows the resource as `T`.
+    ///
+    /// # Safety
+    ///
+    /// This function is safe to call but type-erased internally. The caller
+    /// must request the same `T` that was used with `Resource::new`; requesting
+    /// a different type creates an invalid reference.
     pub fn get<T>(&self) -> &T {
         unsafe { &*self.data.cast::<T>() }
     }
 
+    /// Mutably borrows the resource as `T`.
+    ///
+    /// # Safety
+    ///
+    /// This function is safe to call but type-erased internally. The caller
+    /// must request the same `T` that was used with `Resource::new`; requesting
+    /// a different type creates an invalid mutable reference.
     pub fn get_mut<T>(&mut self) -> &mut T {
         unsafe { &mut *self.data.cast::<T>() }
     }
@@ -39,6 +58,16 @@ unsafe fn drop_value<T>(data: *mut c_void) {
 }
 
 impl Scene {
+    /// Adds a named resource to the scene.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scene = wasserxr::scene::Scene::new();
+    ///
+    /// scene.add_resource("score".to_owned(), 0usize).unwrap();
+    /// assert_eq!(*scene.get_resource::<usize>("score").unwrap(), 0);
+    /// ```
     pub fn add_resource<T>(&mut self, name: String, value: T) -> Result<(), SceneError> {
         match self.resources.entry(name) {
             Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
@@ -49,6 +78,12 @@ impl Scene {
         }
     }
 
+    /// Borrows a named resource by type.
+    ///
+    /// # Safety
+    ///
+    /// The stored value is type-erased. The requested `T` must match the type
+    /// originally passed to `add_resource`.
     pub fn get_resource<T>(&self, name: &str) -> Result<&T, SceneError> {
         self.resources
             .get(name)
@@ -56,6 +91,12 @@ impl Scene {
             .ok_or(SceneError::ResourceNotFound)
     }
 
+    /// Mutably borrows a named resource by type.
+    ///
+    /// # Safety
+    ///
+    /// The stored value is type-erased. The requested `T` must match the type
+    /// originally passed to `add_resource`.
     pub fn get_mut_resource<T>(&mut self, name: &str) -> Result<&mut T, SceneError> {
         self.resources
             .get_mut(name)
