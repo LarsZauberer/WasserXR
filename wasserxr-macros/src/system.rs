@@ -173,16 +173,14 @@ fn create_selector_function(
         #[doc = ""]
         #[doc = "# Safety"]
         #[doc = ""]
-        #[doc = "`scene` must point to a valid `Scene`, and `entity` must point to 16 UUID bytes."]
+        #[doc = "`scene` must point to a valid `Scene`."]
         #[unsafe(export_name = #selector_name)]
         unsafe extern "C" fn #selector_ident(
             scene: *const ::wasserxr::scene::Scene,
-            entity: *const u8,
+            entity: ::wasserxr::bindings::scene::WXREntity,
         ) -> i32 {
             let scene = unsafe { &*scene };
-            let bytes = unsafe { std::slice::from_raw_parts(entity, 16) };
-            let entity_id = ::wasserxr::Uuid::from_slice(bytes)
-                .expect("WasserXR entity pointers must point to 16 UUID bytes");
+            let entity_id = ::wasserxr::Uuid::from_bytes(entity.bytes);
             let selectors: &[&[&str]] = &[
                 #(#component_groups),*
             ];
@@ -220,7 +218,7 @@ fn create_runner_function(
         #[unsafe(export_name = #runner_name)]
         unsafe extern "C" fn #runner_ident(
             scene: *mut ::wasserxr::scene::Scene,
-            entities: *const *const *const u8,
+            entities: *const *const ::wasserxr::bindings::scene::WXREntity,
             groups: *const usize,
         ) {
             let groups = unsafe { std::slice::from_raw_parts(groups, #groups_ident) };
@@ -234,11 +232,7 @@ fn create_runner_function(
                 let mut rust_group = Vec::with_capacity(groups[group_index]);
 
                 for entity in raw_entities {
-                    let bytes = unsafe { std::slice::from_raw_parts(*entity, 16) };
-                    rust_group.push(
-                        ::wasserxr::Uuid::from_slice(bytes)
-                            .expect("WasserXR entity pointers must point to 16 UUID bytes"),
-                    );
+                    rust_group.push(::wasserxr::Uuid::from_bytes(entity.bytes));
                 }
 
                 rust_entities.push(rust_group);

@@ -22,6 +22,7 @@ use query::{SceneQuery, SceneQueryMut};
 use resource::Resource;
 use system::System;
 
+use crate::bindings::scene::WXREntity;
 use crate::error::{AssetError, PluginError, SceneError};
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
@@ -780,21 +781,22 @@ impl Scene {
 
     fn run_system(&mut self, system_id: &str, groups: usize, selector: Selector, runner: Runner) {
         self.set_logger(system_id.to_owned());
-        let mut entities: Vec<Vec<*const u8>> = vec![Vec::new(); groups];
+        let mut entities: Vec<Vec<WXREntity>> = vec![Vec::new(); groups];
 
         for i in self.entities.keys() {
-            let selection = unsafe { selector(self as *const Scene, i.as_bytes() as *const u8) };
+            let entity = WXREntity::from_uuid(*i);
+            let selection = unsafe { selector(self as *const Scene, entity) };
             if selection >= 0
                 && let Some(group) = entities.get_mut(selection as usize)
             {
-                group.push(i.as_bytes() as *const u8);
+                group.push(entity);
             }
         }
 
         let sizes: Vec<usize> = entities.iter().map(|group| group.len()).collect();
         let sizes_ptr = sizes.as_ptr();
 
-        let entities: Vec<*const *const u8> = entities.iter().map(|group| group.as_ptr()).collect();
+        let entities: Vec<*const WXREntity> = entities.iter().map(|group| group.as_ptr()).collect();
         let entities_ptr = entities.as_ptr();
 
         unsafe {
@@ -1656,7 +1658,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_attach_system(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -1674,7 +1676,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_cleanup_system(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -1682,7 +1684,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_reload_counted_system(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -1700,7 +1702,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_reload_counted_system(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -1718,7 +1720,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_reload_low_priority(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         SCENE_RELOAD_TICK_ORDER.lock().unwrap().push("low");
@@ -1727,7 +1729,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_reload_request(
         scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         unsafe {
@@ -1742,7 +1744,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_load_request(
         scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         let path = SCENE_DEFERRED_LOAD_PATH.lock().unwrap().clone().unwrap();
@@ -1754,7 +1756,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_loaded_marker(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -1762,7 +1764,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_remove_request(
         scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         let scene = unsafe { &mut *scene };
@@ -1782,7 +1784,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_remove_target(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         SCENE_DEFERRED_REMOVE_TICK_ORDER
@@ -1794,7 +1796,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_unload_request(
         scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         let scene = unsafe { &mut *scene };
@@ -1811,7 +1813,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_low_priority(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         SCENE_TICK_ORDER.lock().unwrap().push("low");
@@ -1823,7 +1825,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_high_priority(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
         SCENE_TICK_ORDER.lock().unwrap().push("high");

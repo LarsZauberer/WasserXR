@@ -59,13 +59,13 @@ pub struct WXRStringArray {
 }
 
 impl WXREntity {
-    fn from_uuid(id: Uuid) -> Self {
+    pub(crate) fn from_uuid(id: Uuid) -> Self {
         Self {
             bytes: *id.as_bytes(),
         }
     }
 
-    fn into_uuid(self) -> Uuid {
+    pub(crate) fn into_uuid(self) -> Uuid {
         Uuid::from_bytes(self.bytes)
     }
 }

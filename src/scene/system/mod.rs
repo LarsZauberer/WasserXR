@@ -1,16 +1,17 @@
 use crate::{
+    bindings::scene::WXREntity,
     error::SystemError,
     scene::{Scene, plugin::Plugin, serialization::SystemData},
 };
 
-pub(crate) type Selector = unsafe extern "C" fn(*const Scene, *const u8) -> i32;
-pub(crate) type Runner = unsafe extern "C" fn(*mut Scene, *const *const *const u8, *const usize);
+pub(crate) type Selector = unsafe extern "C" fn(*const Scene, WXREntity) -> i32;
+pub(crate) type Runner = unsafe extern "C" fn(*mut Scene, *const *const WXREntity, *const usize);
 pub(crate) type Attacher = unsafe extern "C" fn(*mut Scene);
 pub(crate) type Detacher = unsafe extern "C" fn(*mut Scene);
 
 // Default Selector
 
-unsafe extern "C" fn default_selector(_scene: *const Scene, _entity: *const u8) -> i32 {
+unsafe extern "C" fn default_selector(_scene: *const Scene, _entity: WXREntity) -> i32 {
     0
 }
 
@@ -154,7 +155,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_system_with_groups(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -162,7 +163,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_select_system_with_groups(
         _scene: *const Scene,
-        _entity: *const u8,
+        _entity: WXREntity,
     ) -> i32 {
         2
     }
@@ -180,7 +181,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_system_with_defaults(
         _scene: *mut Scene,
-        _entities: *const *const *const u8,
+        _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
     }
@@ -217,7 +218,7 @@ mod tests {
 
         assert_eq!(system.get_groups(), 0);
         assert_eq!(
-            unsafe { (system.get_selector())(std::ptr::null(), std::ptr::null()) },
+            unsafe { (system.get_selector())(std::ptr::null(), WXREntity { bytes: [0; 16] }) },
             0
         );
     }
