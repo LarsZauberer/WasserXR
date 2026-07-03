@@ -142,7 +142,7 @@ impl Scene {
     }
 
     /// Resets the logger name to `WasserXR`.
-    pub fn reset_logger(&mut self) {
+    pub(crate) fn reset_logger(&mut self) {
         self.log_manager.set_logger("WasserXR".to_owned());
     }
 
