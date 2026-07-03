@@ -136,6 +136,7 @@ unsafe extern "C" fn macro_manual_schema_value_getter(ptr: *mut c_void) -> *mut 
 
 #[unsafe(export_name = "wxr_schema_MacroManualSchemaComponent")]
 #[allow(non_snake_case)]
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn wxr_schema_MacroManualSchemaComponent(schema: *mut Schema) {
     unsafe {
         (*schema).add_field(

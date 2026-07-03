@@ -21,12 +21,12 @@ pub fn get_asset_path(path: &str) -> Option<PathBuf> {
         return path.exists().then(|| path.to_path_buf());
     }
 
-    if let Ok(exe) = env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            let exe_path = exe_dir.join(path);
-            if exe_path.exists() {
-                return exe_path.canonicalize().ok();
-            }
+    if let Ok(exe) = env::current_exe()
+        && let Some(exe_dir) = exe.parent()
+    {
+        let exe_path = exe_dir.join(path);
+        if exe_path.exists() {
+            return exe_path.canonicalize().ok();
         }
     }
 

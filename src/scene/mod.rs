@@ -22,7 +22,6 @@ use query::{SceneQuery, SceneQueryMut};
 use resource::Resource;
 use system::System;
 
-use crate::debug;
 use crate::error::{AssetError, PluginError, SceneError};
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
@@ -721,7 +720,13 @@ impl Scene {
         let plugins: Vec<String> = self
             .plugins
             .keys()
-            .filter_map(|id| if id == "" { None } else { Some(id.to_owned()) })
+            .filter_map(|id| {
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_owned())
+                }
+            })
             .collect();
         let serialization_data = self.serialize().inspect_err(|err| match err {
             SceneError::Serialization(msg) => {

@@ -12,16 +12,9 @@ use crate::{
 ///
 /// Asset schemas are filled by generated `wxr_asset_schema_<Asset>` functions
 /// and later used by `Scene::asset_query`.
+#[derive(Default)]
 pub struct Schema {
     fields: HashMap<String, Field>,
-}
-
-impl Default for Schema {
-    fn default() -> Self {
-        Self {
-            fields: HashMap::new(),
-        }
-    }
 }
 
 impl Schema {

@@ -108,9 +108,7 @@ impl AssetType {
         asset: &Asset,
         field: &str,
     ) -> Result<*mut c_void, AssetError> {
-        let field_ptr = unsafe { self.schema.get_field_ptr(field, asset.data()) };
-
-        field_ptr
+        unsafe { self.schema.get_field_ptr(field, asset.data()) }
     }
 
     pub(crate) fn get_id(&self) -> &str {

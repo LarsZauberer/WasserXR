@@ -12,16 +12,9 @@ use crate::{
 ///
 /// A component schema maps field ids to type hints and binding functions. It is
 /// filled by generated `wxr_schema_<Component>` functions.
+#[derive(Default)]
 pub struct Schema {
     fields: HashMap<String, Field>,
-}
-
-impl Default for Schema {
-    fn default() -> Self {
-        Self {
-            fields: HashMap::new(),
-        }
-    }
 }
 
 impl Schema {

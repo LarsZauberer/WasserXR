@@ -1,5 +1,3 @@
-#[cfg(test)]
-use std::path::PathBuf;
 use std::{
     ffi::{CStr, CString},
     io::ErrorKind,
@@ -12,8 +10,6 @@ use crate::error::PluginError;
 
 pub(crate) struct Plugin {
     path: Option<String>,
-    #[cfg(test)]
-    fd_file_path: Option<PathBuf>,
     fd: *mut c_void,
 }
 
@@ -46,8 +42,6 @@ impl Plugin {
 
         Ok(Self {
             path: Some(path),
-            #[cfg(test)]
-            fd_file_path: Some(fd_file_path),
             fd,
         })
     }
@@ -55,8 +49,6 @@ impl Plugin {
     pub(crate) fn new_static() -> Self {
         Self {
             path: None,
-            #[cfg(test)]
-            fd_file_path: None,
             fd: libc::RTLD_DEFAULT,
         }
     }
@@ -65,8 +57,6 @@ impl Plugin {
     pub(crate) fn new_test_dynamic(path: String) -> Self {
         Self {
             path: Some(path),
-            #[cfg(test)]
-            fd_file_path: None,
             fd: std::ptr::null_mut(),
         }
     }
