@@ -1,4 +1,10 @@
-use std::{env, ffi::CString, fs, path::PathBuf, process::Command};
+use std::{
+    env,
+    ffi::CString,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use wasserxr::bindings::{
     WXRSceneError,
@@ -41,12 +47,7 @@ fn c_staticlib_loads_c_shared_plugin() {
         "cargo build --lib",
     );
 
-    let staticlib = cargo_target_dir.join("debug").join("libwasserxr.a");
-    assert!(
-        staticlib.exists(),
-        "expected static library at {}",
-        staticlib.display()
-    );
+    let _staticlib = find_staticlib(&cargo_target_dir);
 
     let plugin_source = build_dir.join("plugin.c");
     let plugin = build_dir.join("libwxr_c_abi_plugin.so");
@@ -87,6 +88,27 @@ fn run(command: &mut Command, label: &str) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+fn find_staticlib(target_dir: &Path) -> PathBuf {
+    let mut pending = vec![target_dir.to_path_buf()];
+
+    while let Some(dir) = pending.pop() {
+        let entries = fs::read_dir(&dir)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", dir.display()));
+
+        for entry in entries {
+            let path = entry.expect("failed to read target directory entry").path();
+            if path.file_name().is_some_and(|name| name == "libwasserxr.a") {
+                return path;
+            }
+            if path.is_dir() {
+                pending.push(path);
+            }
+        }
+    }
+
+    panic!("expected static library under {}", target_dir.display());
 }
 
 fn run_rust_harness(plugin: &PathBuf) {
