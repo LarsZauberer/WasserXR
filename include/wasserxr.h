@@ -305,7 +305,7 @@ typedef struct WXREntityArray {
 /**
  * C callback that destroys a raw resource pointer.
  */
-typedef void (*WXRResourceDropper)(void*);
+typedef void (*WXRResourceDestroyer)(void*);
 
 /**
  * C ABI function that returns a raw pointer to a component or asset field.
@@ -647,7 +647,7 @@ int32_t wxr_parse_field(struct WXRScene *scene,
 int32_t wxr_add_resource(struct WXRScene *scene,
                          const char *name,
                          void *data,
-                         WXRResourceDropper dropper);
+                         WXRResourceDestroyer destroyer);
 
 /**
  * Returns a raw C resource pointer by name.

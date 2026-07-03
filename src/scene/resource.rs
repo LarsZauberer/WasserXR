@@ -4,7 +4,7 @@ use crate::scene::Scene;
 use std::collections::hash_map::Entry;
 use std::ffi::c_void;
 
-pub type ResourceDropper = unsafe extern "C" fn(*mut c_void);
+pub type ResourceDestroyer = unsafe extern "C" fn(*mut c_void);
 
 /// Type-erased value stored in a `Scene`.
 ///
@@ -12,7 +12,7 @@ pub type ResourceDropper = unsafe extern "C" fn(*mut c_void);
 /// outside the ECS component system.
 pub struct Resource {
     data: *mut c_void,
-    dropper: ResourceDropper,
+    destroyer: ResourceDestroyer,
 }
 
 impl Resource {
@@ -20,12 +20,12 @@ impl Resource {
     pub fn new<T>(value: T) -> Self {
         Self {
             data: Box::into_raw(Box::new(value)).cast(),
-            dropper: drop_value::<T>,
+            destroyer: destroy_value::<T>,
         }
     }
 
-    pub(crate) fn from_raw(data: *mut c_void, dropper: ResourceDropper) -> Self {
-        Self { data, dropper }
+    pub(crate) fn from_raw(data: *mut c_void, destroyer: ResourceDestroyer) -> Self {
+        Self { data, destroyer }
     }
 
     pub(crate) fn data(&self) -> *mut c_void {
@@ -57,11 +57,11 @@ impl Resource {
 
 impl Drop for Resource {
     fn drop(&mut self) {
-        unsafe { (self.dropper)(self.data) };
+        unsafe { (self.destroyer)(self.data) };
     }
 }
 
-unsafe extern "C" fn drop_value<T>(data: *mut c_void) {
+unsafe extern "C" fn destroy_value<T>(data: *mut c_void) {
     unsafe {
         drop(Box::from_raw(data.cast::<T>()));
     }
@@ -92,12 +92,12 @@ impl Scene {
         &mut self,
         name: String,
         data: *mut c_void,
-        dropper: ResourceDropper,
+        destroyer: ResourceDestroyer,
     ) -> Result<(), SceneError> {
         match self.resources.entry(name) {
             Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
             Entry::Vacant(entry) => {
-                entry.insert(Resource::from_raw(data, dropper));
+                entry.insert(Resource::from_raw(data, destroyer));
                 Ok(())
             }
         }

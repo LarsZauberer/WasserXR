@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// C callback that destroys a raw resource pointer.
-pub type WXRResourceDropper = unsafe extern "C" fn(*mut c_void);
+pub type WXRResourceDestroyer = unsafe extern "C" fn(*mut c_void);
 
 /// Opaque C handle for `wasserxr::scene::Scene`.
 pub struct WXRScene {
@@ -935,7 +935,7 @@ pub unsafe extern "C" fn wxr_add_resource(
     scene: *mut WXRScene,
     name: *const c_char,
     data: *mut c_void,
-    dropper: WXRResourceDropper,
+    destroyer: WXRResourceDestroyer,
 ) -> i32 {
     if data.is_null() {
         set_error(WXRSceneError::NullPointer);
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn wxr_add_resource(
 
     match (scene_mut(scene), unsafe { str_from_ptr(name) }) {
         (Ok(scene), Ok(name)) => {
-            result_code(scene.add_raw_resource(name.to_owned(), data, dropper))
+            result_code(scene.add_raw_resource(name.to_owned(), data, destroyer))
         }
         (Err(error), _) | (_, Err(error)) => {
             set_error(error);
