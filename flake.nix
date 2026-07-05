@@ -38,22 +38,6 @@
       {
         packages = {
         };
-        checks = {
-          default =
-            let
-              rustPlatform = pkgs.makeRustPlatform {
-                cargo = nightlyRust;
-                rustc = nightlyRust;
-              };
-            in
-            rustPlatform.buildRustPackage {
-              pname = "wasserxr";
-              version = "0.2.0";
-              src = ./.;
-              cargoLock.lockFile = ./Cargo.lock;
-              doCheck = true;
-            };
-        };
         devShells.default = pkgs.mkShell {
           name = "devShell";
 
@@ -61,6 +45,9 @@
             nightlyRust
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
+            pkgs.rust-cbindgen
+            pkgs.cargo-release
+            pkgs.gcc
 
             pkgs.plantuml
             pkgs.graphviz
