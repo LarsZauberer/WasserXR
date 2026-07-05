@@ -26,10 +26,29 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixpkgs-unstable
 
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Build Libraries
+        run: |
+          nix develop -c cargo build --release
+
+      - name: Build C-Bindings
+        run: |
+          mkdir -p dist
+          nix develop -c cbindgen > dist/wasserxr.h
 
       - name: Release
         run: |
@@ -43,15 +62,6 @@ jobs:
           tag="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
           test -n "$tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
-      - name: Build Libraries
-        run: |
-          nix develop -c cargo build --release
-
-      - name: Build C-Bindings
-        run: |
-          mkdir -p dist
-          nix develop -c cbindgen > dist/wasserxr.h
 
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
