@@ -61,6 +61,8 @@
             nightlyRust
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
+            pkgs.rust-cbindgen
+            pkgs.cargo-edit
 
             pkgs.plantuml
             pkgs.graphviz
