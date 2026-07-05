@@ -63,7 +63,7 @@
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
             pkgs.rust-cbindgen
-            pkgs.cargo-edit
+            pkgs.cargo-release
 
             pkgs.plantuml
             pkgs.graphviz
