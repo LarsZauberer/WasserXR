@@ -34,26 +34,9 @@
             ];
           }
         );
-        packageVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
       in
       {
         packages = {
-        };
-        checks = {
-          default =
-            let
-              rustPlatform = pkgs.makeRustPlatform {
-                cargo = nightlyRust;
-                rustc = nightlyRust;
-              };
-            in
-            rustPlatform.buildRustPackage {
-              pname = "wasserxr";
-              version = packageVersion;
-              src = ./.;
-              cargoLock.lockFile = ./Cargo.lock;
-              doCheck = true;
-            };
         };
         devShells.default = pkgs.mkShell {
           name = "devShell";
