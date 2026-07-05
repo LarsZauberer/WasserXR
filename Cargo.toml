@@ -1,0 +1,27 @@
+[package]
+name = "wasserxr"
+version = "0.2.0"
+edition = "2024"
+description = "A **dynamic XR Engine** to help you stay in the **flow**"
+readme = "README.md"
+repository = "https://github.com/LarsZauberer/WasserXR"
+license-file = "LICENSE.md"
+exclude = [ "result" ]
+
+[workspace]
+members = [".", "wasserxr-macros"]
+resolver = "3"
+
+[dependencies]
+bincode = { version = "2.0.1", features = ["serde"] }
+chrono = "0.4.45"
+libc = "0.2.186"
+serde = { version = "1.0.228", features = ["derive"] }
+wasserxr-macros = { path = "wasserxr-macros", version = "0.2.0" }
+uuid = { version = "1.23.2", features = ["serde", "v7"] }
+
+[build-dependencies]
+cbindgen = "0.29"
+
+[lib]
+crate-type = ["staticlib", "rlib"]

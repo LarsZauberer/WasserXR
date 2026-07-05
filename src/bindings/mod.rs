@@ -1,0 +1,169 @@
+//! C ABI bindings for WasserXR.
+
+pub mod logging;
+pub mod scene;
+pub mod schema;
+pub mod utils;
+
+use std::{
+    cell::Cell,
+    ffi::{CStr, CString, c_char},
+};
+
+use crate::error::{AssetError, ComponentError, PluginError, SceneError};
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// C ABI error code for the latest failed WasserXR binding call.
+pub enum WXRSceneError {
+    /// No error has been recorded for this thread.
+    NoError,
+    /// A required pointer argument was null.
+    NullPointer,
+    /// A C string argument was null or not valid UTF-8.
+    InvalidString,
+    /// The entity id is not present in the scene.
+    EntityNotFound,
+    /// The entity already has a component with this id.
+    ComponentAlreadyExists,
+    /// A resource with this name is already registered.
+    ResourceAlreadyExists,
+    /// A system with this id is already registered.
+    SystemAlreadyExists,
+    /// A plugin with this path is already loaded.
+    PluginAlreadyLoaded,
+    /// The system id is not present in the scene.
+    SystemNotFound,
+    /// The resource name is not present in the scene.
+    ResourceNotFound,
+    /// The plugin id or path is not present in the scene.
+    PluginNotFound,
+    /// The built-in static plugin cannot be unloaded.
+    StaticPluginUnload,
+    /// The component id is not present on the requested entity.
+    ComponentNotFound,
+    /// A component field operation failed.
+    ComponentFieldError,
+    /// An asset operation failed.
+    AssetError,
+    /// Loading a plugin failed.
+    PluginLoading,
+    /// A system could not be created from any loaded plugin.
+    SystemCreation,
+    /// Component symbols could not be resolved from any loaded plugin.
+    ComponentCreation,
+    /// The component creator returned a null pointer.
+    ComponentCreatorFailed,
+    /// Scene serialization failed.
+    Serialization,
+    /// Scene deserialization failed.
+    Deserialization,
+    /// Reading or writing a scene file failed.
+    FileIo,
+}
+
+thread_local! {
+    static LAST_ERROR: Cell<WXRSceneError> = const { Cell::new(WXRSceneError::NoError) };
+}
+
+/// Returns the latest error recorded by a WasserXR C binding on this thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn wxr_error() -> WXRSceneError {
+    LAST_ERROR.with(Cell::get)
+}
+
+pub(crate) fn clear_error() {
+    LAST_ERROR.with(|error| error.set(WXRSceneError::NoError));
+}
+
+pub(crate) fn set_error(error: WXRSceneError) {
+    LAST_ERROR.with(|slot| slot.set(error));
+}
+
+pub(crate) fn set_scene_error(error: SceneError) {
+    set_error(error.into());
+}
+
+pub(crate) fn result_code(result: Result<(), SceneError>) -> i32 {
+    match result {
+        Ok(()) => {
+            clear_error();
+            0
+        }
+        Err(error) => {
+            set_scene_error(error);
+            -1
+        }
+    }
+}
+
+pub(crate) unsafe fn str_from_ptr<'a>(ptr: *const c_char) -> Result<&'a str, WXRSceneError> {
+    if ptr.is_null() {
+        return Err(WXRSceneError::NullPointer);
+    }
+
+    unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .map_err(|_| WXRSceneError::InvalidString)
+}
+
+pub(crate) fn string_to_ptr(value: String) -> *mut c_char {
+    match CString::new(value) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Frees a C string returned by WasserXR bindings.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_free_string(value: *mut c_char) {
+    if !value.is_null() {
+        unsafe {
+            drop(CString::from_raw(value));
+        }
+    }
+}
+
+impl From<SceneError> for WXRSceneError {
+    fn from(value: SceneError) -> Self {
+        match value {
+            SceneError::EntityNotFound => Self::EntityNotFound,
+            SceneError::ComponentAlreadyExists => Self::ComponentAlreadyExists,
+            SceneError::ResourceAlreadyExists => Self::ResourceAlreadyExists,
+            SceneError::SystemAlreadyExists => Self::SystemAlreadyExists,
+            SceneError::PluginAlreadyLoaded => Self::PluginAlreadyLoaded,
+            SceneError::SystemNotFound => Self::SystemNotFound,
+            SceneError::ResourceNotFound => Self::ResourceNotFound,
+            SceneError::PluginNotFound => Self::PluginNotFound,
+            SceneError::StaticPluginUnload => Self::StaticPluginUnload,
+            SceneError::ComponentNotFound => Self::ComponentNotFound,
+            SceneError::ComponentFieldError(_) => Self::ComponentFieldError,
+            SceneError::AssetError(_) => Self::AssetError,
+            SceneError::PluginLoading(_) => Self::PluginLoading,
+            SceneError::SystemCreation => Self::SystemCreation,
+            SceneError::ComponentCreation => Self::ComponentCreation,
+            SceneError::ComponentCreatorFailed => Self::ComponentCreatorFailed,
+            SceneError::Serialization(_) => Self::Serialization,
+            SceneError::Deserialization(_) => Self::Deserialization,
+            SceneError::FileIo(_) => Self::FileIo,
+        }
+    }
+}
+
+impl From<ComponentError> for WXRSceneError {
+    fn from(_: ComponentError) -> Self {
+        Self::ComponentFieldError
+    }
+}
+
+impl From<AssetError> for WXRSceneError {
+    fn from(_: AssetError) -> Self {
+        Self::AssetError
+    }
+}
+
+impl From<PluginError> for WXRSceneError {
+    fn from(_: PluginError) -> Self {
+        Self::PluginLoading
+    }
+}
