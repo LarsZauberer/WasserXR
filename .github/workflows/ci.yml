@@ -1,8 +1,10 @@
 name: CI - Rust via Nix Flake Check
 
 on:
-  push:
   pull_request:
+    branches: [ "*" ]
+  push:
+    branches: [ "main" ]
 
 jobs:
   ci:
