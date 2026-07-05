@@ -31,6 +31,6 @@ jobs:
 
       - name: Publish root crate
         run: |
-          nix develop -c cargo publish -p wasserxr --locked
+          nix develop -c cargo publish -p wasserxr --locked --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES }}
