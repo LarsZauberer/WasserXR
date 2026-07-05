@@ -22,25 +22,28 @@ fn c_staticlib_loads_c_shared_plugin() {
         return;
     }
 
-    if Command::new("cc").arg("--version").output().is_err() {
-        eprintln!("skipping C ABI integration test because `cc` is not available");
+    if Command::new("gcc").arg("--version").output().is_err() {
+        eprintln!("skipping C ABI integration test because `gcc` is not available");
         return;
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let work_dir = manifest_dir
-        .join("target")
-        .join("c-abi-test")
+    let work_dir = env::temp_dir()
+        .join("wasserxr-c-abi-test")
         .join(std::process::id().to_string());
     let cargo_target_dir = work_dir.join("cargo-target");
     let build_dir = work_dir.join("build");
+    let include_dir = build_dir.join("include");
+    let header = include_dir.join("wasserxr.h");
 
-    fs::create_dir_all(&build_dir).expect("failed to create C ABI test build directory");
+    fs::create_dir_all(&include_dir).expect("failed to create C ABI test build directory");
 
     run(
         Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
-            .current_dir(&manifest_dir)
+            .current_dir(&work_dir)
             .arg("build")
+            .arg("--manifest-path")
+            .arg(manifest_dir.join("Cargo.toml"))
             .arg("--lib")
             .arg("--target-dir")
             .arg(&cargo_target_dir),
@@ -48,6 +51,17 @@ fn c_staticlib_loads_c_shared_plugin() {
     );
 
     let _staticlib = find_staticlib(&cargo_target_dir);
+
+    run(
+        Command::new("cbindgen")
+            .current_dir(&work_dir)
+            .arg(&manifest_dir)
+            .arg("--config")
+            .arg(manifest_dir.join("cbindgen.toml"))
+            .arg("--output")
+            .arg(&header),
+        "cbindgen",
+    );
 
     let plugin_source = build_dir.join("plugin.c");
     let plugin = build_dir.join("libwxr_c_abi_plugin.so");
@@ -61,16 +75,17 @@ fn c_staticlib_loads_c_shared_plugin() {
     .expect("failed to copy C plugin source");
 
     run(
-        Command::new("cc")
+        Command::new("gcc")
+            .current_dir(&work_dir)
             .arg("-std=c11")
             .arg("-fPIC")
             .arg("-shared")
             .arg("-I")
-            .arg(manifest_dir.join("include"))
+            .arg(&include_dir)
             .arg(&plugin_source)
             .arg("-o")
             .arg(&plugin),
-        "cc plugin",
+        "gcc plugin",
     );
 
     run_rust_harness(&plugin);

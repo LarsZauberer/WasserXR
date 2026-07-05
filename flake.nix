@@ -47,6 +47,7 @@
             pkgs.cargo-expand
             pkgs.rust-cbindgen
             pkgs.cargo-release
+            pkgs.gcc
 
             pkgs.plantuml
             pkgs.graphviz
