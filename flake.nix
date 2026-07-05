@@ -34,6 +34,7 @@
             ];
           }
         );
+        packageVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
       in
       {
         packages = {
@@ -48,7 +49,7 @@
             in
             rustPlatform.buildRustPackage {
               pname = "wasserxr";
-              version = "0.2.0";
+              version = packageVersion;
               src = ./.;
               cargoLock.lockFile = ./Cargo.lock;
               doCheck = true;
