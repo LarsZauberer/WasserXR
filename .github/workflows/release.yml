@@ -1,4 +1,4 @@
-name: Cargo Release
+name: Release
 
 on:
   workflow_dispatch:
@@ -36,3 +36,27 @@ jobs:
           nix develop -c cargo release --workspace --execute --no-confirm ${{ inputs.version }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES }}
+
+      - name: Find release tag
+        id: release_tag
+        run: |
+          tag="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
+          test -n "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build Libraries
+        run: |
+          nix develop -c cargo build --release
+
+      - name: Build C-Bindings
+        run: |
+          mkdir -p dist
+          nix develop -c cbindgen > dist/wasserxr.h
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          files: |
+            dist/wasserxr.h
+            target/release/libwasserxr.a
