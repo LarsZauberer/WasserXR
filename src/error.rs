@@ -105,4 +105,6 @@ pub enum SceneError {
     Deserialization(String),
     /// Reading or writing a scene file failed.
     FileIo(String),
+    /// Starting the MCP server failed.
+    Mcp(String),
 }

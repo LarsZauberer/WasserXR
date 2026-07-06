@@ -7,6 +7,7 @@ pub mod component;
 pub(crate) mod entity;
 /// Scene logging types, callbacks, and exported log macros.
 pub mod logging;
+pub(crate) mod mcp;
 pub(crate) mod plugin;
 pub mod query;
 /// Type-erased scene resources.
@@ -65,6 +66,9 @@ pub struct Scene {
     // Deferred Calls
     deferred_calls: Vec<DeferredCall>,
 
+    // MCP
+    mcp: Option<mcp::McpServer>,
+
     // Logging
     log_manager: LogManager,
 
@@ -88,6 +92,9 @@ impl Default for Scene {
 
             // Deferred Calls
             deferred_calls: Vec::new(),
+
+            // MCP
+            mcp: None,
 
             // Logging
             log_manager: LogManager::new("WasserXR".to_owned()),
@@ -869,6 +876,8 @@ impl Scene {
 
             self.run_deferred_calls();
         }
+
+        self.handle_mcp_commands();
 
         let should_exit = self.should_exit;
         self.should_exit = false;

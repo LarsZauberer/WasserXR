@@ -60,6 +60,8 @@ pub enum WXRSceneError {
     Deserialization,
     /// Reading or writing a scene file failed.
     FileIo,
+    /// Starting the MCP server failed.
+    Mcp,
 }
 
 thread_local! {
@@ -146,6 +148,7 @@ impl From<SceneError> for WXRSceneError {
             SceneError::Serialization(_) => Self::Serialization,
             SceneError::Deserialization(_) => Self::Deserialization,
             SceneError::FileIo(_) => Self::FileIo,
+            SceneError::Mcp(_) => Self::Mcp,
         }
     }
 }
