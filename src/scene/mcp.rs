@@ -122,9 +122,9 @@ fn serve(listener: TcpListener, sender: Sender<McpRequest>, cancel: Cancellation
             return;
         };
 
-        let service: StreamableHttpService<WasserXrMcp, LocalSessionManager> =
+        let service: StreamableHttpService<WasserXRMcp, LocalSessionManager> =
             StreamableHttpService::new(
-                move || Ok(WasserXrMcp::new(sender.clone())),
+                move || Ok(WasserXRMcp::new(sender.clone())),
                 Default::default(),
                 StreamableHttpServerConfig::default().with_cancellation_token(cancel.child_token()),
             );
@@ -200,12 +200,12 @@ struct SystemArgs {
 }
 
 #[derive(Clone)]
-struct WasserXrMcp {
+struct WasserXRMcp {
     sender: Sender<McpRequest>,
     tool_router: ToolRouter<Self>,
 }
 
-impl WasserXrMcp {
+impl WasserXRMcp {
     fn new(sender: Sender<McpRequest>) -> Self {
         Self {
             sender,
@@ -240,7 +240,7 @@ impl WasserXrMcp {
 }
 
 #[tool_router]
-impl WasserXrMcp {
+impl WasserXRMcp {
     #[tool(description = "List all entities with their ids, names, and attached component ids")]
     async fn list_entities(&self) -> Result<CallToolResult, ErrorData> {
         self.run(|scene| {
@@ -437,7 +437,7 @@ impl WasserXrMcp {
 }
 
 #[tool_handler(router = self.tool_router)]
-impl ServerHandler for WasserXrMcp {
+impl ServerHandler for WasserXRMcp {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("wasserxr", env!("CARGO_PKG_VERSION")))
