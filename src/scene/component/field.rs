@@ -129,6 +129,7 @@ impl Field {
             FieldType::Char => unsafe { (*(ptr as *const char)).to_string() },
             FieldType::String => unsafe { (*(ptr as *const String)).clone() },
             FieldType::Blob => format!("{ptr:p}"),
+            FieldType::Boolean => unsafe { (*(ptr as *const u8) != 0).to_string() },
         })
     }
 
@@ -164,6 +165,7 @@ impl Field {
             FieldType::Char => unsafe { *(ptr as *mut char) = parse_char(input)? },
             FieldType::String => unsafe { *(ptr as *mut String) = input.to_owned() },
             FieldType::Blob => return Err(ComponentError::FieldValueParsing),
+            FieldType::Boolean => unsafe { *(ptr as *mut u8) = u8::from(parse_bool(input)?) },
         }
 
         Ok(())
@@ -206,6 +208,14 @@ fn parse_char(input: &str) -> Result<char, ComponentError> {
     }
 
     Ok(value)
+}
+
+fn parse_bool(input: &str) -> Result<bool, ComponentError> {
+    match input.to_lowercase().as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(ComponentError::FieldValueParsing),
+    }
 }
 
 #[cfg(test)]
@@ -418,6 +428,26 @@ mod tests {
         unsafe { field.parse(ptr, "new") }.unwrap();
 
         assert_eq!(value, "new");
+    }
+
+    #[test]
+    fn field_render_and_parse_boolean() {
+        let field = Field::new(FieldType::Boolean, None, true, None, None);
+        let mut value = 2u8;
+        let ptr = &mut value as *mut u8 as *mut c_void;
+
+        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "true");
+        unsafe { field.parse(ptr, "FALSE") }.unwrap();
+        assert_eq!(value, 0);
+        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "false");
+
+        unsafe { field.parse(ptr, "tRuE") }.unwrap();
+        assert_eq!(value, 1);
+        assert_eq!(
+            unsafe { field.parse(ptr, "yes") },
+            Err(ComponentError::FieldValueParsing)
+        );
+        assert_eq!(value, 1);
     }
 
     #[test]

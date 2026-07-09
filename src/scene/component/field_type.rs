@@ -46,4 +46,6 @@ pub enum FieldType {
     #[default]
     /// Opaque data that can be queried by pointer but cannot be text-parsed.
     Blob,
+    /// `boolean`
+    Boolean,
 }

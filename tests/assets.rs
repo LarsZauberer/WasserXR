@@ -20,6 +20,7 @@ pub struct MacroFileAsset {
     content: String,
     bytes: usize,
     position: [f64; 2],
+    available: bool,
 
     #[none]
     #[allow(dead_code)]
@@ -36,6 +37,7 @@ fn create_macro_file_asset(_scene: &mut Scene, path: &str) -> Option<MacroFileAs
         content,
         bytes,
         position: [1.0, 2.0],
+        available: true,
         hidden: "hidden".to_owned(),
     })
 }
@@ -180,20 +182,26 @@ fn asset_query_supports_tuple_fields() {
     let path = temp_asset_file("tuple", "tuple content");
     let mut scene = Scene::new();
 
-    let (content, bytes) = scene
-        .asset_query::<(&String, &usize)>("MacroFileAsset", &path, &["content", "bytes"])
+    let (content, bytes, available) = scene
+        .asset_query::<(&String, &usize, &bool)>(
+            "MacroFileAsset",
+            &path,
+            &["content", "bytes", "available"],
+        )
         .unwrap();
 
     assert_eq!(content, "tuple content");
     assert_eq!(*bytes, "tuple content".len());
+    assert!(*available);
 }
 
 #[test]
-fn asset_macro_registers_vector_field_type() {
+fn asset_macro_registers_vector_and_boolean_field_types() {
     let mut schema = Schema::default();
     unsafe { wxr_asset_schema_MacroFileAsset(&mut schema) };
 
     assert_eq!(schema.get_field_type("position"), Ok(FieldType::F64Vec2));
+    assert_eq!(schema.get_field_type("available"), Ok(FieldType::Boolean));
 }
 
 #[test]

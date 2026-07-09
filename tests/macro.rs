@@ -33,6 +33,10 @@ pub struct MacroComponent {
     #[mutable]
     default_string: String,
 
+    #[getter]
+    #[mutable]
+    enabled: bool,
+
     #[none]
     #[allow(dead_code)]
     hidden: i32,
@@ -560,6 +564,12 @@ fn component_macro_registers_exact_field_types() {
     );
     assert_eq!(
         scene
+            .get_component_field_type(component_entity, "MacroComponent", "enabled")
+            .unwrap(),
+        FieldType::Boolean
+    );
+    assert_eq!(
+        scene
             .get_component_field_type(hooks_entity, "MacroCustomHooksComponent", "value")
             .unwrap(),
         FieldType::Usize
@@ -575,6 +585,37 @@ fn component_macro_registers_exact_field_types() {
             .get_component_field_type(position_entity, "MacroPosition", "position")
             .unwrap(),
         FieldType::F32Vec3
+    );
+}
+
+#[test]
+fn component_macro_renders_and_parses_boolean_field() {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "MacroComponent".to_owned())
+        .unwrap();
+
+    assert_eq!(
+        scene
+            .render_field(entity, "MacroComponent", "enabled")
+            .unwrap(),
+        "false"
+    );
+
+    scene
+        .parse_field(entity, "MacroComponent", "enabled", "tRuE")
+        .unwrap();
+
+    let (enabled,) = scene
+        .query::<(&bool,)>(entity, "MacroComponent", &["enabled"])
+        .unwrap();
+    assert!(*enabled);
+    assert_eq!(
+        scene
+            .render_field(entity, "MacroComponent", "enabled")
+            .unwrap(),
+        "true"
     );
 }
 
