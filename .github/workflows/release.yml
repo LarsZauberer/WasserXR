@@ -67,6 +67,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
+          generate_release_notes: true
           files: |
             dist/wasserxr.h
             target/release/libwasserxr.a
