@@ -289,6 +289,7 @@ fn asset_field_type(ty: &Type) -> proc_macro2::TokenStream {
         "f64" => quote! { ::wasserxr::scene::component::FieldType::F64 },
         "char" => quote! { ::wasserxr::scene::component::FieldType::Char },
         "String" => quote! { ::wasserxr::scene::component::FieldType::String },
+        "bool" => quote! { ::wasserxr::scene::component::FieldType::Boolean },
         _ => quote! { ::wasserxr::scene::component::FieldType::Blob },
     }
 }
