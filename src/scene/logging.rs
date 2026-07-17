@@ -173,6 +173,7 @@ impl Scene {
 }
 
 /// Prints one log entry to stdout.
+#[deprecated]
 pub fn print_logger(entry: &LogEntry) {
     println!("{}", entry);
 }
