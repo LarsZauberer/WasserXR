@@ -779,7 +779,14 @@ impl Scene {
         Ok(())
     }
 
-    fn run_system(&mut self, system_id: &str, groups: usize, selector: Selector, runner: Runner) {
+    fn run_system(
+        &mut self,
+        system_id: &str,
+        groups: usize,
+        selector: Selector,
+        runner: Runner,
+        delta: f32,
+    ) {
         self.set_logger(system_id.to_owned());
         let mut entities: Vec<Vec<WXREntity>> = vec![Vec::new(); groups];
 
@@ -800,7 +807,7 @@ impl Scene {
         let entities_ptr = entities.as_ptr();
 
         unsafe {
-            runner(self as *mut Scene, entities_ptr, sizes_ptr);
+            runner(self as *mut Scene, delta, entities_ptr, sizes_ptr);
         }
         self.reset_logger();
     }
@@ -855,16 +862,17 @@ impl Scene {
             .collect();
 
         for system_id in system_ids {
-            let Some(system) = self.systems.get(&system_id) else {
+            let Some(system) = self.systems.get_mut(&system_id) else {
                 continue;
             };
 
             let groups = system.get_groups();
             let selector = system.get_selector();
             let runner = system.get_runner();
+            let delta = system.tick_delta();
 
             self.is_ticking = true;
-            self.run_system(&system_id, groups, selector, runner);
+            self.run_system(&system_id, groups, selector, runner, delta);
             self.is_ticking = false;
 
             self.run_deferred_calls();
@@ -1658,6 +1666,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_attach_system(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1676,6 +1685,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_cleanup_system(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1684,6 +1694,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_reload_counted_system(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1702,6 +1713,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_reload_counted_system(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1720,6 +1732,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_reload_low_priority(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1729,6 +1742,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_reload_request(
         scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1744,6 +1758,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_load_request(
         scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1756,6 +1771,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_loaded_marker(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1764,6 +1780,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_remove_request(
         scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1784,6 +1801,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_remove_target(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1796,6 +1814,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_deferred_unload_request(
         scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1813,6 +1832,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_low_priority(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -1825,6 +1845,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_scene_high_priority(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {

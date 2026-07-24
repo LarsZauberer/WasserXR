@@ -218,6 +218,7 @@ fn create_runner_function(
         #[unsafe(export_name = #runner_name)]
         unsafe extern "C" fn #runner_ident(
             scene: *mut ::wasserxr::scene::Scene,
+            delta: f32,
             entities: *const *const ::wasserxr::bindings::scene::WXREntity,
             groups: *const usize,
         ) {
@@ -239,7 +240,7 @@ fn create_runner_function(
             }
 
             let scene = unsafe { &mut *scene };
-            #function_name(scene, rust_entities);
+            #function_name(scene, delta, rust_entities);
         }
     }
 }

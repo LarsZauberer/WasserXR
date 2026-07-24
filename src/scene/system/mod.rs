@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     bindings::scene::WXREntity,
     error::SystemError,
@@ -5,7 +7,8 @@ use crate::{
 };
 
 pub(crate) type Selector = unsafe extern "C" fn(*const Scene, WXREntity) -> i32;
-pub(crate) type Runner = unsafe extern "C" fn(*mut Scene, *const *const WXREntity, *const usize);
+pub(crate) type Runner =
+    unsafe extern "C" fn(*mut Scene, f32, *const *const WXREntity, *const usize);
 pub(crate) type Attacher = unsafe extern "C" fn(*mut Scene);
 pub(crate) type Detacher = unsafe extern "C" fn(*mut Scene);
 
@@ -29,6 +32,9 @@ pub(crate) struct System {
     selector: Selector,
     attacher: Attacher,
     detacher: Detacher,
+
+    // Timing
+    last_called: Option<Instant>,
 }
 
 impl System {
@@ -89,6 +95,7 @@ impl System {
             selector,
             attacher,
             detacher,
+            last_called: None,
         })
     }
 
@@ -135,6 +142,21 @@ impl System {
         self.runner
     }
 
+    /// Returns the seconds elapsed since the previous call and resets the
+    /// internal timer to now.
+    ///
+    /// The first call after construction returns `0.0`, since there is no
+    /// previous tick to measure against.
+    pub(crate) fn tick_delta(&mut self) -> f32 {
+        let now = Instant::now();
+        let delta = match self.last_called {
+            Some(last_called) => now.duration_since(last_called).as_secs_f32(),
+            None => 0.0,
+        };
+        self.last_called = Some(now);
+        delta
+    }
+
     pub(crate) fn get_groups(&self) -> usize {
         self.groups
     }
@@ -155,6 +177,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_system_with_groups(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -181,6 +204,7 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_system_system_with_defaults(
         _scene: *mut Scene,
+        _delta: f32,
         _entities: *const *const WXREntity,
         _sizes: *const usize,
     ) {
@@ -259,6 +283,20 @@ mod tests {
         }
 
         assert_eq!(SYSTEM_ATTACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn system_tick_delta_first_call_is_zero_then_positive() {
+        let scene = Scene::new();
+        let plugin = Plugin::new_static();
+        let mut system =
+            System::new("system_with_defaults".to_owned(), &plugin, 1, &scene).unwrap();
+
+        assert_eq!(system.tick_delta(), 0.0);
+
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        assert!(system.tick_delta() > 0.0);
     }
 
     #[test]

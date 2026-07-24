@@ -232,22 +232,22 @@ static MACRO_ATTACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mut
 static MACRO_DETACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mutex::new(None));
 
 #[system(entities = [["MacroCounter"], ["MacroMarker"]])]
-pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
+pub fn macro_group_counter(_scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     *MACRO_SYSTEM_ENTITIES.lock().unwrap() = entities;
 }
 
 #[system]
-pub fn macro_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
+pub fn macro_empty_system(_scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     *MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
 }
 
 #[system(entities = [])]
-pub fn macro_explicit_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
+pub fn macro_explicit_empty_system(_scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
 }
 
 #[system]
-pub fn macro_lifecycle_system(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
+pub fn macro_lifecycle_system(_scene: &mut Scene, _delta: f32, _entities: Vec<Vec<Uuid>>) {}
 
 #[attacher(macro_lifecycle_system)]
 pub fn attach_macro_lifecycle_system(scene: &mut Scene) {

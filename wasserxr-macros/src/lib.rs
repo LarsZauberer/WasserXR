@@ -61,8 +61,8 @@ pub fn detacher(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[system(entities = [["Transform", "Mesh"], ["Camera"]])]
-/// fn render(scene: &mut wasserxr::scene::Scene, entities: Vec<Vec<uuid::Uuid>>) {
-///     // ...
+/// fn render(scene: &mut wasserxr::scene::Scene, delta: f32, entities: Vec<Vec<uuid::Uuid>>) {
+///     // `delta` is the seconds elapsed since this system last ran.
 /// }
 /// ```
 ///
