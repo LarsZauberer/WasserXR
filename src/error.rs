@@ -87,6 +87,8 @@ pub enum SceneError {
     StaticPluginUnload,
     /// The component id is not present on the requested entity.
     ComponentNotFound,
+    /// The owning plugin does not export the requested method symbol.
+    MethodNotFound,
     /// A component field operation failed.
     ComponentFieldError(ComponentError),
     /// An asset operation failed.
