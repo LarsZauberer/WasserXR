@@ -6,6 +6,7 @@
 
 mod asset;
 mod component;
+mod method;
 mod system;
 
 use proc_macro::TokenStream;
@@ -115,6 +116,37 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
 
     component::expand(args, item)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Turns a Rust function into an exported WasserXR component method binding.
+///
+/// Use it on a function with this shape:
+///
+/// ```ignore
+/// #[method(Component)]
+/// fn my_method_name(
+///     scene: &mut Scene,
+///     component: &mut Component,
+///     force: &mut f32,
+///     iterations: &mut usize,
+/// ) -> Result<*mut c_void, i32> {
+///     // ...
+/// }
+/// ```
+///
+/// The macro exports `wxr_method_<Component>_<my_method_name>`. The first
+/// parameter must be exactly `&mut Scene`, the second a mutable reference to the
+/// component type named in the attribute, and every remaining parameter a
+/// mutable reference with a simple identifier name resolved by that name. The
+/// return type must be exactly `Result<*mut c_void, i32>`.
+#[proc_macro_attribute]
+pub fn method(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as method::Args);
+    let item = parse_macro_input!(item as ItemFn);
+
+    method::expand(args, item)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }

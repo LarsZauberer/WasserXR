@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, c_void},
+    ffi::{CString, c_char, c_void},
     ptr, slice,
 };
 
@@ -10,7 +10,12 @@ use crate::{
         WXRSceneError, clear_error, result_code, set_error, set_scene_error, str_from_ptr,
         string_to_ptr,
     },
-    scene::Scene,
+    scene::{
+        Scene,
+        component::methods::{
+            Method, WXRArgument, WXRMethodResult, WXRMethodStatus, find_argument,
+        },
+    },
 };
 
 /// C callback that destroys a raw resource pointer.
@@ -993,6 +998,129 @@ pub extern "C" fn wxr_should_exit(scene: *mut WXRScene) -> i32 {
     }
 }
 
+/// Opaque heap-allocated handle for a resolved component method.
+pub type WXRMethod = Method<'static>;
+
+/// Resolves a named argument for C callers.
+///
+/// On success the resolved data pointer is written to `value_out` and
+/// `WXRMethodStatus::Success` is returned. The lookup has the same semantics as
+/// the macro-generated wrappers: a missing name yields `MissingArgument`, a
+/// duplicated name yields `DuplicateArgument`, unknown names are ignored, and
+/// data pointers are not checked for null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_method_find_argument(
+    arguments: *const WXRArgument,
+    argument_count: usize,
+    name: *const c_char,
+    value_out: *mut *mut c_void,
+) -> WXRMethodStatus {
+    let arguments = if arguments.is_null() {
+        &[][..]
+    } else {
+        unsafe { slice::from_raw_parts(arguments, argument_count) }
+    };
+
+    // A name that cannot be read matches nothing, so it is reported as missing.
+    let Ok(name) = (unsafe { str_from_ptr(name) })
+        .and_then(|name| CString::new(name).map_err(|_| WXRSceneError::InvalidString))
+    else {
+        return WXRMethodStatus::MissingArgument;
+    };
+
+    match find_argument::<c_void>(arguments, &name) {
+        Ok(value) => {
+            if !value_out.is_null() {
+                unsafe {
+                    *value_out = value as *mut c_void;
+                }
+            }
+            WXRMethodStatus::Success
+        }
+        Err(status) => status,
+    }
+}
+
+/// Resolves a component method handle, or null on failure.
+///
+/// On failure the error is recorded for `wxr_error`. The returned handle must
+/// be consumed by `wxr_method_call` or abandoned with `wxr_method_destroy`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_get_method(
+    scene: *mut WXRScene,
+    entity: WXREntity,
+    component_id: *const c_char,
+    method_name: *const c_char,
+) -> *mut WXRMethod {
+    match (
+        scene_mut(scene),
+        unsafe { str_from_ptr(component_id) },
+        unsafe { str_from_ptr(method_name) },
+    ) {
+        (Ok(scene_ref), Ok(component_id), Ok(method_name)) => {
+            match scene_ref.resolve_method(entity.into_uuid(), component_id, method_name) {
+                Ok((function, component)) => {
+                    clear_error();
+                    Box::into_raw(Box::new(Method::new(scene, function, component)))
+                }
+                Err(error) => {
+                    set_scene_error(error);
+                    ptr::null_mut()
+                }
+            }
+        }
+        (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
+            set_error(error);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Appends a borrowed named argument to a method handle.
+///
+/// The name and data stay owned by the caller and must remain valid until the
+/// consuming `wxr_method_call`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_method_argument(
+    method: *mut WXRMethod,
+    name: *const c_char,
+    data: *mut c_void,
+) {
+    if let Some(method) = unsafe { method.as_mut() } {
+        method.push_argument(name, data);
+    }
+}
+
+/// Invokes a method handle synchronously and frees it.
+///
+/// The handle is consumed and freed on every outcome and is invalid afterward.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_method_call(method: *mut WXRMethod) -> WXRMethodResult {
+    if method.is_null() {
+        return WXRMethodResult {
+            status: WXRMethodStatus::ActionError,
+            action_error: -1,
+            value: ptr::null_mut(),
+        };
+    }
+
+    let result = unsafe { (*method).call() };
+    unsafe {
+        wxr_method_destroy(method);
+    }
+    result
+}
+
+/// Frees a method handle without calling it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_method_destroy(method: *mut WXRMethod) {
+    if !method.is_null() {
+        unsafe {
+            drop(Box::from_raw(method));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1150,5 +1278,36 @@ mod tests {
             wxr_destroy_scene(scene);
         }
         assert_eq!(RESOURCE_DROPS.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn c_find_argument_writes_value_out() {
+        let mut value = 42_i32;
+        let name = CString::new("force").unwrap();
+        let arguments = [WXRArgument {
+            name: name.as_ptr(),
+            data: &mut value as *mut i32 as *mut c_void,
+        }];
+        let mut out: *mut c_void = ptr::null_mut();
+
+        let status = unsafe {
+            wxr_method_find_argument(arguments.as_ptr(), arguments.len(), name.as_ptr(), &mut out)
+        };
+
+        assert_eq!(status, WXRMethodStatus::Success);
+        assert_eq!(unsafe { *(out as *const i32) }, 42);
+    }
+
+    #[test]
+    fn c_find_argument_reports_missing() {
+        let name = CString::new("force").unwrap();
+        let arguments: [WXRArgument; 0] = [];
+        let mut out: *mut c_void = ptr::null_mut();
+
+        let status =
+            unsafe { wxr_method_find_argument(arguments.as_ptr(), 0, name.as_ptr(), &mut out) };
+
+        assert_eq!(status, WXRMethodStatus::MissingArgument);
+        assert!(out.is_null());
     }
 }

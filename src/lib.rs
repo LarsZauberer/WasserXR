@@ -51,5 +51,6 @@ pub mod utils;
 
 pub use uuid::Uuid;
 pub use wasserxr_macros::{
-    asset_type, asset_type_creator, attacher, component, component_creator, detacher, system,
+    asset_type, asset_type_creator, attacher, component, component_creator, detacher, method,
+    system,
 };

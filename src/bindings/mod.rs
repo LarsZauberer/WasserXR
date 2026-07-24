@@ -42,6 +42,8 @@ pub enum WXRSceneError {
     StaticPluginUnload,
     /// The component id is not present on the requested entity.
     ComponentNotFound,
+    /// The owning plugin does not export the requested method symbol.
+    MethodNotFound,
     /// A component field operation failed.
     ComponentFieldError,
     /// An asset operation failed.
@@ -137,6 +139,7 @@ impl From<SceneError> for WXRSceneError {
             SceneError::PluginNotFound => Self::PluginNotFound,
             SceneError::StaticPluginUnload => Self::StaticPluginUnload,
             SceneError::ComponentNotFound => Self::ComponentNotFound,
+            SceneError::MethodNotFound => Self::MethodNotFound,
             SceneError::ComponentFieldError(_) => Self::ComponentFieldError,
             SceneError::AssetError(_) => Self::AssetError,
             SceneError::PluginLoading(_) => Self::PluginLoading,

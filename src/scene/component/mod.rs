@@ -3,6 +3,8 @@
 mod field;
 /// Runtime field type hints.
 pub mod field_type;
+/// Synchronous component method calls over the plugin ABI.
+pub mod methods;
 /// Component schema storage.
 pub mod schema;
 /// ABI-safe serialized field bytes.
@@ -208,6 +210,10 @@ impl Component {
         }
 
         unsafe { self.schema.parse_field(id, self.data, input) }
+    }
+
+    pub(crate) fn get_data(&self) -> *mut c_void {
+        self.data
     }
 
     pub(crate) fn get_id(&self) -> &str {
