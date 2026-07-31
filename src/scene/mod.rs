@@ -1374,18 +1374,11 @@ mod tests {
     // ----- entities -----
 
     #[rstest]
-    fn scene_add_entity_defaults_to_empty_name(mut scene: Scene) {
+    fn scene_add_entity_defaults_empty_then_names_it(mut scene: Scene) {
         let entity = scene.add_entity();
-
         assert_eq!(scene.get_entity_name(entity).unwrap(), "");
-    }
-
-    #[rstest]
-    fn scene_set_entity_name_for_existing_entity(mut scene: Scene) {
-        let entity = scene.add_entity();
 
         scene.set_entity_name(entity, "Player".to_owned()).unwrap();
-
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Player");
     }
 
@@ -1432,19 +1425,13 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_get_entity_components(counter_scene: (Scene, Uuid)) {
+    fn scene_locates_entities_and_components(counter_scene: (Scene, Uuid)) {
         let (scene, entity) = counter_scene;
 
         assert_eq!(
             scene.get_entity_components(entity).unwrap(),
             vec!["Counter"]
         );
-    }
-
-    #[rstest]
-    fn scene_get_entity_with_component(counter_scene: (Scene, Uuid)) {
-        let (scene, entity) = counter_scene;
-
         assert_eq!(scene.get_entity_with_component("Counter"), Some(entity));
         assert_eq!(scene.get_entity_with_component("missing"), None);
     }
@@ -1462,39 +1449,17 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_get_component_fields(counter_scene: (Scene, Uuid)) {
+    fn scene_reports_component_metadata(counter_scene: (Scene, Uuid)) {
         let (scene, entity) = counter_scene;
 
         assert_eq!(
             scene.get_component_fields(entity, "Counter").unwrap(),
             vec!["value"]
         );
-    }
-
-    #[rstest]
-    fn scene_get_entity_component_plugin_id(counter_scene: (Scene, Uuid)) {
-        let (scene, entity) = counter_scene;
-
         assert_eq!(
             scene.get_entity_component_plugin_id(entity, "Counter"),
             Ok("")
         );
-    }
-
-    #[rstest]
-    fn scene_get_entity_component_plugin_id_rejects_missing_component(mut scene: Scene) {
-        let entity = scene.add_entity();
-
-        assert_eq!(
-            scene.get_entity_component_plugin_id(entity, "missing"),
-            Err(SceneError::ComponentNotFound)
-        );
-    }
-
-    #[rstest]
-    fn scene_get_component_field_type(counter_scene: (Scene, Uuid)) {
-        let (scene, entity) = counter_scene;
-
         assert_eq!(
             scene
                 .get_component_field_type(entity, "Counter", "value")
@@ -1504,9 +1469,22 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_reports_field_mutability_per_field(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_component_metadata_rejects_missing_component(mut scene: Scene) {
+        let entity = scene.add_entity();
 
+        assert_eq!(
+            scene.get_entity_component_plugin_id(entity, "missing"),
+            Err(SceneError::ComponentNotFound)
+        );
+    }
+
+    #[rstest]
+    fn scene_reports_field_mutability_and_parsability(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
+        scene.add_component(entity, "Owner".to_owned()).unwrap();
+
+        // `Pair.a` is mutable and string-parsable, `Pair.b` is read-only, and
+        // the `Owner.readonly` blob is not string-parsable.
         assert_eq!(
             scene.is_component_field_mutable(entity, "Pair", "a"),
             Ok(true)
@@ -1515,13 +1493,6 @@ mod tests {
             scene.is_component_field_mutable(entity, "Pair", "b"),
             Ok(false)
         );
-    }
-
-    #[rstest]
-    fn scene_reports_string_parsability_per_field(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
-        scene.add_component(entity, "Owner".to_owned()).unwrap();
-
         assert_eq!(
             scene.is_component_field_string_parsable(entity, "Pair", "a"),
             Ok(true)
@@ -1757,16 +1728,10 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_get_systems(mut scene: Scene) {
-        scene.add_system("cleanup".to_owned(), 1).unwrap();
-
-        assert_eq!(scene.get_systems(), vec!["cleanup"]);
-    }
-
-    #[rstest]
-    fn scene_get_system_priority_and_plugin_id(mut scene: Scene) {
+    fn scene_reports_system_metadata(mut scene: Scene) {
         scene.add_system("cleanup".to_owned(), 7).unwrap();
 
+        assert_eq!(scene.get_systems(), vec!["cleanup"]);
         assert_eq!(scene.get_system_priority("cleanup"), Ok(7));
         assert_eq!(scene.get_system_plugin_id("cleanup"), Ok(""));
     }
@@ -1805,7 +1770,14 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_plugin_lookup_prioritizes_dynamic_plugins_before_static(mut scene: Scene) {
+    fn scene_plugin_lookup_orders_dynamic_before_static(mut scene: Scene) {
+        // With no dynamic plugins, only the static plugin ("") is visited.
+        let static_only: Vec<&str> = scene
+            .plugins_dynamic_first()
+            .map(|plugin| plugin.get_id())
+            .collect();
+        assert_eq!(static_only, vec![""]);
+
         scene.plugins.insert(
             "dynamic_a".to_owned(),
             Plugin::new_test_dynamic("dynamic_a".to_owned()),
@@ -1815,25 +1787,15 @@ mod tests {
             Plugin::new_test_dynamic("dynamic_b".to_owned()),
         );
 
+        // Dynamic plugins are visited first, the static plugin last.
         let plugin_ids: Vec<&str> = scene
             .plugins_dynamic_first()
             .map(|plugin| plugin.get_id())
             .collect();
-
         assert_eq!(plugin_ids.len(), 3);
         assert!(plugin_ids[..2].contains(&"dynamic_a"));
         assert!(plugin_ids[..2].contains(&"dynamic_b"));
         assert_eq!(plugin_ids[2], "");
-    }
-
-    #[rstest]
-    fn scene_plugin_lookup_uses_static_when_no_dynamic_plugins_exist(scene: Scene) {
-        let plugin_ids: Vec<&str> = scene
-            .plugins_dynamic_first()
-            .map(|plugin| plugin.get_id())
-            .collect();
-
-        assert_eq!(plugin_ids, vec![""]);
     }
 
     #[rstest]
@@ -2009,20 +1971,28 @@ mod tests {
     // ----- serialization / persistence -----
 
     #[rstest]
-    fn scene_deserialize_round_trip(mut scene: Scene) {
+    fn scene_round_trips_through_memory_and_disk(mut scene: Scene) {
         let entity = scene.add_entity();
         scene.set_entity_name(entity, "Player".to_owned()).unwrap();
         scene.add_component(entity, "Counter".to_owned()).unwrap();
         set_counter(&mut scene, entity, 42);
         scene.add_system("cleanup".to_owned(), 3).unwrap();
 
-        let serialized = scene.serialize().unwrap();
+        // In-memory: serialize then deserialize into a fresh scene.
         let mut loaded = Scene::new();
-        loaded.deserialize(&serialized).unwrap();
-
+        loaded.deserialize(&scene.serialize().unwrap()).unwrap();
         assert_eq!(loaded.get_entity_name(entity).unwrap(), "Player");
         assert_eq!(get_counter(&loaded, entity), 42);
         assert_eq!(loaded.remove_system("cleanup"), Ok(()));
+
+        // On disk: save then load into another fresh scene.
+        let path = std::env::temp_dir().join(format!("wasserxr-{}.scene", Uuid::now_v7()));
+        scene.save(&path).unwrap();
+        let mut reloaded = Scene::new();
+        reloaded.load(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(reloaded.get_entity_name(entity).unwrap(), "Player");
+        assert_eq!(get_counter(&reloaded, entity), 42);
     }
 
     #[rstest]
@@ -2068,24 +2038,6 @@ mod tests {
 
         assert_eq!(scene.get_entity_name(entity_data.id).unwrap(), "");
         assert!(!scene.has_component(entity_data.id, "missing_component"));
-    }
-
-    #[rstest]
-    fn scene_save_and_load_round_trip(mut scene: Scene) {
-        let entity = scene.add_entity();
-        scene.set_entity_name(entity, "Saved".to_owned()).unwrap();
-        scene.add_component(entity, "Counter".to_owned()).unwrap();
-        set_counter(&mut scene, entity, 11);
-
-        let path = std::env::temp_dir().join(format!("wasserxr-{}.scene", Uuid::now_v7()));
-        scene.save(&path).unwrap();
-
-        let mut loaded = Scene::new();
-        loaded.load(&path).unwrap();
-        let _ = std::fs::remove_file(&path);
-
-        assert_eq!(loaded.get_entity_name(entity).unwrap(), "Saved");
-        assert_eq!(get_counter(&loaded, entity), 11);
     }
 
     #[rstest]
