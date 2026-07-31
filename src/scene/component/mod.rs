@@ -231,19 +231,12 @@ impl Drop for Component {
 mod tests {
     use super::*;
     use crate::error::PluginError;
-    use rstest::{fixture, rstest};
+    use crate::test_fixtures::statics;
+    use rstest::rstest;
     use std::{
         ffi::c_void,
         sync::atomic::{AtomicUsize, Ordering},
     };
-
-    /// A scene plus the static plugin, the pairing every `Component::new` needs.
-    /// Kept local because `Plugin` is crate-private and cannot live in the
-    /// path-included fixture.
-    #[fixture]
-    fn statics() -> (Scene, Plugin) {
-        (Scene::new(), Plugin::new_static())
-    }
 
     // The macros cannot express a component with a *missing* symbol, so these
     // few error-path stubs are still hand-written. `Raw` is throwaway storage.

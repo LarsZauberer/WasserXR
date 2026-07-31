@@ -590,3 +590,16 @@ pub fn scene_state() -> SceneState {
     *LOAD_PATH.lock().unwrap() = None;
     SceneState(guard)
 }
+
+/// The asset-test counterpart of [`SceneState`]: serializes and resets the
+/// asset-creation state (`FileAsset` caching is observed via [`ASSET_CREATE_COUNT`]).
+pub struct AssetState(std::sync::MutexGuard<'static, ()>);
+
+#[fixture]
+pub fn asset_state() -> AssetState {
+    let guard = ASSET_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    ASSET_CREATE_COUNT.store(0, std::sync::atomic::Ordering::Relaxed);
+    AssetState(guard)
+}

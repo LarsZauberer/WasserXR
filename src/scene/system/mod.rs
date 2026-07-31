@@ -144,15 +144,9 @@ impl System {
 mod tests {
     use super::*;
     use crate::error::PluginError;
-    use rstest::{fixture, rstest};
+    use crate::test_fixtures::statics;
+    use rstest::rstest;
     use std::sync::atomic::{AtomicUsize, Ordering};
-
-    /// A scene plus the static plugin, the pairing every `System::new` needs.
-    /// Kept local because `Plugin` is crate-private.
-    #[fixture]
-    fn statics() -> (Scene, Plugin) {
-        (Scene::new(), Plugin::new_static())
-    }
 
     static SYSTEM_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SYSTEM_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);

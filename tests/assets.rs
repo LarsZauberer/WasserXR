@@ -7,7 +7,7 @@ mod testing_plugin_fixture;
 use std::{fs, sync::atomic::Ordering};
 
 use rstest::rstest;
-use testing_plugin_fixture as fx;
+use testing_plugin_fixture::{self as fx, asset_state};
 use wasserxr::{
     error::{AssetError, SceneError},
     scene::{Scene, assets::Schema, component::FieldType},
@@ -29,10 +29,7 @@ fn missing_asset_file() -> String {
 }
 
 #[rstest]
-fn asset_query_reads_fields_and_creates_once() {
-    let _guard = fx::ASSET_TEST_LOCK.lock().unwrap();
-    fx::ASSET_CREATE_COUNT.store(0, Ordering::Relaxed);
-
+fn asset_query_reads_fields_and_creates_once(#[from(asset_state)] _state: fx::AssetState) {
     let path = temp_asset_file("asset content");
     let mut scene = Scene::new();
 
@@ -57,10 +54,9 @@ fn asset_query_reads_fields_and_creates_once() {
 }
 
 #[rstest]
-fn ensure_asset_loaded_enables_read_only_queries_across_assets() {
-    let _guard = fx::ASSET_TEST_LOCK.lock().unwrap();
-    fx::ASSET_CREATE_COUNT.store(0, Ordering::Relaxed);
-
+fn ensure_asset_loaded_enables_read_only_queries_across_assets(
+    #[from(asset_state)] _state: fx::AssetState,
+) {
     let first = temp_asset_file("first content");
     let second = temp_asset_file("second content");
     let mut scene = Scene::new();
@@ -100,11 +96,10 @@ fn asset_macro_registers_vector_and_boolean_field_types() {
 #[case(None, SceneError::AssetError(AssetError::InvalidAsset))]
 #[case(Some("hidden"), SceneError::AssetError(AssetError::FieldNotFound))]
 fn asset_query_rejects_bad_requests(
+    #[from(asset_state)] _state: fx::AssetState,
     #[case] none_field: Option<&str>,
     #[case] expected: SceneError,
 ) {
-    let _guard = fx::ASSET_TEST_LOCK.lock().unwrap();
-
     let mut scene = Scene::new();
     let (path, field) = match none_field {
         // Missing file: the asset creator fails.

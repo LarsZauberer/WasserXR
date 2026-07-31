@@ -51,6 +51,20 @@ mod testing_plugin_fixture;
 /// Small utility modules used by the runtime and applications.
 pub mod utils;
 
+/// Test-only fixtures that need crate-private items, so they cannot live in the
+/// `#[path]`-included `testing_plugin_fixture` (which integration crates share).
+#[cfg(test)]
+mod test_fixtures {
+    use crate::scene::{Scene, plugin::Plugin};
+
+    /// A scene plus the static plugin: the inputs `Component::new`,
+    /// `System::new`, and `AssetType::new` all require.
+    #[rstest::fixture]
+    pub(crate) fn statics() -> (Scene, Plugin) {
+        (Scene::new(), Plugin::new_static())
+    }
+}
+
 pub use uuid::Uuid;
 pub use wasserxr_macros::{
     asset_type, asset_type_creator, attacher, component, component_creator, detacher, system,

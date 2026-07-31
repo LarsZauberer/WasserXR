@@ -144,19 +144,13 @@ impl Asset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_fixtures::statics;
     use crate::{error::PluginError, scene::component::FieldType};
-    use rstest::{fixture, rstest};
+    use rstest::rstest;
     use std::sync::{
         LazyLock, Mutex,
         atomic::{AtomicUsize, Ordering},
     };
-
-    /// A scene plus the static plugin, the pairing every `AssetType::new` needs.
-    /// Kept local because `Plugin` is crate-private.
-    #[fixture]
-    fn statics() -> (Scene, Plugin) {
-        (Scene::new(), Plugin::new_static())
-    }
 
     #[repr(C)]
     struct TestAsset {
@@ -164,7 +158,7 @@ mod tests {
     }
 
     static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static ASSET_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    static DROP_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     unsafe extern "C" fn unit_asset_getter(data: *mut c_void) -> *mut c_void {
         unsafe { &mut (*(data as *mut TestAsset)).value as *mut i64 as *mut c_void }
@@ -229,7 +223,7 @@ mod tests {
 
     #[rstest]
     fn asset_type_create_asset_reads_field(statics: (Scene, Plugin)) {
-        let _guard = ASSET_TEST_LOCK.lock().unwrap();
+        let _guard = DROP_TEST_LOCK.lock().unwrap();
         let (mut scene, plugin) = statics;
         let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
         let asset = asset_type.create_asset(&mut scene, "path").unwrap();
@@ -275,7 +269,7 @@ mod tests {
 
     #[rstest]
     fn asset_drop_runs_destroyer(statics: (Scene, Plugin)) {
-        let _guard = ASSET_TEST_LOCK.lock().unwrap();
+        let _guard = DROP_TEST_LOCK.lock().unwrap();
         DROP_COUNT.store(0, Ordering::Relaxed);
         {
             let (mut scene, plugin) = statics;
