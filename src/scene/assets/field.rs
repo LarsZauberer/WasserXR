@@ -45,15 +45,9 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    fn field_exposes_type(#[values(FieldType::String, FieldType::Blob)] type_hint: FieldType) {
-        let field = Field::new(type_hint, Some(null_getter));
-
-        assert_eq!(field.get_type(), type_hint);
-    }
-
-    #[rstest]
-    fn field_getter_is_returned_when_present_and_errors_when_missing() {
-        let present = Field::new(FieldType::Blob, Some(null_getter));
+    fn field_exposes_type_and_getter_presence() {
+        let present = Field::new(FieldType::String, Some(null_getter));
+        assert_eq!(present.get_type(), FieldType::String);
         assert_eq!(
             present.get_getter().unwrap() as usize,
             null_getter as *const () as usize

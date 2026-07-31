@@ -50,7 +50,7 @@ pub unsafe extern "C" fn noop_deserializer(_data: *mut std::ffi::c_void, _value:
 // ---------------------------------------------------------------------------
 
 /// Canonical single-field component: a mutable, serializable `i64` `value`,
-/// starting at [`COUNTER_START`].
+/// starting at 1.
 #[component]
 #[derive(Default)]
 pub struct Counter {
@@ -58,14 +58,9 @@ pub struct Counter {
     value: i64,
 }
 
-/// The value a freshly created [`Counter`] starts at.
-pub const COUNTER_START: i64 = 1;
-
 #[component_creator(Counter)]
 fn create_counter(_scene: &mut Scene) -> Option<Counter> {
-    Some(Counter {
-        value: COUNTER_START,
-    })
+    Some(Counter { value: 1 })
 }
 
 /// Two `i64` fields: `a` mutable, `b` read-only. Covers multi-field queries and
@@ -143,8 +138,8 @@ fn create_wide(_scene: &mut Scene) -> Option<Wide> {
 }
 
 /// Exercises the spread of field attributes the `#[component]` macro supports:
-/// getter-only (immutable), mutable-only, explicit serializer/deserializer,
-/// a boolean, and an excluded `#[none]` field.
+/// getter-only (immutable), mutable-only, explicit serializer/deserializer, a
+/// getter+mutable boolean, and an excluded `#[none]` field.
 #[component]
 #[derive(Default)]
 pub struct Featured {
@@ -161,7 +156,6 @@ pub struct Featured {
     #[mutable]
     enabled: bool,
     #[none]
-    #[allow(dead_code)]
     hidden: i32,
 }
 
@@ -271,7 +265,6 @@ pub unsafe extern "C" fn wxr_schema_ManualSchema(schema: *mut Schema) {
 #[derive(Default)]
 pub struct NoSchema {
     #[none]
-    #[allow(dead_code)]
     value: i32,
 }
 
@@ -284,7 +277,6 @@ fn create_no_schema(_scene: &mut Scene) -> Option<NoSchema> {
 #[component]
 #[derive(Default)]
 pub struct FailingCreator {
-    #[allow(dead_code)]
     value: i32,
 }
 
@@ -324,7 +316,6 @@ fn create_nested(_scene: &mut Scene) -> Option<NestedComponent> {
 #[derive(Default)]
 pub struct OrderComponent {
     #[none]
-    #[allow(dead_code)]
     marker: u8,
 }
 
@@ -348,10 +339,9 @@ fn create_order_component(_scene: &mut Scene) -> Option<OrderComponent> {
 /// binary, so any test touching these globals must hold this lock.
 pub static SCENE_LOCK: Mutex<()> = Mutex::new(());
 
+// Lib-binary statics, all reset + guarded together by the `scene_state` fixture.
 pub static ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static DEFERRED_REMOVE_TARGET_PRESENT: AtomicBool = AtomicBool::new(false);
 pub static DEFERRED_UNLOAD_PLUGIN_PRESENT: AtomicBool = AtomicBool::new(false);
 pub static LOAD_PATH: LazyLock<Mutex<Option<std::path::PathBuf>>> =
@@ -360,6 +350,10 @@ pub static TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 pub static UNLOAD_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
+
+// Integration-binary statics. Each is written by exactly one test in
+// `tests/macro.rs`, so no lock is needed. If a second test ever uses
+// `group_counter`/`empty_system`/`lifecycle`, guard these like the ones above.
 pub static GROUP_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 pub static EMPTY_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
@@ -374,6 +368,8 @@ pub static LIFECYCLE_DETACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> =
 pub fn cleanup(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
 
 /// System whose attach/detach hooks bump [`ATTACH_COUNT`] / [`DETACH_COUNT`].
+/// Used both to observe add/remove and to prove a reload detaches then
+/// re-attaches systems.
 #[system]
 pub fn attach_counter(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
 
@@ -385,21 +381,6 @@ pub fn attach_attach_counter(_scene: &mut Scene) {
 #[detacher(attach_counter)]
 pub fn detach_attach_counter(_scene: &mut Scene) {
     DETACH_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-}
-
-/// System whose attach/detach hooks bump the reload counters; used to prove a
-/// reload detaches then re-attaches systems.
-#[system]
-pub fn reload_counted(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
-
-#[attacher(reload_counted)]
-pub fn attach_reload_counted(_scene: &mut Scene) {
-    RELOAD_ATTACH_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-}
-
-#[detacher(reload_counted)]
-pub fn detach_reload_counted(_scene: &mut Scene) {
-    RELOAD_DETACH_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 }
 
 /// Low-priority system that records its run order into [`TICK_ORDER`].
@@ -512,7 +493,6 @@ pub struct FileAsset {
     available: bool,
 
     #[none]
-    #[allow(dead_code)]
     hidden: String,
 }
 
@@ -535,7 +515,6 @@ fn create_file_asset(_scene: &mut Scene, path: &str) -> Option<FileAsset> {
 #[asset_type]
 pub struct OrderAsset {
     #[none]
-    #[allow(dead_code)]
     marker: u8,
 }
 
@@ -570,6 +549,15 @@ pub fn set_counter(scene: &mut Scene, entity: Uuid, value: i64) {
     *field = value;
 }
 
+/// A fresh scene with one entity carrying `component`. The single canonical
+/// "scene with one component" builder.
+pub fn scene_with(component: &str) -> (Scene, Uuid) {
+    let mut scene = Scene::new();
+    let entity = scene.add_entity();
+    scene.add_component(entity, component.to_owned()).unwrap();
+    (scene, entity)
+}
+
 /// A fresh, empty scene.
 #[fixture]
 pub fn scene() -> Scene {
@@ -579,8 +567,26 @@ pub fn scene() -> Scene {
 /// A scene holding one entity that already carries a `"Counter"` component.
 #[fixture]
 pub fn counter_scene() -> (Scene, Uuid) {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene.add_component(entity, "Counter".to_owned()).unwrap();
-    (scene, entity)
+    scene_with("Counter")
+}
+
+/// Guards and resets the shared lib-binary system state. Holding this (via the
+/// [`scene_state`] fixture) is the *only* thing a test must do to safely touch
+/// [`ATTACH_COUNT`], [`TICK_ORDER`], [`LOAD_PATH`], etc.: acquisition resets
+/// them all, and the held lock serializes against every other such test.
+pub struct SceneState(std::sync::MutexGuard<'static, ()>);
+
+#[fixture]
+pub fn scene_state() -> SceneState {
+    let guard = SCENE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    ATTACH_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+    DETACH_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+    DEFERRED_REMOVE_TARGET_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);
+    DEFERRED_UNLOAD_PLUGIN_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);
+    TICK_ORDER.lock().unwrap().clear();
+    UNLOAD_ORDER.lock().unwrap().clear();
+    *LOAD_PATH.lock().unwrap() = None;
+    SceneState(guard)
 }

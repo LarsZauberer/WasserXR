@@ -263,20 +263,6 @@ mod tests {
     }
 
     #[rstest]
-    fn field_exposes_type_and_configured_hooks() {
-        let field = Field::new(
-            FieldType::I64,
-            Some(null_getter),
-            true,
-            Some(sample_serializer),
-            Some(noop_deserializer),
-        );
-
-        assert_eq!(field.get_type(), FieldType::I64);
-        assert!(field.is_mutable());
-    }
-
-    #[rstest]
     #[case(true)]
     #[case(false)]
     fn field_reports_configured_mutability(#[case] mutable: bool) {
@@ -286,71 +272,47 @@ mod tests {
     }
 
     #[rstest]
-    fn field_getter_is_returned_when_present_and_errors_when_missing() {
-        let present = Field::new(FieldType::Blob, Some(null_getter), false, None, None);
+    fn field_exposes_type_and_each_hook_when_present_or_missing() {
+        // A fully-wired field reports its type and returns every hook pointer.
+        let full = Field::new(
+            FieldType::I64,
+            Some(null_getter),
+            true,
+            Some(sample_serializer),
+            Some(noop_deserializer),
+        );
+        assert_eq!(full.get_type(), FieldType::I64);
         assert_eq!(
-            present.get_getter().unwrap() as usize,
+            full.get_getter().unwrap() as usize,
             null_getter as *const () as usize
         );
-
-        let missing = Field::new(FieldType::Blob, None, false, None, None);
-        assert_eq!(missing.get_getter(), Err(ComponentError::FieldNoGetter));
-    }
-
-    #[rstest]
-    fn field_serializer_is_returned_when_present_and_errors_when_missing() {
-        let present = Field::new(FieldType::Blob, None, false, Some(sample_serializer), None);
         assert_eq!(
-            present.get_serializer().unwrap() as usize,
+            full.get_serializer().unwrap() as usize,
             sample_serializer as *const () as usize
         );
-
-        let missing = Field::new(FieldType::Blob, None, false, None, Some(noop_deserializer));
         assert_eq!(
-            missing.get_serializer(),
-            Err(ComponentError::FieldNoSerializer)
-        );
-    }
-
-    #[rstest]
-    fn field_deserializer_is_returned_when_present_and_errors_when_missing() {
-        let present = Field::new(FieldType::Blob, None, false, None, Some(noop_deserializer));
-        assert_eq!(
-            present.get_deserializer().unwrap() as usize,
+            full.get_deserializer().unwrap() as usize,
             noop_deserializer as *const () as usize
         );
 
-        let missing = Field::new(FieldType::Blob, None, false, Some(sample_serializer), None);
+        // A bare field reports the matching "missing hook" error for each.
+        let bare = Field::new(FieldType::Blob, None, false, None, None);
+        assert_eq!(bare.get_getter(), Err(ComponentError::FieldNoGetter));
         assert_eq!(
-            missing.get_deserializer(),
+            bare.get_serializer(),
+            Err(ComponentError::FieldNoSerializer)
+        );
+        assert_eq!(
+            bare.get_deserializer(),
             Err(ComponentError::FieldNoDeserializer)
         );
     }
 
     #[rstest]
-    fn field_render_and_parse_signed_integer() {
+    fn field_renders_and_parses_scalar_types() {
         assert_roundtrip(FieldType::I32, -4i32, "-4", "42", 42);
-        assert_parse_rejected(FieldType::I32, 7i32, &["not a number"]);
-    }
-
-    #[rstest]
-    fn field_parse_unsigned_integer_rejects_negative_input() {
-        assert_parse_rejected(FieldType::U8, 1u8, &["-1"]);
-    }
-
-    #[rstest]
-    fn field_render_and_parse_float() {
         assert_roundtrip(FieldType::F32, 1.5f32, "1.5", "2.25", 2.25);
-    }
-
-    #[rstest]
-    fn field_render_and_parse_char() {
         assert_roundtrip(FieldType::Char, 'a', "a", "z", 'z');
-        assert_parse_rejected(FieldType::Char, 'a', &["ab"]);
-    }
-
-    #[rstest]
-    fn field_render_and_parse_string() {
         assert_roundtrip(
             FieldType::String,
             "old".to_owned(),
@@ -358,10 +320,13 @@ mod tests {
             "new",
             "new".to_owned(),
         );
+        // Boolean: any non-zero byte renders `true`, and parsing is case-insensitive.
+        assert_roundtrip(FieldType::Boolean, 2u8, "true", "FALSE", 0u8);
+        assert_roundtrip(FieldType::Boolean, 0u8, "false", "tRuE", 1u8);
     }
 
     #[rstest]
-    fn field_render_and_parse_f32_vector_tolerates_whitespace() {
+    fn field_renders_and_parses_vectors_tolerating_whitespace() {
         assert_roundtrip(
             FieldType::F32Vec3,
             [1.5f32, 2.5, 3.5],
@@ -369,7 +334,7 @@ mod tests {
             "4.0, 5.0, 6.0",
             [4.0, 5.0, 6.0],
         );
-        // Parsing must accept the compact, space-free form too.
+        // The compact, space-free form parses too.
         assert_roundtrip(
             FieldType::F32Vec3,
             [4.0f32, 5.0, 6.0],
@@ -377,10 +342,6 @@ mod tests {
             "7.0,8.0,9.0",
             [7.0, 8.0, 9.0],
         );
-    }
-
-    #[rstest]
-    fn field_render_and_parse_f64_vector() {
         assert_roundtrip(
             FieldType::F64Vec2,
             [1.5f64, 2.5],
@@ -391,16 +352,13 @@ mod tests {
     }
 
     #[rstest]
-    fn field_parse_vector_rejects_wrong_arity_and_non_numeric() {
-        assert_parse_rejected(FieldType::F32Vec2, [1.0f32, 2.0], &["3.0", "3.0, invalid"]);
-    }
-
-    #[rstest]
-    fn field_render_and_parse_boolean_is_case_insensitive() {
-        // Any non-zero byte renders as `true`.
-        assert_roundtrip(FieldType::Boolean, 2u8, "true", "FALSE", 0u8);
-        assert_roundtrip(FieldType::Boolean, 0u8, "false", "tRuE", 1u8);
+    fn field_parse_rejects_invalid_inputs() {
+        assert_parse_rejected(FieldType::I32, 7i32, &["not a number"]);
+        assert_parse_rejected(FieldType::U8, 1u8, &["-1"]); // unsigned rejects negative
+        assert_parse_rejected(FieldType::Char, 'a', &["ab"]); // char rejects multi-char
         assert_parse_rejected(FieldType::Boolean, 1u8, &["yes"]);
+        // Vectors reject wrong arity and non-numeric elements.
+        assert_parse_rejected(FieldType::F32Vec2, [1.0f32, 2.0], &["3.0", "3.0, invalid"]);
     }
 
     #[rstest]

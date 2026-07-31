@@ -140,14 +140,10 @@ mod tests {
     }
 
     #[rstest]
-    fn schema_add_field_registers_field_by_name() {
-        assert_eq!(schema_with_health(true).get_fields(), vec!["health"]);
-    }
-
-    #[rstest]
     fn schema_returns_each_registered_hook_for_existing_field() {
         let schema = schema_with_health(false);
 
+        assert_eq!(schema.get_fields(), vec!["health"]);
         assert_eq!(
             schema.get_getter("health").unwrap() as usize,
             null_getter as *const () as usize

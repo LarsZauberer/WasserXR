@@ -7,19 +7,11 @@
 mod testing_plugin_fixture;
 
 use rstest::rstest;
-use testing_plugin_fixture as fx;
+use testing_plugin_fixture::{self as fx, scene_with};
 use wasserxr::{
     error::{ComponentError, SceneError},
     scene::{Scene, component::FieldType},
 };
-
-/// A scene with one entity carrying `component`.
-fn scene_with(component: &str) -> (Scene, uuid::Uuid) {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene.add_component(entity, component.to_owned()).unwrap();
-    (scene, entity)
-}
 
 #[rstest]
 fn component_macro_generates_working_getters_and_mutability() {

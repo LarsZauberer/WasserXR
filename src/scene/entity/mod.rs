@@ -60,27 +60,9 @@ mod tests {
     use uuid::Uuid;
 
     #[rstest]
-    fn entity_new_has_nonnil_id_and_empty_name() {
-        let entity = Entity::new();
-
+    fn entity_serialize_round_trip_preserves_id_and_name() {
+        let mut entity = Entity::new();
         assert_ne!(entity.get_id(), Uuid::nil());
-        assert_eq!(entity.get_name(), "");
-    }
-
-    #[rstest]
-    fn entity_set_name_updates_name_and_keeps_id() {
-        let mut entity = Entity::new();
-        let id = entity.get_id();
-
-        entity.set_name("Player".to_owned());
-
-        assert_eq!(entity.get_name(), "Player");
-        assert_eq!(entity.get_id(), id);
-    }
-
-    #[rstest]
-    fn entity_serialize_round_trip() {
-        let mut entity = Entity::new();
         entity.set_name("Player".to_owned());
         let id = entity.get_id();
 

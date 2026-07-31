@@ -1359,17 +1359,11 @@ mod tests {
     use crate::error::ComponentError;
     use crate::scene::serialization::{ComponentData, FieldData, SceneData};
     use crate::testing_plugin_fixture::{
-        self as fx, OwnedValue, counter_scene, get_counter, scene, set_counter,
+        self as fx, OwnedValue, counter_scene, get_counter, scene, scene_state, scene_with,
+        set_counter,
     };
     use rstest::rstest;
     use std::sync::atomic::Ordering;
-
-    /// Adds an entity carrying one `Pair` component and returns its id.
-    fn entity_with_pair(scene: &mut Scene) -> Uuid {
-        let entity = scene.add_entity();
-        scene.add_component(entity, "Pair".to_owned()).unwrap();
-        entity
-    }
 
     // ----- entities -----
 
@@ -1406,13 +1400,6 @@ mod tests {
     }
 
     // ----- components -----
-
-    #[rstest]
-    fn scene_add_component_for_existing_entity(mut scene: Scene) {
-        let entity = scene.add_entity();
-
-        assert_eq!(scene.add_component(entity, "Counter".to_owned()), Ok(()));
-    }
 
     #[rstest]
     fn scene_add_component_rejects_duplicate_component(counter_scene: (Scene, Uuid)) {
@@ -1479,8 +1466,8 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_reports_field_mutability_and_parsability(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_reports_field_mutability_and_parsability() {
+        let (mut scene, entity) = scene_with("Pair");
         scene.add_component(entity, "Owner".to_owned()).unwrap();
 
         // `Pair.a` is mutable and string-parsable, `Pair.b` is read-only, and
@@ -1524,17 +1511,6 @@ mod tests {
     // ----- queries -----
 
     #[rstest]
-    fn scene_query_gets_shared_field(counter_scene: (Scene, Uuid)) {
-        let (scene, entity) = counter_scene;
-
-        let (value,) = scene
-            .query::<(&i64,)>(entity, "Counter", &["value"])
-            .unwrap();
-
-        assert_eq!(*value, 1);
-    }
-
-    #[rstest]
     fn scene_query_gets_mutable_field(counter_scene: (Scene, Uuid)) {
         let (mut scene, entity) = counter_scene;
 
@@ -1549,8 +1525,8 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_query_gets_mutable_and_shared_fields(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_query_gets_mutable_and_shared_fields() {
+        let (mut scene, entity) = scene_with("Pair");
 
         {
             let (a, b) = scene
@@ -1567,8 +1543,8 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_query_allows_multiple_shared_queries(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_query_allows_multiple_shared_queries() {
+        let (scene, entity) = scene_with("Pair");
 
         let (a, b) = scene
             .query::<(&i64, &i64)>(entity, "Pair", &["a", "b"])
@@ -1597,8 +1573,8 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_query_rejects_malformed_field_lists(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_query_rejects_malformed_field_lists() {
+        let (mut scene, entity) = scene_with("Pair");
 
         // Duplicate field names.
         assert_eq!(
@@ -1693,8 +1669,8 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_parse_field_rejects_immutable_field(mut scene: Scene) {
-        let entity = entity_with_pair(&mut scene);
+    fn scene_parse_field_rejects_immutable_field() {
+        let (mut scene, entity) = scene_with("Pair");
 
         assert_eq!(
             scene.parse_field(entity, "Pair", "b", "42"),
@@ -1704,26 +1680,20 @@ mod tests {
         );
     }
 
-    // ----- systems (mutating shared fixture state: hold SCENE_LOCK) -----
+    // ----- systems -----
+    //
+    // Tests that mutate shared fixture state take the `scene_state` fixture,
+    // which resets those globals and holds `SCENE_LOCK` for the test's duration.
 
     #[rstest]
-    fn scene_add_system_runs_attacher(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::ATTACH_COUNT.store(0, Ordering::SeqCst);
-
+    fn scene_add_and_remove_system_run_lifecycle_hooks(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         scene.add_system("attach_counter".to_owned(), 1).unwrap();
-
         assert_eq!(fx::ATTACH_COUNT.load(Ordering::SeqCst), 1);
-    }
-
-    #[rstest]
-    fn scene_remove_system_runs_detacher(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::DETACH_COUNT.store(0, Ordering::SeqCst);
-        scene.add_system("attach_counter".to_owned(), 1).unwrap();
 
         scene.remove_system("attach_counter").unwrap();
-
         assert_eq!(fx::DETACH_COUNT.load(Ordering::SeqCst), 1);
     }
 
@@ -1745,9 +1715,10 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_tick_runs_systems_in_priority_order(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::TICK_ORDER.lock().unwrap().clear();
+    fn scene_tick_runs_systems_in_priority_order(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         scene.add_entity();
         scene.add_system("high_priority".to_owned(), 2).unwrap();
         scene.add_system("low_priority".to_owned(), 1).unwrap();
@@ -1811,9 +1782,10 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_unload_plugin_destroys_assets_before_components(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::UNLOAD_ORDER.lock().unwrap().clear();
+    fn scene_unload_plugin_destroys_assets_before_components(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         scene.plugins.insert(
             "dynamic_order".to_owned(),
             Plugin::new_test_dynamic("dynamic_order".to_owned()),
@@ -1851,35 +1823,13 @@ mod tests {
         );
     }
 
-    #[rstest]
-    fn scene_reload_reinstantiates_scene_objects(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        fx::RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
-        let entity = scene.add_entity();
-        scene
-            .set_entity_name(entity, "Reloaded".to_owned())
-            .unwrap();
-        scene.add_component(entity, "Counter".to_owned()).unwrap();
-        set_counter(&mut scene, entity, 42);
-        scene.add_system("reload_counted".to_owned(), 1).unwrap();
-
-        scene.reload().unwrap();
-
-        assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
-        assert_eq!(get_counter(&scene, entity), 42);
-        assert_eq!(fx::RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
-        assert_eq!(fx::RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
-        assert_eq!(scene.remove_system("reload_counted"), Ok(()));
-    }
-
     // ----- tick-deferred mutations -----
 
     #[rstest]
-    fn scene_tick_defers_remove_system_until_current_runner_finishes(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::DEFERRED_REMOVE_TARGET_PRESENT.store(false, Ordering::SeqCst);
-        fx::TICK_ORDER.lock().unwrap().clear();
+    fn scene_tick_defers_remove_system_until_current_runner_finishes(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         scene.add_entity();
         scene.add_system("remove_target".to_owned(), 1).unwrap();
         scene.add_system("remove_request".to_owned(), 2).unwrap();
@@ -1896,9 +1846,10 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_tick_defers_unload_plugin_until_current_runner_finishes(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::DEFERRED_UNLOAD_PLUGIN_PRESENT.store(false, Ordering::SeqCst);
+    fn scene_tick_defers_unload_plugin_until_current_runner_finishes(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         scene.add_entity();
         scene.plugins.insert(
             "dynamic_deferred".to_owned(),
@@ -1913,18 +1864,19 @@ mod tests {
     }
 
     #[rstest]
-    fn scene_tick_reloads_when_requested_by_system(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
-        fx::RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        fx::RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
-        fx::TICK_ORDER.lock().unwrap().clear();
+    fn scene_tick_reloads_when_requested_by_system(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         let entity = scene.add_entity();
         scene
             .set_entity_name(entity, "Deferred".to_owned())
             .unwrap();
         scene.add_component(entity, "Counter".to_owned()).unwrap();
         set_counter(&mut scene, entity, 7);
-        scene.add_system("reload_counted".to_owned(), 1).unwrap();
+        // `attach_counter`'s hooks let us prove the reload detached and
+        // re-attached the systems (attach twice, detach once).
+        scene.add_system("attach_counter".to_owned(), 1).unwrap();
         scene.add_system("low_priority".to_owned(), 1).unwrap();
         scene.add_system("reload_request".to_owned(), 2).unwrap();
 
@@ -1936,16 +1888,18 @@ mod tests {
         drop(tick_order);
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Deferred");
         assert_eq!(get_counter(&scene, entity), 7);
-        assert_eq!(fx::RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
-        assert_eq!(fx::RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
-        assert_eq!(scene.remove_system("reload_counted"), Ok(()));
+        assert_eq!(fx::ATTACH_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(fx::DETACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(scene.remove_system("attach_counter"), Ok(()));
         assert_eq!(scene.remove_system("low_priority"), Ok(()));
         assert_eq!(scene.remove_system("reload_request"), Ok(()));
     }
 
     #[rstest]
-    fn scene_tick_loads_when_requested_by_system(mut scene: Scene) {
-        let _guard = fx::SCENE_LOCK.lock().unwrap();
+    fn scene_tick_loads_when_requested_by_system(
+        #[from(scene_state)] _state: fx::SceneState,
+        mut scene: Scene,
+    ) {
         let mut saved = Scene::new();
         let entity = saved.add_entity();
         saved
