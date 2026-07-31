@@ -1,57 +1,35 @@
-use serde::{Deserialize, Serialize};
-use wasserxr::{component, component_creator, scene::Scene};
+//! Integration coverage for round-tripping a nested, serde-backed component
+//! field through a reload. The component lives in the shared fixture.
 
-#[component]
-struct MyStruct {
-    #[mutable]
-    data: Data,
-}
+#[path = "../src/testing_plugin_fixture.rs"]
+mod testing_plugin_fixture;
 
-#[derive(Deserialize, Serialize)]
-struct Data {
-    a: Vec<usize>,
-    b: [f32; 3],
-}
+use rstest::rstest;
+use testing_plugin_fixture::Nested;
+use wasserxr::scene::Scene;
 
-#[component_creator(MyStruct)]
-fn create_my_struct(_scene: &mut Scene) -> Option<MyStruct> {
-    Some(MyStruct {
-        data: Data {
-            a: vec![],
-            b: [1.0; 3],
-        },
-    })
-}
-
-#[test]
-fn test_nested_serialization() {
+#[rstest]
+fn nested_component_field_survives_reload() {
     let mut scene = Scene::new();
-
     let entity = scene.add_entity();
     scene
-        .add_component(entity, "MyStruct".to_owned())
-        .expect("Failed to create MyStruct");
+        .add_component(entity, "NestedComponent".to_owned())
+        .expect("Failed to create NestedComponent");
+
+    {
+        let (data,) = scene
+            .query_mut::<(&mut Nested,)>(entity, "NestedComponent", &["data"])
+            .expect("Failed to get data field");
+        data.numbers.push(5);
+        data.vector[1] = 0.5;
+        data.vector[2] = -1.0;
+    }
+
+    scene.reload().unwrap();
 
     let (data,) = scene
-        .query_mut::<(&mut Data,)>(entity, "MyStruct", &["data"])
+        .query::<(&Nested,)>(entity, "NestedComponent", &["data"])
         .expect("Failed to get data field");
-
-    data.a.push(5);
-    data.b[1] = 0.5;
-    data.b[2] = -1.0;
-
-    let _ = data;
-
-    let _ = scene.reload();
-
-    let (data,) = scene
-        .query::<(&Data,)>(entity, "MyStruct", &["data"])
-        .expect("Failed to get data field");
-
-    assert_eq!(data.a.len(), 1);
-    assert_eq!(data.a[0], 5);
-
-    assert_eq!(data.b[0], 1.0);
-    assert_eq!(data.b[1], 0.5);
-    assert_eq!(data.b[2], -1.0);
+    assert_eq!(data.numbers, vec![5]);
+    assert_eq!(data.vector, [1.0, 0.5, -1.0]);
 }

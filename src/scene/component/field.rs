@@ -221,236 +221,189 @@ fn parse_bool(input: &str) -> Result<bool, ComponentError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing_plugin_fixture::{noop_deserializer, null_getter, sample_serializer};
+    use rstest::rstest;
     use std::ffi::c_void;
 
-    unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
+    /// Renders `value`, parses `input` back over the same storage, and asserts
+    /// the stored result. `T` must be laid out exactly as the field type expects.
+    fn assert_roundtrip<T: PartialEq + std::fmt::Debug>(
+        type_hint: FieldType,
+        mut value: T,
+        rendered: &str,
+        input: &str,
+        expected: T,
+    ) {
+        let field = Field::new(type_hint, None, true, None, None);
+        let ptr = &mut value as *mut T as *mut c_void;
+
+        assert_eq!(unsafe { field.render(ptr) }.unwrap(), rendered);
+        unsafe { field.parse(ptr, input) }.unwrap();
+        assert_eq!(value, expected);
     }
 
-    unsafe extern "C" fn test_serializer(_data: *const c_void) -> SerializedBytes {
-        SerializedBytes::from_vec(vec![1, 2, 3])
+    /// Asserts that each `input` is rejected as unparsable and leaves `value`
+    /// untouched.
+    fn assert_parse_rejected<T: PartialEq + std::fmt::Debug + Clone>(
+        type_hint: FieldType,
+        mut value: T,
+        inputs: &[&str],
+    ) {
+        let field = Field::new(type_hint, None, true, None, None);
+        let ptr = &mut value as *mut T as *mut c_void;
+        let original = value.clone();
+
+        for input in inputs {
+            assert_eq!(
+                unsafe { field.parse(ptr, input) },
+                Err(ComponentError::FieldValueParsing)
+            );
+        }
+        assert_eq!(value, original);
     }
 
-    unsafe extern "C" fn test_deserializer(_data: *mut c_void, _value: SerializedBytes) {}
-
-    #[test]
-    fn field_new() {
+    #[rstest]
+    fn field_exposes_type_and_configured_hooks() {
         let field = Field::new(
             FieldType::I64,
-            Some(test_getter),
+            Some(null_getter),
             true,
-            Some(test_serializer),
-            Some(test_deserializer),
+            Some(sample_serializer),
+            Some(noop_deserializer),
         );
 
         assert_eq!(field.get_type(), FieldType::I64);
         assert!(field.is_mutable());
     }
 
-    #[test]
-    fn field_get_getter_when_present() {
-        let field = Field::new(FieldType::Blob, Some(test_getter), false, None, None);
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn field_reports_configured_mutability(#[case] mutable: bool) {
+        let field = Field::new(FieldType::Blob, Some(null_getter), mutable, None, None);
 
+        assert_eq!(field.is_mutable(), mutable);
+    }
+
+    #[rstest]
+    fn field_getter_is_returned_when_present_and_errors_when_missing() {
+        let present = Field::new(FieldType::Blob, Some(null_getter), false, None, None);
         assert_eq!(
-            field.get_getter().unwrap() as usize,
-            test_getter as *const () as usize
+            present.get_getter().unwrap() as usize,
+            null_getter as *const () as usize
         );
+
+        let missing = Field::new(FieldType::Blob, None, false, None, None);
+        assert_eq!(missing.get_getter(), Err(ComponentError::FieldNoGetter));
     }
 
-    #[test]
-    fn field_get_getter_when_missing() {
-        let field = Field::new(FieldType::Blob, None, false, None, None);
-
-        assert_eq!(field.get_getter(), Err(ComponentError::FieldNoGetter));
-    }
-
-    #[test]
-    fn field_is_mutable_when_enabled() {
-        let field = Field::new(FieldType::Blob, Some(test_getter), true, None, None);
-
-        assert!(field.is_mutable());
-    }
-
-    #[test]
-    fn field_is_not_mutable_by_default() {
-        let field = Field::new(FieldType::Blob, Some(test_getter), false, None, None);
-
-        assert!(!field.is_mutable());
-    }
-
-    #[test]
-    fn field_get_serializer_when_present() {
-        let field = Field::new(FieldType::Blob, None, false, Some(test_serializer), None);
-
+    #[rstest]
+    fn field_serializer_is_returned_when_present_and_errors_when_missing() {
+        let present = Field::new(FieldType::Blob, None, false, Some(sample_serializer), None);
         assert_eq!(
-            field.get_serializer().unwrap() as usize,
-            test_serializer as *const () as usize
+            present.get_serializer().unwrap() as usize,
+            sample_serializer as *const () as usize
         );
-    }
 
-    #[test]
-    fn field_get_serializer_when_missing() {
-        let field = Field::new(FieldType::Blob, None, false, None, Some(test_deserializer));
-
+        let missing = Field::new(FieldType::Blob, None, false, None, Some(noop_deserializer));
         assert_eq!(
-            field.get_serializer(),
+            missing.get_serializer(),
             Err(ComponentError::FieldNoSerializer)
         );
     }
 
-    #[test]
-    fn field_get_deserializer_when_present() {
-        let field = Field::new(FieldType::Blob, None, false, None, Some(test_deserializer));
-
+    #[rstest]
+    fn field_deserializer_is_returned_when_present_and_errors_when_missing() {
+        let present = Field::new(FieldType::Blob, None, false, None, Some(noop_deserializer));
         assert_eq!(
-            field.get_deserializer().unwrap() as usize,
-            test_deserializer as *const () as usize
+            present.get_deserializer().unwrap() as usize,
+            noop_deserializer as *const () as usize
         );
-    }
 
-    #[test]
-    fn field_get_deserializer_when_missing() {
-        let field = Field::new(FieldType::Blob, None, false, Some(test_serializer), None);
-
+        let missing = Field::new(FieldType::Blob, None, false, Some(sample_serializer), None);
         assert_eq!(
-            field.get_deserializer(),
+            missing.get_deserializer(),
             Err(ComponentError::FieldNoDeserializer)
         );
     }
 
-    #[test]
+    #[rstest]
     fn field_render_and_parse_signed_integer() {
-        let field = Field::new(FieldType::I32, None, true, None, None);
-        let mut value = -4i32;
-        let ptr = &mut value as *mut i32 as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "-4");
-        unsafe { field.parse(ptr, "42") }.unwrap();
-
-        assert_eq!(value, 42);
-        assert_eq!(
-            unsafe { field.parse(ptr, "not a number") },
-            Err(ComponentError::FieldValueParsing)
-        );
+        assert_roundtrip(FieldType::I32, -4i32, "-4", "42", 42);
+        assert_parse_rejected(FieldType::I32, 7i32, &["not a number"]);
     }
 
-    #[test]
+    #[rstest]
     fn field_parse_unsigned_integer_rejects_negative_input() {
-        let field = Field::new(FieldType::U8, None, true, None, None);
-        let mut value = 1u8;
-        let ptr = &mut value as *mut u8 as *mut c_void;
-
-        assert_eq!(
-            unsafe { field.parse(ptr, "-1") },
-            Err(ComponentError::FieldValueParsing)
-        );
-        assert_eq!(value, 1);
+        assert_parse_rejected(FieldType::U8, 1u8, &["-1"]);
     }
 
-    #[test]
+    #[rstest]
     fn field_render_and_parse_float() {
-        let field = Field::new(FieldType::F32, None, true, None, None);
-        let mut value = 1.5f32;
-        let ptr = &mut value as *mut f32 as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "1.5");
-        unsafe { field.parse(ptr, "2.25") }.unwrap();
-
-        assert_eq!(value, 2.25);
+        assert_roundtrip(FieldType::F32, 1.5f32, "1.5", "2.25", 2.25);
     }
 
-    #[test]
-    fn field_render_and_parse_f32_vector() {
-        let field = Field::new(FieldType::F32Vec3, None, true, None, None);
-        let mut value = [1.5f32, 2.5, 3.5];
-        let ptr = &mut value as *mut [f32; 3] as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "1.5, 2.5, 3.5");
-        unsafe { field.parse(ptr, "4.0, 5.0, 6.0") }.unwrap();
-        assert_eq!(value, [4.0, 5.0, 6.0]);
-
-        unsafe { field.parse(ptr, "7.0,8.0,9.0") }.unwrap();
-        assert_eq!(value, [7.0, 8.0, 9.0]);
-    }
-
-    #[test]
-    fn field_render_and_parse_f64_vector() {
-        let field = Field::new(FieldType::F64Vec2, None, true, None, None);
-        let mut value = [1.5f64, 2.5];
-        let ptr = &mut value as *mut [f64; 2] as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "1.5, 2.5");
-        unsafe { field.parse(ptr, "3.0,4.0") }.unwrap();
-
-        assert_eq!(value, [3.0, 4.0]);
-    }
-
-    #[test]
-    fn field_parse_vector_rejects_invalid_input() {
-        let field = Field::new(FieldType::F32Vec2, None, true, None, None);
-        let mut value = [1.0f32, 2.0];
-        let ptr = &mut value as *mut [f32; 2] as *mut c_void;
-
-        assert_eq!(
-            unsafe { field.parse(ptr, "3.0") },
-            Err(ComponentError::FieldValueParsing)
-        );
-        assert_eq!(
-            unsafe { field.parse(ptr, "3.0, invalid") },
-            Err(ComponentError::FieldValueParsing)
-        );
-        assert_eq!(value, [1.0, 2.0]);
-    }
-
-    #[test]
+    #[rstest]
     fn field_render_and_parse_char() {
-        let field = Field::new(FieldType::Char, None, true, None, None);
-        let mut value = 'a';
-        let ptr = &mut value as *mut char as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "a");
-        unsafe { field.parse(ptr, "z") }.unwrap();
-
-        assert_eq!(value, 'z');
-        assert_eq!(
-            unsafe { field.parse(ptr, "ab") },
-            Err(ComponentError::FieldValueParsing)
-        );
+        assert_roundtrip(FieldType::Char, 'a', "a", "z", 'z');
+        assert_parse_rejected(FieldType::Char, 'a', &["ab"]);
     }
 
-    #[test]
+    #[rstest]
     fn field_render_and_parse_string() {
-        let field = Field::new(FieldType::String, None, true, None, None);
-        let mut value = "old".to_owned();
-        let ptr = &mut value as *mut String as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "old");
-        unsafe { field.parse(ptr, "new") }.unwrap();
-
-        assert_eq!(value, "new");
-    }
-
-    #[test]
-    fn field_render_and_parse_boolean() {
-        let field = Field::new(FieldType::Boolean, None, true, None, None);
-        let mut value = 2u8;
-        let ptr = &mut value as *mut u8 as *mut c_void;
-
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "true");
-        unsafe { field.parse(ptr, "FALSE") }.unwrap();
-        assert_eq!(value, 0);
-        assert_eq!(unsafe { field.render(ptr) }.unwrap(), "false");
-
-        unsafe { field.parse(ptr, "tRuE") }.unwrap();
-        assert_eq!(value, 1);
-        assert_eq!(
-            unsafe { field.parse(ptr, "yes") },
-            Err(ComponentError::FieldValueParsing)
+        assert_roundtrip(
+            FieldType::String,
+            "old".to_owned(),
+            "old",
+            "new",
+            "new".to_owned(),
         );
-        assert_eq!(value, 1);
     }
 
-    #[test]
+    #[rstest]
+    fn field_render_and_parse_f32_vector_tolerates_whitespace() {
+        assert_roundtrip(
+            FieldType::F32Vec3,
+            [1.5f32, 2.5, 3.5],
+            "1.5, 2.5, 3.5",
+            "4.0, 5.0, 6.0",
+            [4.0, 5.0, 6.0],
+        );
+        // Parsing must accept the compact, space-free form too.
+        assert_roundtrip(
+            FieldType::F32Vec3,
+            [4.0f32, 5.0, 6.0],
+            "4, 5, 6",
+            "7.0,8.0,9.0",
+            [7.0, 8.0, 9.0],
+        );
+    }
+
+    #[rstest]
+    fn field_render_and_parse_f64_vector() {
+        assert_roundtrip(
+            FieldType::F64Vec2,
+            [1.5f64, 2.5],
+            "1.5, 2.5",
+            "3.0,4.0",
+            [3.0, 4.0],
+        );
+    }
+
+    #[rstest]
+    fn field_parse_vector_rejects_wrong_arity_and_non_numeric() {
+        assert_parse_rejected(FieldType::F32Vec2, [1.0f32, 2.0], &["3.0", "3.0, invalid"]);
+    }
+
+    #[rstest]
+    fn field_render_and_parse_boolean_is_case_insensitive() {
+        // Any non-zero byte renders as `true`.
+        assert_roundtrip(FieldType::Boolean, 2u8, "true", "FALSE", 0u8);
+        assert_roundtrip(FieldType::Boolean, 0u8, "false", "tRuE", 1u8);
+        assert_parse_rejected(FieldType::Boolean, 1u8, &["yes"]);
+    }
+
+    #[rstest]
     fn field_renders_blob_pointer_and_rejects_parse() {
         let field = Field::new(FieldType::Blob, None, true, None, None);
         let mut value = 1u8;

@@ -166,16 +166,11 @@ pub unsafe extern "C" fn wxr_asset_schema_add_field(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        ffi::{CString, c_void},
-        ptr,
-    };
+    use crate::testing_plugin_fixture::null_getter;
+    use rstest::rstest;
+    use std::ffi::CString;
 
-    unsafe extern "C" fn getter(_data: *mut c_void) -> *mut c_void {
-        ptr::null_mut()
-    }
-
-    #[test]
+    #[rstest]
     fn component_schema_add_field_accepts_c_values() {
         let schema = wxr_component_schema_new();
         let field = CString::new("value").unwrap();
@@ -186,7 +181,7 @@ mod tests {
                     schema,
                     field.as_ptr(),
                     component::FieldType::I64,
-                    getter,
+                    null_getter,
                     1,
                 )
             },
@@ -198,7 +193,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[rstest]
     fn asset_schema_add_field_accepts_c_values() {
         let schema = wxr_asset_schema_new();
         let field = CString::new("value").unwrap();
@@ -209,7 +204,7 @@ mod tests {
                     schema,
                     field.as_ptr(),
                     component::FieldType::I64,
-                    getter,
+                    null_getter,
                 )
             },
             0

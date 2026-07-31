@@ -996,64 +996,15 @@ pub extern "C" fn wxr_should_exit(scene: *mut WXRScene) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        bindings::wxr_error,
-        scene::component::{FieldType, Schema, SerializedBytes},
-    };
+    use crate::bindings::wxr_error;
+    use rstest::rstest;
     use std::{
         ffi::{CStr, CString},
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    #[repr(C)]
-    struct FfiCounter {
-        value: i64,
-    }
-
-    unsafe extern "C" fn ffi_counter_getter(data: *mut c_void) -> *mut c_void {
-        unsafe { &mut (*(data as *mut FfiCounter)).value as *mut i64 as *mut c_void }
-    }
-
-    unsafe extern "C" fn ffi_counter_serializer(data: *const c_void) -> SerializedBytes {
-        unsafe {
-            SerializedBytes::from_vec((*(data as *const FfiCounter)).value.to_le_bytes().to_vec())
-        }
-    }
-
-    unsafe extern "C" fn ffi_counter_deserializer(data: *mut c_void, value: SerializedBytes) {
-        unsafe {
-            let bytes = value.into_vec();
-            if let Ok(bytes) = <[u8; 8]>::try_from(bytes.as_slice()) {
-                (*(data as *mut FfiCounter)).value = i64::from_le_bytes(bytes);
-            }
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_ffi_counter(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(FfiCounter { value: 5 })) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_ffi_counter(data: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(data as *mut FfiCounter));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_ffi_counter(schema: *mut Schema) {
-        unsafe {
-            (*schema).add_field(
-                "value".to_owned(),
-                FieldType::I64,
-                Some(ffi_counter_getter),
-                true,
-                Some(ffi_counter_serializer),
-                Some(ffi_counter_deserializer),
-            );
-        }
-    }
+    // The `Counter` component (id `"Counter"`, starting value 1) is shared
+    // scaffolding; see `crate::testing_plugin_fixture`.
 
     static RESOURCE_DROPS: AtomicUsize = AtomicUsize::new(0);
 
@@ -1064,7 +1015,7 @@ mod tests {
         RESOURCE_DROPS.fetch_add(1, Ordering::SeqCst);
     }
 
-    #[test]
+    #[rstest]
     fn scene_entity_name_round_trip() {
         let scene = wxr_create_scene();
         let entity = wxr_add_entity(scene);
@@ -1092,7 +1043,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[rstest]
     fn scene_error_tracks_failure() {
         let scene = wxr_create_scene();
         let missing = WXREntity { bytes: [7; 16] };
@@ -1105,11 +1056,11 @@ mod tests {
         }
     }
 
-    #[test]
+    #[rstest]
     fn scene_query_returns_field_pointer() {
         let scene = wxr_create_scene();
         let entity = wxr_add_entity(scene);
-        let component = CString::new("ffi_counter").unwrap();
+        let component = CString::new("Counter").unwrap();
         let field = CString::new("value").unwrap();
 
         assert_eq!(
@@ -1118,7 +1069,7 @@ mod tests {
         );
         let value = unsafe { wxr_query(scene, entity, component.as_ptr(), field.as_ptr()) };
         assert!(!value.is_null());
-        assert_eq!(unsafe { *(value as *const i64) }, 5);
+        assert_eq!(unsafe { *(value as *const i64) }, 1);
 
         unsafe {
             *(value as *mut i64) = 9;
@@ -1132,7 +1083,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[rstest]
     fn raw_resource_round_trip_and_drop() {
         RESOURCE_DROPS.store(0, Ordering::SeqCst);
         let scene = wxr_create_scene();

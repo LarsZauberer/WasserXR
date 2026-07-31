@@ -46,6 +46,8 @@ extern crate self as wasserxr;
 pub mod bindings;
 pub mod error;
 pub mod scene;
+#[cfg(test)]
+mod testing_plugin_fixture;
 /// Small utility modules used by the runtime and applications.
 pub mod utils;
 

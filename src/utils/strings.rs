@@ -28,42 +28,32 @@ pub unsafe extern "C" fn wxr_rust_string_to_c_string(value: *const c_void) -> *m
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
     use std::ffi::CStr;
 
-    #[test]
-    fn converts_rust_string_pointer() {
-        let model = String::from("models/cube.glb");
+    #[rstest]
+    #[case("models/cube.glb")]
+    #[case("models/capsule.glb")]
+    fn converts_and_transfers_ownership_of_rust_string(#[case] model: &str) {
+        let model = model.to_owned();
         let ptr = unsafe { wxr_rust_string_to_c_string((&model as *const String).cast()) };
 
         unsafe {
-            assert_eq!(
-                CStr::from_ptr(ptr).to_bytes_with_nul(),
-                b"models/cube.glb\0"
-            );
+            assert_eq!(CStr::from_ptr(ptr).to_str().unwrap(), model);
+            // Ownership was transferred to the caller, so we must free it here.
             drop(CString::from_raw(ptr));
         }
     }
 
-    #[test]
+    #[rstest]
     fn rejects_interior_nul_bytes() {
         let model = String::from("models\0cube.glb");
 
         assert!(unsafe { wxr_rust_string_to_c_string((&model as *const String).cast()) }.is_null());
     }
 
-    #[test]
+    #[rstest]
     fn null_pointer_returns_null() {
         assert!(unsafe { wxr_rust_string_to_c_string(ptr::null()) }.is_null());
-    }
-
-    #[test]
-    fn raw_pointer_round_trips_when_ownership_is_transferred() {
-        let model = String::from("models/capsule.glb");
-        let ptr = unsafe { wxr_rust_string_to_c_string((&model as *const String).cast()) };
-
-        unsafe {
-            assert_eq!(CStr::from_ptr(ptr).to_str().unwrap(), "models/capsule.glb");
-            drop(CString::from_raw(ptr));
-        }
     }
 }

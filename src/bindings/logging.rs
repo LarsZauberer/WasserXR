@@ -210,9 +210,10 @@ pub extern "C" fn wxr_render_log_entry(entry: *const WXRLogEntry) -> *mut c_char
 mod tests {
     use super::*;
     use crate::bindings::scene::{wxr_create_scene, wxr_destroy_scene};
+    use rstest::rstest;
     use std::ffi::{CStr, CString};
 
-    #[test]
+    #[rstest]
     fn log_entry_getters_and_render_work() {
         let scene = wxr_create_scene();
         let logger = CString::new("test").unwrap();

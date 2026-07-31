@@ -122,148 +122,67 @@ impl Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::c_void;
+    use crate::testing_plugin_fixture::{noop_deserializer, null_getter, sample_serializer};
+    use rstest::rstest;
 
-    unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
-    }
-
-    unsafe extern "C" fn test_serializer(
-        _data: *const c_void,
-    ) -> crate::scene::component::SerializedBytes {
-        crate::scene::component::SerializedBytes::from_vec(vec![1])
-    }
-
-    unsafe extern "C" fn test_deserializer(
-        _data: *mut c_void,
-        _value: crate::scene::component::SerializedBytes,
-    ) {
-    }
-
-    #[test]
-    fn schema_add_field() {
+    /// A schema with one `"health"` field wired to the shared hooks.
+    fn schema_with_health(mutable: bool) -> Schema {
         let mut schema = Schema::new();
-
         schema.add_field(
             "health".to_owned(),
             FieldType::I64,
-            Some(test_getter),
-            true,
-            Some(test_serializer),
-            Some(test_deserializer),
+            Some(null_getter),
+            mutable,
+            Some(sample_serializer),
+            Some(noop_deserializer),
         );
-
-        let fields = schema.get_fields();
-        assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0], "health");
+        schema
     }
 
-    #[test]
-    fn schema_get_getter_for_existing_field() {
-        let mut schema = Schema::new();
+    #[rstest]
+    fn schema_add_field_registers_field_by_name() {
+        assert_eq!(schema_with_health(true).get_fields(), vec!["health"]);
+    }
 
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::I64,
-            Some(test_getter),
-            false,
-            None,
-            None,
-        );
+    #[rstest]
+    fn schema_returns_each_registered_hook_for_existing_field() {
+        let schema = schema_with_health(false);
 
         assert_eq!(
             schema.get_getter("health").unwrap() as usize,
-            test_getter as *const () as usize
+            null_getter as *const () as usize
+        );
+        assert_eq!(
+            schema.get_serializer("health").unwrap() as usize,
+            sample_serializer as *const () as usize
+        );
+        assert_eq!(
+            schema.get_deserializer("health").unwrap() as usize,
+            noop_deserializer as *const () as usize
         );
     }
 
-    #[test]
-    fn schema_get_getter_for_missing_field() {
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn schema_reports_field_mutability(#[case] mutable: bool) {
+        assert_eq!(
+            schema_with_health(mutable).is_mutable("health"),
+            Ok(mutable)
+        );
+    }
+
+    #[rstest]
+    fn schema_lookups_error_on_missing_field() {
         let schema = Schema::new();
 
         assert_eq!(
             schema.get_getter("health"),
             Err(ComponentError::FieldNotFound)
         );
-    }
-
-    #[test]
-    fn schema_is_mutable_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::I64,
-            Some(test_getter),
-            true,
-            None,
-            None,
-        );
-
-        assert!(schema.is_mutable("health").unwrap());
-    }
-
-    #[test]
-    fn schema_is_not_mutable_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::I64,
-            Some(test_getter),
-            false,
-            None,
-            None,
-        );
-
-        assert!(!schema.is_mutable("health").unwrap());
-    }
-
-    #[test]
-    fn schema_is_mutable_for_missing_field() {
-        let schema = Schema::new();
-
         assert_eq!(
             schema.is_mutable("health"),
             Err(ComponentError::FieldNotFound)
-        );
-    }
-
-    #[test]
-    fn schema_get_serializer_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::I64,
-            Some(test_getter),
-            false,
-            Some(test_serializer),
-            Some(test_deserializer),
-        );
-
-        assert_eq!(
-            schema.get_serializer("health").unwrap() as usize,
-            test_serializer as *const () as usize
-        );
-    }
-
-    #[test]
-    fn schema_get_deserializer_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field(
-            "health".to_owned(),
-            FieldType::I64,
-            Some(test_getter),
-            false,
-            Some(test_serializer),
-            Some(test_deserializer),
-        );
-
-        assert_eq!(
-            schema.get_deserializer("health").unwrap() as usize,
-            test_deserializer as *const () as usize
         );
     }
 }

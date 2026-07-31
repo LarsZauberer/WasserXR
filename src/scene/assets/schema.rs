@@ -62,47 +62,31 @@ impl Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing_plugin_fixture::null_getter;
+    use rstest::rstest;
 
-    unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
+    fn schema_with_content() -> Schema {
+        let mut schema = Schema::new();
+        schema.add_field("content".to_owned(), FieldType::String, Some(null_getter));
+        schema
     }
 
-    #[test]
-    fn schema_add_field() {
-        let mut schema = Schema::new();
+    #[rstest]
+    fn schema_add_field_registers_field_name_type_and_getter() {
+        let schema = schema_with_content();
 
-        schema.add_field("content".to_owned(), FieldType::String, Some(test_getter));
-
-        let fields = schema.get_fields();
-        assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0], "content");
-    }
-
-    #[test]
-    fn schema_get_getter_for_existing_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field("content".to_owned(), FieldType::String, Some(test_getter));
-
+        assert_eq!(schema.get_fields(), vec!["content"]);
+        assert_eq!(schema.get_field_type("content"), Ok(FieldType::String));
         assert_eq!(
             schema.get_getter("content").unwrap() as usize,
-            test_getter as *const () as usize
+            null_getter as *const () as usize
         );
     }
 
-    #[test]
+    #[rstest]
     fn schema_get_getter_for_missing_field() {
         let schema = Schema::new();
 
         assert_eq!(schema.get_getter("content"), Err(AssetError::FieldNotFound));
-    }
-
-    #[test]
-    fn schema_get_field_type() {
-        let mut schema = Schema::new();
-
-        schema.add_field("content".to_owned(), FieldType::String, Some(test_getter));
-
-        assert_eq!(schema.get_field_type("content"), Ok(FieldType::String));
     }
 }

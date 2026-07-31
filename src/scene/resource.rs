@@ -140,7 +140,8 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::testing_plugin_fixture::scene;
+    use rstest::rstest;
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -154,8 +155,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn resource_returns_stored_value() {
+    #[rstest]
+    fn resource_returns_and_mutates_stored_value() {
         let mut resource = Resource::new(1usize);
 
         assert_eq!(*resource.get::<usize>(), 1);
@@ -163,7 +164,7 @@ mod tests {
         assert_eq!(*resource.get::<usize>(), 2);
     }
 
-    #[test]
+    #[rstest]
     fn resource_drops_stored_value() {
         let drops = Arc::new(AtomicUsize::new(0));
 
@@ -175,19 +176,16 @@ mod tests {
         assert_eq!(drops.load(Ordering::SeqCst), 1);
     }
 
-    #[test]
-    fn scene_adds_and_gets_resource() {
-        let mut scene = Scene::new();
-
+    #[rstest]
+    fn scene_adds_and_gets_resource(mut scene: Scene) {
         scene.add_resource("counter".to_owned(), 1usize).unwrap();
         *scene.get_mut_resource::<usize>("counter").unwrap() = 2;
 
         assert_eq!(*scene.get_resource::<usize>("counter").unwrap(), 2);
     }
 
-    #[test]
-    fn scene_rejects_duplicate_resource() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_rejects_duplicate_resource(mut scene: Scene) {
         scene.add_resource("counter".to_owned(), 1usize).unwrap();
 
         assert_eq!(
@@ -196,19 +194,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scene_rejects_missing_resource() {
-        let scene = Scene::new();
-
+    #[rstest]
+    fn scene_rejects_missing_resource(scene: Scene) {
         assert_eq!(
             scene.get_resource::<usize>("missing"),
             Err(SceneError::ResourceNotFound)
         );
     }
 
-    #[test]
-    fn scene_resource_survives_reload() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_resource_survives_reload(mut scene: Scene) {
         scene.add_resource("counter".to_owned(), 1usize).unwrap();
 
         scene.reload().unwrap();

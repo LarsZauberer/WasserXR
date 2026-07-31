@@ -92,18 +92,17 @@ impl Plugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[unsafe(no_mangle)]
     static TEST_DATA: usize = 5;
 
-    #[test]
-    fn plugin_new_static() {
-        let plugin = Plugin::new_static();
-
-        assert_eq!(plugin.get_id(), "");
+    #[rstest]
+    fn plugin_new_static_has_empty_id() {
+        assert_eq!(Plugin::new_static().get_id(), "");
     }
 
-    #[test]
+    #[rstest]
     fn plugin_get_symbol_for_existing_symbol() {
         let plugin = Plugin::new_static();
 
@@ -115,24 +114,17 @@ mod tests {
         }
     }
 
-    #[test]
+    #[rstest]
     fn plugin_get_symbol_for_missing_symbol() {
         let plugin = Plugin::new_static();
 
-        match plugin.get_symbol::<*const usize>("nonexistent") {
-            Ok(_) => {
-                panic!("Nonexistent symbol should have not been able to be found");
-            }
-            Err(PluginError::MissingSymbol(symbol)) => {
-                assert_eq!(symbol, "nonexistent");
-            }
-            Err(_) => {
-                panic!("Nonexistent symbol had an error that was not a MissingSymbol error");
-            }
-        }
+        assert_eq!(
+            plugin.get_symbol::<*const usize>("nonexistent"),
+            Err(PluginError::MissingSymbol("nonexistent".to_owned()))
+        );
     }
 
-    #[test]
+    #[rstest]
     fn plugin_get_symbol_for_invalid_symbol() {
         let plugin = Plugin::new_static();
 
@@ -142,7 +134,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[rstest]
     fn plugin_new_for_missing_path() {
         let result = Plugin::new("/definitely/missing/wasserxr/test/plugin.so".to_owned());
 

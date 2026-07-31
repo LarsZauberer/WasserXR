@@ -1355,494 +1355,33 @@ impl Scene {
 
 #[cfg(test)]
 mod tests {
-    #![allow(deprecated)]
-
     use super::*;
-    use crate::{
-        error::ComponentError,
-        scene::{
-            component::{FieldType, Getter, Schema, SerializedBytes},
-            serialization::{ComponentData, FieldData, SceneData},
-        },
+    use crate::error::ComponentError;
+    use crate::scene::serialization::{ComponentData, FieldData, SceneData};
+    use crate::testing_plugin_fixture::{
+        self as fx, OwnedValue, counter_scene, get_counter, scene, set_counter,
     };
-    use std::sync::{
-        LazyLock, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    };
+    use rstest::rstest;
+    use std::sync::atomic::Ordering;
 
-    #[repr(C)]
-    struct SceneCounter {
-        value: i64,
+    /// Adds an entity carrying one `Pair` component and returns its id.
+    fn entity_with_pair(scene: &mut Scene) -> Uuid {
+        let entity = scene.add_entity();
+        scene.add_component(entity, "Pair".to_owned()).unwrap();
+        entity
     }
 
-    #[repr(C)]
-    struct ScenePair {
-        a: i64,
-        b: i64,
-    }
+    // ----- entities -----
 
-    #[repr(C)]
-    struct SceneOctet {
-        values: [i64; 8],
-    }
-
-    #[derive(Default, Debug, PartialEq, Eq)]
-    struct SceneOwnedValue {
-        value: String,
-    }
-
-    #[repr(C)]
-    struct SceneOwner {
-        value: SceneOwnedValue,
-    }
-
-    struct SceneOrderComponent;
-
-    struct SceneOrderAsset;
-
-    unsafe extern "C" fn scene_counter_getter(data: *mut c_void) -> *mut c_void {
-        unsafe { &mut (*(data as *mut SceneCounter)).value as *mut i64 as *mut c_void }
-    }
-
-    unsafe extern "C" fn scene_pair_a_getter(data: *mut c_void) -> *mut c_void {
-        unsafe { &mut (*(data as *mut ScenePair)).a as *mut i64 as *mut c_void }
-    }
-
-    unsafe extern "C" fn scene_pair_b_getter(data: *mut c_void) -> *mut c_void {
-        unsafe { &mut (*(data as *mut ScenePair)).b as *mut i64 as *mut c_void }
-    }
-
-    macro_rules! scene_octet_getter {
-        ($name:ident, $index:expr) => {
-            unsafe extern "C" fn $name(data: *mut c_void) -> *mut c_void {
-                unsafe {
-                    &mut (*(data as *mut SceneOctet)).values[$index] as *mut i64 as *mut c_void
-                }
-            }
-        };
-    }
-
-    scene_octet_getter!(scene_octet_a_getter, 0);
-    scene_octet_getter!(scene_octet_b_getter, 1);
-    scene_octet_getter!(scene_octet_c_getter, 2);
-    scene_octet_getter!(scene_octet_d_getter, 3);
-    scene_octet_getter!(scene_octet_e_getter, 4);
-    scene_octet_getter!(scene_octet_f_getter, 5);
-    scene_octet_getter!(scene_octet_g_getter, 6);
-    scene_octet_getter!(scene_octet_h_getter, 7);
-
-    unsafe extern "C" fn scene_counter_serializer(data: *const c_void) -> SerializedBytes {
-        unsafe {
-            SerializedBytes::from_vec(
-                (*(data as *const SceneCounter))
-                    .value
-                    .to_le_bytes()
-                    .to_vec(),
-            )
-        }
-    }
-
-    unsafe extern "C" fn scene_counter_deserializer(data: *mut c_void, value: SerializedBytes) {
-        unsafe {
-            let bytes = value.into_vec();
-            if let Ok(bytes) = <[u8; 8]>::try_from(bytes.as_slice()) {
-                (*(data as *mut SceneCounter)).value = i64::from_le_bytes(bytes);
-            }
-        }
-    }
-
-    unsafe extern "C" fn scene_owner_getter(data: *mut c_void) -> *mut c_void {
-        unsafe { &mut (*(data as *mut SceneOwner)).value as *mut SceneOwnedValue as *mut c_void }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_counter(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(SceneCounter { value: 1 })) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_pair(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(ScenePair { a: 1, b: 2 })) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_octet(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(SceneOctet {
-            values: [1, 2, 3, 4, 5, 6, 7, 8],
-        })) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_scene_counter(data: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(data as *mut SceneCounter));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_scene_pair(data: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(data as *mut ScenePair));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_scene_octet(data: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(data as *mut SceneOctet));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_owner(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(SceneOwner {
-            value: SceneOwnedValue::default(),
-        })) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_scene_owner(data: *mut c_void) {
-        unsafe {
-            drop(Box::from_raw(data as *mut SceneOwner));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_scene_order_component(_scene: *mut Scene) -> *mut c_void {
-        Box::into_raw(Box::new(SceneOrderComponent)) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_scene_order_component(data: *mut c_void) {
-        SCENE_UNLOAD_ORDER.lock().unwrap().push("component");
-        unsafe {
-            drop(Box::from_raw(data as *mut SceneOrderComponent));
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_scene_counter(schema: *mut Schema) {
-        unsafe {
-            (*schema).add_field(
-                "value".to_owned(),
-                FieldType::I64,
-                Some(scene_counter_getter),
-                true,
-                Some(scene_counter_serializer),
-                Some(scene_counter_deserializer),
-            );
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_scene_pair(schema: *mut Schema) {
-        unsafe {
-            (*schema).add_field(
-                "a".to_owned(),
-                FieldType::I64,
-                Some(scene_pair_a_getter),
-                true,
-                None,
-                None,
-            );
-            (*schema).add_field(
-                "b".to_owned(),
-                FieldType::I64,
-                Some(scene_pair_b_getter),
-                false,
-                None,
-                None,
-            );
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_scene_octet(schema: *mut Schema) {
-        let fields: [(&str, Getter); 8] = [
-            ("a", scene_octet_a_getter),
-            ("b", scene_octet_b_getter),
-            ("c", scene_octet_c_getter),
-            ("d", scene_octet_d_getter),
-            ("e", scene_octet_e_getter),
-            ("f", scene_octet_f_getter),
-            ("g", scene_octet_g_getter),
-            ("h", scene_octet_h_getter),
-        ];
-
-        unsafe {
-            for (id, getter) in fields {
-                (*schema).add_field(
-                    id.to_owned(),
-                    FieldType::I64,
-                    Some(getter),
-                    false,
-                    None,
-                    None,
-                );
-            }
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_scene_owner(schema: *mut Schema) {
-        unsafe {
-            (*schema).add_field(
-                "value".to_owned(),
-                FieldType::Blob,
-                Some(scene_owner_getter),
-                false,
-                None,
-                None,
-            );
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_create_scene_order_asset(
-        _scene: *mut Scene,
-        _data_string: *const std::ffi::c_char,
-    ) -> *mut c_void {
-        Box::into_raw(Box::new(SceneOrderAsset)) as *mut c_void
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_schema_scene_order_asset(
-        _schema: *mut crate::scene::assets::Schema,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_asset_destroy_scene_order_asset(
-        _scene: *mut Scene,
-        data: *mut c_void,
-    ) {
-        SCENE_UNLOAD_ORDER.lock().unwrap().push("asset");
-        unsafe {
-            drop(Box::from_raw(data as *mut SceneOrderAsset));
-        }
-    }
-
-    static SCENE_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_DEFERRED_RELOAD_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_DEFERRED_RELOAD_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static SCENE_DEFERRED_REMOVE_TARGET_PRESENT: AtomicBool = AtomicBool::new(false);
-    static SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT: AtomicBool = AtomicBool::new(false);
-    static SCENE_DEFERRED_LOAD_PATH: LazyLock<Mutex<Option<std::path::PathBuf>>> =
-        LazyLock::new(|| Mutex::new(None));
-    static SCENE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
-        LazyLock::new(|| Mutex::new(Vec::new()));
-    static SCENE_RELOAD_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
-        LazyLock::new(|| Mutex::new(Vec::new()));
-    static SCENE_DEFERRED_REMOVE_TICK_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
-        LazyLock::new(|| Mutex::new(Vec::new()));
-    static SCENE_UNLOAD_ORDER: LazyLock<Mutex<Vec<&'static str>>> =
-        LazyLock::new(|| Mutex::new(Vec::new()));
-
-    fn set_scene_counter(scene: &mut Scene, entity: Uuid, value: i64) {
-        let (field,) = scene
-            .query_mut::<(&mut i64,)>(entity, "scene_counter", &["value"])
-            .unwrap();
-        *field = value;
-    }
-
-    fn get_scene_counter(scene: &Scene, entity: Uuid) -> i64 {
-        let (field,) = scene
-            .query::<(&i64,)>(entity, "scene_counter", &["value"])
-            .unwrap();
-        *field
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_attach_system(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_attach_scene_attach_system(_scene: *mut Scene) {
-        SCENE_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_detach_scene_attach_system(_scene: *mut Scene) {
-        SCENE_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_cleanup_system(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_reload_counted_system(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_attach_scene_reload_counted_system(_scene: *mut Scene) {
-        SCENE_RELOAD_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_detach_scene_reload_counted_system(_scene: *mut Scene) {
-        SCENE_RELOAD_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_deferred_reload_counted_system(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_attach_scene_deferred_reload_counted_system(_scene: *mut Scene) {
-        SCENE_DEFERRED_RELOAD_ATTACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_detach_scene_deferred_reload_counted_system(_scene: *mut Scene) {
-        SCENE_DEFERRED_RELOAD_DETACH_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_deferred_reload_low_priority(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        SCENE_RELOAD_TICK_ORDER.lock().unwrap().push("low");
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_reload_request(
-        scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        unsafe {
-            (&mut *scene).reload().unwrap();
-        }
-        SCENE_RELOAD_TICK_ORDER
-            .lock()
-            .unwrap()
-            .push("reload-request");
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_load_request(
-        scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        let path = SCENE_DEFERRED_LOAD_PATH.lock().unwrap().clone().unwrap();
-        unsafe {
-            (&mut *scene).load(path).unwrap();
-        }
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_loaded_marker(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_deferred_remove_request(
-        scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        let scene = unsafe { &mut *scene };
-        scene.remove_system("scene_deferred_remove_target").unwrap();
-        SCENE_DEFERRED_REMOVE_TARGET_PRESENT.store(
-            scene
-                .get_systems()
-                .contains(&"scene_deferred_remove_target".to_owned()),
-            Ordering::SeqCst,
-        );
-        SCENE_DEFERRED_REMOVE_TICK_ORDER
-            .lock()
-            .unwrap()
-            .push("remove-request");
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_deferred_remove_target(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        SCENE_DEFERRED_REMOVE_TICK_ORDER
-            .lock()
-            .unwrap()
-            .push("remove-target");
-    }
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_deferred_unload_request(
-        scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        let scene = unsafe { &mut *scene };
-        scene.unload_plugin("dynamic_deferred").unwrap();
-        SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.store(
-            scene.get_plugins().contains(&"dynamic_deferred".to_owned()),
-            Ordering::SeqCst,
-        );
-    }
-
-    #[unsafe(no_mangle)]
-    static WXR_GROUPS_SCENE_LOW_PRIORITY: usize = 1;
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_low_priority(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        SCENE_TICK_ORDER.lock().unwrap().push("low");
-    }
-
-    #[unsafe(no_mangle)]
-    static WXR_GROUPS_SCENE_HIGH_PRIORITY: usize = 1;
-
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_system_scene_high_priority(
-        _scene: *mut Scene,
-        _entities: *const *const WXREntity,
-        _sizes: *const usize,
-    ) {
-        SCENE_TICK_ORDER.lock().unwrap().push("high");
-    }
-
-    #[test]
-    fn scene_add_entity() {
-        let mut scene = Scene::new();
-
+    #[rstest]
+    fn scene_add_entity_defaults_to_empty_name(mut scene: Scene) {
         let entity = scene.add_entity();
 
         assert_eq!(scene.get_entity_name(entity).unwrap(), "");
     }
 
-    #[test]
-    fn scene_set_entity_name_for_existing_entity() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_set_entity_name_for_existing_entity(mut scene: Scene) {
         let entity = scene.add_entity();
 
         scene.set_entity_name(entity, "Player".to_owned()).unwrap();
@@ -1850,21 +1389,19 @@ mod tests {
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Player");
     }
 
-    #[test]
-    fn scene_get_entities() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_get_entities_returns_every_entity_sorted(mut scene: Scene) {
         let first_entity = scene.add_entity();
         let second_entity = scene.add_entity();
 
-        let mut entities = vec![first_entity, second_entity];
-        entities.sort();
+        let mut expected = vec![first_entity, second_entity];
+        expected.sort();
 
-        assert_eq!(scene.get_entities(), entities);
+        assert_eq!(scene.get_entities(), expected);
     }
 
-    #[test]
-    fn scene_remove_entity_for_existing_entity() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_remove_entity_for_existing_entity(mut scene: Scene) {
         let entity = scene.add_entity();
 
         scene.remove_entity(entity).unwrap();
@@ -1875,281 +1412,77 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scene_add_component_for_existing_entity() {
-        let mut scene = Scene::new();
+    // ----- components -----
+
+    #[rstest]
+    fn scene_add_component_for_existing_entity(mut scene: Scene) {
         let entity = scene.add_entity();
+
+        assert_eq!(scene.add_component(entity, "Counter".to_owned()), Ok(()));
+    }
+
+    #[rstest]
+    fn scene_add_component_rejects_duplicate_component(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
 
         assert_eq!(
-            scene.add_component(entity, "scene_counter".to_owned()),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn scene_get_entity_components() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.get_entity_components(entity).unwrap(),
-            vec!["scene_counter"]
-        );
-    }
-
-    #[test]
-    fn scene_get_entity_with_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.get_entity_with_component("scene_counter"),
-            Some(entity)
-        );
-        assert_eq!(scene.get_entity_with_component("missing"), None);
-    }
-
-    #[test]
-    fn scene_query_gets_shared_field() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        let (value,) = scene
-            .query::<(&i64,)>(entity, "scene_counter", &["value"])
-            .unwrap();
-
-        assert_eq!(*value, 1);
-    }
-
-    #[test]
-    fn scene_query_gets_mutable_field() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        {
-            let (value,) = scene
-                .query_mut::<(&mut i64,)>(entity, "scene_counter", &["value"])
-                .unwrap();
-            *value = 17;
-        }
-
-        let (value,) = scene
-            .query::<(&i64,)>(entity, "scene_counter", &["value"])
-            .unwrap();
-        assert_eq!(*value, 17);
-    }
-
-    #[test]
-    fn scene_query_gets_mutable_and_shared_fields() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-
-        {
-            let (a, b) = scene
-                .query_mut::<(&mut i64, &i64)>(entity, "scene_pair", &["a", "b"])
-                .unwrap();
-            assert_eq!(*b, 2);
-            *a = 5;
-        }
-
-        let (a, b) = scene
-            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
-            .unwrap();
-        assert_eq!((*a, *b), (5, 2));
-    }
-
-    #[test]
-    fn scene_query_allows_multiple_shared_queries() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-
-        let (a, b) = scene
-            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
-            .unwrap();
-        let (c, d) = scene
-            .query::<(&i64, &i64)>(entity, "scene_pair", &["a", "b"])
-            .unwrap();
-
-        assert_eq!((*a, *b, *c, *d), (1, 2, 1, 2));
-    }
-
-    #[test]
-    fn scene_query_gets_eight_shared_fields() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_octet".to_owned())
-            .unwrap();
-
-        let (a, b, c, d, e, f, g, h) = scene
-            .query::<(&i64, &i64, &i64, &i64, &i64, &i64, &i64, &i64)>(
-                entity,
-                "scene_octet",
-                &["a", "b", "c", "d", "e", "f", "g", "h"],
-            )
-            .unwrap();
-
-        assert_eq!((*a, *b, *c, *d, *e, *f, *g, *h), (1, 2, 3, 4, 5, 6, 7, 8));
-    }
-
-    #[test]
-    fn scene_query_rejects_duplicate_fields() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.query_mut::<(&mut i64, &i64)>(entity, "scene_pair", &["a", "a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
-        );
-    }
-
-    #[test]
-    fn scene_query_rejects_wrong_field_count() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.query::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
-        );
-    }
-
-    #[test]
-    fn scene_query_mut_rejects_wrong_field_count() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.query_mut::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
-        );
-    }
-
-    #[test]
-    fn scene_query_mut_rejects_non_mutable_field() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.query_mut::<(&mut SceneOwnedValue,)>(entity, "scene_owner", &["value"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNotMutable
-            ))
-        );
-    }
-
-    #[test]
-    fn scene_query_mut_allows_shared_non_mutable_field() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
-            .unwrap();
-
-        let (value,) = scene
-            .query_mut::<(&SceneOwnedValue,)>(entity, "scene_owner", &["value"])
-            .unwrap();
-
-        assert_eq!(value, &SceneOwnedValue::default());
-    }
-
-    #[test]
-    fn scene_add_component_for_duplicate_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        assert_eq!(
-            scene.add_component(entity, "scene_counter".to_owned()),
+            scene.add_component(entity, "Counter".to_owned()),
             Err(SceneError::ComponentAlreadyExists)
         );
     }
 
-    #[test]
-    fn scene_remove_component_for_existing_component() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-
-        scene.remove_component(entity, "scene_counter").unwrap();
+    #[rstest]
+    fn scene_get_entity_components(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
 
         assert_eq!(
-            scene.query::<(&i64,)>(entity, "scene_counter", &["value"]),
+            scene.get_entity_components(entity).unwrap(),
+            vec!["Counter"]
+        );
+    }
+
+    #[rstest]
+    fn scene_get_entity_with_component(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
+
+        assert_eq!(scene.get_entity_with_component("Counter"), Some(entity));
+        assert_eq!(scene.get_entity_with_component("missing"), None);
+    }
+
+    #[rstest]
+    fn scene_remove_component_for_existing_component(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
+
+        scene.remove_component(entity, "Counter").unwrap();
+
+        assert_eq!(
+            scene.query::<(&i64,)>(entity, "Counter", &["value"]),
             Err(SceneError::ComponentNotFound)
         );
     }
 
-    #[test]
-    fn scene_get_component_fields() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_get_component_fields(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
 
         assert_eq!(
-            scene.get_component_fields(entity, "scene_counter").unwrap(),
+            scene.get_component_fields(entity, "Counter").unwrap(),
             vec!["value"]
         );
     }
 
-    #[test]
-    fn scene_get_entity_component_plugin_id() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_get_entity_component_plugin_id(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
 
         assert_eq!(
-            scene.get_entity_component_plugin_id(entity, "scene_counter"),
+            scene.get_entity_component_plugin_id(entity, "Counter"),
             Ok("")
         );
     }
 
-    #[test]
-    fn scene_get_entity_component_plugin_id_rejects_missing_component() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_get_entity_component_plugin_id_rejects_missing_component(mut scene: Scene) {
         let entity = scene.add_entity();
 
         assert_eq!(
@@ -2158,218 +1491,311 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scene_get_component_field_type() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_get_component_field_type(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
 
         assert_eq!(
             scene
-                .get_component_field_type(entity, "scene_counter", "value")
+                .get_component_field_type(entity, "Counter", "value")
                 .unwrap(),
             FieldType::I64
         );
     }
 
-    #[test]
-    fn scene_is_component_field_mutable() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_reports_field_mutability_per_field(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
 
         assert_eq!(
-            scene.is_component_field_mutable(entity, "scene_pair", "a"),
+            scene.is_component_field_mutable(entity, "Pair", "a"),
             Ok(true)
         );
         assert_eq!(
-            scene.is_component_field_mutable(entity, "scene_pair", "b"),
+            scene.is_component_field_mutable(entity, "Pair", "b"),
             Ok(false)
         );
     }
 
-    #[test]
-    fn scene_is_component_field_string_parsable() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_reports_string_parsability_per_field(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
+        scene.add_component(entity, "Owner".to_owned()).unwrap();
 
         assert_eq!(
-            scene.is_component_field_string_parsable(entity, "scene_pair", "a"),
+            scene.is_component_field_string_parsable(entity, "Pair", "a"),
             Ok(true)
         );
         assert_eq!(
-            scene.is_component_field_string_parsable(entity, "scene_owner", "value"),
+            scene.is_component_field_string_parsable(entity, "Owner", "readonly"),
             Ok(false)
         );
     }
 
-    #[test]
-    fn scene_component_field_predicates_reject_missing_field() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_component_field_predicates_reject_missing_field(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
 
         assert_eq!(
-            scene.is_component_field_mutable(entity, "scene_counter", "missing"),
+            scene.is_component_field_mutable(entity, "Counter", "missing"),
             Err(SceneError::ComponentFieldError(
                 ComponentError::FieldNotFound
             ))
         );
         assert_eq!(
-            scene.is_component_field_string_parsable(entity, "scene_counter", "missing"),
+            scene.is_component_field_string_parsable(entity, "Counter", "missing"),
             Err(SceneError::ComponentFieldError(
                 ComponentError::FieldNotFound
             ))
         );
     }
 
-    #[test]
-    fn scene_render_field_returns_rendered_value() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
+    // ----- queries -----
+
+    #[rstest]
+    fn scene_query_gets_shared_field(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
+
+        let (value,) = scene
+            .query::<(&i64,)>(entity, "Counter", &["value"])
             .unwrap();
 
-        assert_eq!(
-            scene
-                .render_field(entity, "scene_counter", "value")
-                .unwrap(),
-            "1"
-        );
+        assert_eq!(*value, 1);
     }
 
-    #[test]
-    fn scene_parse_field_updates_mutable_value() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
+    #[rstest]
+    fn scene_query_gets_mutable_field(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
 
-        scene
-            .parse_field(entity, "scene_counter", "value", "42")
-            .unwrap();
+        {
+            let (value,) = scene
+                .query_mut::<(&mut i64,)>(entity, "Counter", &["value"])
+                .unwrap();
+            *value = 17;
+        }
 
-        assert_eq!(get_scene_counter(&scene, entity), 42);
+        assert_eq!(get_counter(&scene, entity), 17);
     }
 
-    #[test]
-    fn scene_parse_field_rejects_invalid_value() {
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
+    #[rstest]
+    fn scene_query_gets_mutable_and_shared_fields(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
+
+        {
+            let (a, b) = scene
+                .query_mut::<(&mut i64, &i64)>(entity, "Pair", &["a", "b"])
+                .unwrap();
+            assert_eq!(*b, 2);
+            *a = 5;
+        }
+
+        let (a, b) = scene
+            .query::<(&i64, &i64)>(entity, "Pair", &["a", "b"])
+            .unwrap();
+        assert_eq!((*a, *b), (5, 2));
+    }
+
+    #[rstest]
+    fn scene_query_allows_multiple_shared_queries(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
+
+        let (a, b) = scene
+            .query::<(&i64, &i64)>(entity, "Pair", &["a", "b"])
+            .unwrap();
+        let (c, d) = scene
+            .query::<(&i64, &i64)>(entity, "Pair", &["a", "b"])
             .unwrap();
 
+        assert_eq!((*a, *b, *c, *d), (1, 2, 1, 2));
+    }
+
+    #[rstest]
+    fn scene_query_gets_eight_shared_fields(mut scene: Scene) {
+        let entity = scene.add_entity();
+        scene.add_component(entity, "Wide".to_owned()).unwrap();
+
+        let (a, b, c, d, e, f, g, h) = scene
+            .query::<(&i64, &i64, &i64, &i64, &i64, &i64, &i64, &i64)>(
+                entity,
+                "Wide",
+                &["a", "b", "c", "d", "e", "f", "g", "h"],
+            )
+            .unwrap();
+
+        assert_eq!((*a, *b, *c, *d, *e, *f, *g, *h), (1, 2, 3, 4, 5, 6, 7, 8));
+    }
+
+    #[rstest]
+    fn scene_query_rejects_malformed_field_lists(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
+
+        // Duplicate field names.
         assert_eq!(
-            scene.parse_field(entity, "scene_counter", "value", "invalid"),
+            scene.query_mut::<(&mut i64, &i64)>(entity, "Pair", &["a", "a"]),
             Err(SceneError::ComponentFieldError(
-                ComponentError::FieldValueParsing
+                ComponentError::FieldParsing
             ))
         );
-        assert_eq!(get_scene_counter(&scene, entity), 1);
+        // Fewer names than the shared tuple arity.
+        assert_eq!(
+            scene.query::<(&i64, &i64)>(entity, "Pair", &["a"]),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldParsing
+            ))
+        );
+        // Fewer names than the mutable tuple arity.
+        assert_eq!(
+            scene.query_mut::<(&i64, &i64)>(entity, "Pair", &["a"]),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldParsing
+            ))
+        );
     }
 
-    #[test]
-    fn scene_parse_field_rejects_immutable_field() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_query_mut_rejects_non_mutable_field(mut scene: Scene) {
         let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_pair".to_owned())
-            .unwrap();
+        scene.add_component(entity, "Owner".to_owned()).unwrap();
 
         assert_eq!(
-            scene.parse_field(entity, "scene_pair", "b", "42"),
+            scene.query_mut::<(&mut OwnedValue,)>(entity, "Owner", &["readonly"]),
             Err(SceneError::ComponentFieldError(
                 ComponentError::FieldNotMutable
             ))
         );
     }
 
-    #[test]
-    fn scene_render_field_renders_blob_pointer() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_query_mut_allows_shared_non_mutable_field(mut scene: Scene) {
         let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_owner".to_owned())
+        scene.add_component(entity, "Owner".to_owned()).unwrap();
+
+        let (value,) = scene
+            .query_mut::<(&OwnedValue,)>(entity, "Owner", &["readonly"])
             .unwrap();
+
+        assert_eq!(value, &OwnedValue::default());
+    }
+
+    // ----- render / parse -----
+
+    #[rstest]
+    fn scene_render_field_returns_rendered_value(counter_scene: (Scene, Uuid)) {
+        let (scene, entity) = counter_scene;
+
+        assert_eq!(scene.render_field(entity, "Counter", "value").unwrap(), "1");
+    }
+
+    #[rstest]
+    fn scene_render_field_renders_blob_pointer(mut scene: Scene) {
+        let entity = scene.add_entity();
+        scene.add_component(entity, "Owner".to_owned()).unwrap();
 
         assert!(
             scene
-                .render_field(entity, "scene_owner", "value")
+                .render_field(entity, "Owner", "readonly")
                 .unwrap()
                 .starts_with("0x")
         );
     }
 
-    #[test]
-    fn scene_add_system_for_existing_symbol() {
-        SCENE_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_parse_field_updates_mutable_value(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
 
-        scene
-            .add_system("scene_attach_system".to_owned(), 1)
-            .unwrap();
+        scene.parse_field(entity, "Counter", "value", "42").unwrap();
 
-        assert_eq!(SCENE_ATTACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(get_counter(&scene, entity), 42);
     }
 
-    #[test]
-    fn scene_get_systems() {
-        let mut scene = Scene::new();
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 1)
-            .unwrap();
+    #[rstest]
+    fn scene_parse_field_rejects_invalid_value(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
 
-        assert_eq!(scene.get_systems(), vec!["scene_cleanup_system"]);
+        assert_eq!(
+            scene.parse_field(entity, "Counter", "value", "invalid"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldValueParsing
+            ))
+        );
+        assert_eq!(get_counter(&scene, entity), 1);
     }
 
-    #[test]
-    fn scene_get_system_priority() {
-        let mut scene = Scene::new();
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 7)
-            .unwrap();
+    #[rstest]
+    fn scene_parse_field_rejects_immutable_field(mut scene: Scene) {
+        let entity = entity_with_pair(&mut scene);
 
-        assert_eq!(scene.get_system_priority("scene_cleanup_system"), Ok(7));
+        assert_eq!(
+            scene.parse_field(entity, "Pair", "b", "42"),
+            Err(SceneError::ComponentFieldError(
+                ComponentError::FieldNotMutable
+            ))
+        );
     }
 
-    #[test]
-    fn scene_get_system_plugin_id() {
-        let mut scene = Scene::new();
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 7)
-            .unwrap();
+    // ----- systems (mutating shared fixture state: hold SCENE_LOCK) -----
 
-        assert_eq!(scene.get_system_plugin_id("scene_cleanup_system"), Ok(""));
+    #[rstest]
+    fn scene_add_system_runs_attacher(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::ATTACH_COUNT.store(0, Ordering::SeqCst);
+
+        scene.add_system("attach_counter".to_owned(), 1).unwrap();
+
+        assert_eq!(fx::ATTACH_COUNT.load(Ordering::SeqCst), 1);
     }
 
-    #[test]
-    fn scene_get_system_plugin_id_rejects_missing_system() {
-        let scene = Scene::new();
+    #[rstest]
+    fn scene_remove_system_runs_detacher(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::DETACH_COUNT.store(0, Ordering::SeqCst);
+        scene.add_system("attach_counter".to_owned(), 1).unwrap();
 
+        scene.remove_system("attach_counter").unwrap();
+
+        assert_eq!(fx::DETACH_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[rstest]
+    fn scene_get_systems(mut scene: Scene) {
+        scene.add_system("cleanup".to_owned(), 1).unwrap();
+
+        assert_eq!(scene.get_systems(), vec!["cleanup"]);
+    }
+
+    #[rstest]
+    fn scene_get_system_priority_and_plugin_id(mut scene: Scene) {
+        scene.add_system("cleanup".to_owned(), 7).unwrap();
+
+        assert_eq!(scene.get_system_priority("cleanup"), Ok(7));
+        assert_eq!(scene.get_system_plugin_id("cleanup"), Ok(""));
+    }
+
+    #[rstest]
+    fn scene_get_system_plugin_id_rejects_missing_system(scene: Scene) {
         assert_eq!(
             scene.get_system_plugin_id("missing"),
             Err(SceneError::SystemNotFound)
         );
     }
 
-    #[test]
-    fn scene_get_plugins() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_tick_runs_systems_in_priority_order(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::TICK_ORDER.lock().unwrap().clear();
+        scene.add_entity();
+        scene.add_system("high_priority".to_owned(), 2).unwrap();
+        scene.add_system("low_priority".to_owned(), 1).unwrap();
+
+        scene.tick();
+
+        assert_eq!(*fx::TICK_ORDER.lock().unwrap(), vec!["high", "low"]);
+    }
+
+    // ----- plugins -----
+
+    #[rstest]
+    fn scene_get_plugins(mut scene: Scene) {
         scene.plugins.insert(
             "dynamic_a".to_owned(),
             Plugin::new_test_dynamic("dynamic_a".to_owned()),
@@ -2378,9 +1804,8 @@ mod tests {
         assert_eq!(scene.get_plugins(), vec!["dynamic_a"]);
     }
 
-    #[test]
-    fn scene_plugin_lookup_prioritizes_dynamic_plugins_before_static() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_plugin_lookup_prioritizes_dynamic_plugins_before_static(mut scene: Scene) {
         scene.plugins.insert(
             "dynamic_a".to_owned(),
             Plugin::new_test_dynamic("dynamic_a".to_owned()),
@@ -2401,10 +1826,8 @@ mod tests {
         assert_eq!(plugin_ids[2], "");
     }
 
-    #[test]
-    fn scene_plugin_lookup_uses_static_when_no_dynamic_plugins_exist() {
-        let scene = Scene::new();
-
+    #[rstest]
+    fn scene_plugin_lookup_uses_static_when_no_dynamic_plugins_exist(scene: Scene) {
         let plugin_ids: Vec<&str> = scene
             .plugins_dynamic_first()
             .map(|plugin| plugin.get_id())
@@ -2413,29 +1836,46 @@ mod tests {
         assert_eq!(plugin_ids, vec![""]);
     }
 
-    #[test]
-    fn scene_remove_system_for_existing_system() {
-        SCENE_DETACH_COUNT.store(0, Ordering::SeqCst);
-        let mut scene = Scene::new();
-        scene
-            .add_system("scene_attach_system".to_owned(), 1)
-            .unwrap();
+    #[rstest]
+    fn scene_unload_plugin_rejects_static_plugin_and_preserves_state(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
+        scene.add_system("cleanup".to_owned(), 1).unwrap();
 
-        scene.remove_system("scene_attach_system").unwrap();
+        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
 
-        assert_eq!(SCENE_DETACH_COUNT.load(Ordering::SeqCst), 1);
+        // The static plugin's component and system remain usable.
+        assert_eq!(get_counter(&scene, entity), 1);
+        scene.remove_system("cleanup").unwrap();
     }
 
-    #[test]
-    fn scene_reset_with_runtime_state() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_unload_plugin_destroys_assets_before_components(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::UNLOAD_ORDER.lock().unwrap().clear();
+        scene.plugins.insert(
+            "dynamic_order".to_owned(),
+            Plugin::new_test_dynamic("dynamic_order".to_owned()),
+        );
         let entity = scene.add_entity();
         scene
-            .add_component(entity, "scene_counter".to_owned())
+            .add_component(entity, "OrderComponent".to_owned())
             .unwrap();
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 1)
-            .unwrap();
+        scene.ensure_asset_loaded("OrderAsset", "asset").unwrap();
+
+        scene.unload_plugin("dynamic_order").unwrap();
+
+        assert_eq!(
+            *fx::UNLOAD_ORDER.lock().unwrap(),
+            vec!["asset", "component"]
+        );
+    }
+
+    // ----- reset / reload -----
+
+    #[rstest]
+    fn scene_reset_clears_runtime_state(counter_scene: (Scene, Uuid)) {
+        let (mut scene, entity) = counter_scene;
+        scene.add_system("cleanup".to_owned(), 1).unwrap();
 
         scene.reset().unwrap();
 
@@ -2444,261 +1884,156 @@ mod tests {
             Err(SceneError::EntityNotFound)
         );
         assert_eq!(
-            scene.remove_system("scene_cleanup_system"),
+            scene.remove_system("cleanup"),
             Err(SceneError::SystemNotFound)
         );
     }
 
-    #[test]
-    fn scene_unload_plugin_rejects_static_plugin() {
-        let mut scene = Scene::new();
-
-        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
-    }
-
-    #[test]
-    fn scene_unload_plugin_for_static_plugin() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_reload_reinstantiates_scene_objects(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
+        fx::RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
         let entity = scene.add_entity();
         scene
-            .add_component(entity, "scene_counter".to_owned())
+            .set_entity_name(entity, "Reloaded".to_owned())
             .unwrap();
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 1)
-            .unwrap();
+        scene.add_component(entity, "Counter".to_owned()).unwrap();
+        set_counter(&mut scene, entity, 42);
+        scene.add_system("reload_counted".to_owned(), 1).unwrap();
 
-        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
+        scene.reload().unwrap();
 
-        assert_eq!(get_scene_counter(&scene, entity), 1);
-        scene.remove_system("scene_cleanup_system").unwrap();
+        assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
+        assert_eq!(get_counter(&scene, entity), 42);
+        assert_eq!(fx::RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(fx::RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(scene.remove_system("reload_counted"), Ok(()));
     }
 
-    #[test]
-    fn scene_unload_plugin_destroys_assets_before_components() {
-        SCENE_UNLOAD_ORDER.lock().unwrap().clear();
-        let mut scene = Scene::new();
-        scene.plugins.insert(
-            "dynamic_order".to_owned(),
-            Plugin::new_test_dynamic("dynamic_order".to_owned()),
-        );
-        let entity = scene.add_entity();
-        scene
-            .add_component(entity, "scene_order_component".to_owned())
-            .unwrap();
-        scene
-            .ensure_asset_loaded("scene_order_asset", "asset")
-            .unwrap();
+    // ----- tick-deferred mutations -----
 
-        scene.unload_plugin("dynamic_order").unwrap();
-
-        assert_eq!(
-            *SCENE_UNLOAD_ORDER.lock().unwrap(),
-            vec!["asset", "component"]
-        );
-    }
-
-    #[test]
-    fn scene_tick_with_multiple_systems() {
-        SCENE_TICK_ORDER.lock().unwrap().clear();
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_tick_defers_remove_system_until_current_runner_finishes(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::DEFERRED_REMOVE_TARGET_PRESENT.store(false, Ordering::SeqCst);
+        fx::TICK_ORDER.lock().unwrap().clear();
         scene.add_entity();
-        scene
-            .add_system("scene_high_priority".to_owned(), 2)
-            .unwrap();
-        scene
-            .add_system("scene_low_priority".to_owned(), 1)
-            .unwrap();
-
-        scene.tick();
-
-        assert_eq!(*SCENE_TICK_ORDER.lock().unwrap(), vec!["high", "low"]);
-    }
-
-    #[test]
-    fn scene_tick_defers_remove_system_until_current_runner_finishes() {
-        SCENE_DEFERRED_REMOVE_TARGET_PRESENT.store(false, Ordering::SeqCst);
-        SCENE_DEFERRED_REMOVE_TICK_ORDER.lock().unwrap().clear();
-        let mut scene = Scene::new();
-        scene.add_entity();
-        scene
-            .add_system("scene_deferred_remove_target".to_owned(), 1)
-            .unwrap();
-        scene
-            .add_system("scene_deferred_remove_request".to_owned(), 2)
-            .unwrap();
+        scene.add_system("remove_target".to_owned(), 1).unwrap();
+        scene.add_system("remove_request".to_owned(), 2).unwrap();
 
         assert!(scene.tick());
 
-        assert!(SCENE_DEFERRED_REMOVE_TARGET_PRESENT.load(Ordering::SeqCst));
+        assert!(fx::DEFERRED_REMOVE_TARGET_PRESENT.load(Ordering::SeqCst));
+        assert_eq!(*fx::TICK_ORDER.lock().unwrap(), vec!["remove-request"]);
         assert_eq!(
-            *SCENE_DEFERRED_REMOVE_TICK_ORDER.lock().unwrap(),
-            vec!["remove-request"]
-        );
-        assert_eq!(
-            scene.remove_system("scene_deferred_remove_target"),
+            scene.remove_system("remove_target"),
             Err(SceneError::SystemNotFound)
         );
-        assert_eq!(scene.remove_system("scene_deferred_remove_request"), Ok(()));
+        assert_eq!(scene.remove_system("remove_request"), Ok(()));
     }
 
-    #[test]
-    fn scene_tick_defers_unload_plugin_until_current_runner_finishes() {
-        SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.store(false, Ordering::SeqCst);
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_tick_defers_unload_plugin_until_current_runner_finishes(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::DEFERRED_UNLOAD_PLUGIN_PRESENT.store(false, Ordering::SeqCst);
         scene.add_entity();
         scene.plugins.insert(
             "dynamic_deferred".to_owned(),
             Plugin::new_test_dynamic("dynamic_deferred".to_owned()),
         );
-        scene
-            .add_system("scene_deferred_unload_request".to_owned(), 1)
-            .unwrap();
+        scene.add_system("unload_request".to_owned(), 1).unwrap();
 
         assert!(scene.tick());
 
-        assert!(SCENE_DEFERRED_UNLOAD_PLUGIN_PRESENT.load(Ordering::SeqCst));
+        assert!(fx::DEFERRED_UNLOAD_PLUGIN_PRESENT.load(Ordering::SeqCst));
         assert!(!scene.get_plugins().contains(&"dynamic_deferred".to_owned()));
     }
 
-    #[test]
-    fn scene_reload_reinstantiates_scene_objects() {
-        SCENE_RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        SCENE_RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
-        let mut scene = Scene::new();
-        let entity = scene.add_entity();
-        scene
-            .set_entity_name(entity, "Reloaded".to_owned())
-            .unwrap();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-        set_scene_counter(&mut scene, entity, 42);
-        scene
-            .add_system("scene_reload_counted_system".to_owned(), 1)
-            .unwrap();
-
-        scene.reload().unwrap();
-
-        assert_eq!(scene.get_entity_name(entity).unwrap(), "Reloaded");
-        assert_eq!(get_scene_counter(&scene, entity), 42);
-        assert_eq!(SCENE_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
-        assert_eq!(SCENE_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
-        assert_eq!(scene.remove_system("scene_reload_counted_system"), Ok(()));
-    }
-
-    #[test]
-    fn scene_tick_reloads_when_requested_by_system() {
-        SCENE_DEFERRED_RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        SCENE_DEFERRED_RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
-        SCENE_RELOAD_TICK_ORDER.lock().unwrap().clear();
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_tick_reloads_when_requested_by_system(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
+        fx::RELOAD_ATTACH_COUNT.store(0, Ordering::SeqCst);
+        fx::RELOAD_DETACH_COUNT.store(0, Ordering::SeqCst);
+        fx::TICK_ORDER.lock().unwrap().clear();
         let entity = scene.add_entity();
         scene
             .set_entity_name(entity, "Deferred".to_owned())
             .unwrap();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-        set_scene_counter(&mut scene, entity, 7);
-        scene
-            .add_system("scene_deferred_reload_counted_system".to_owned(), 1)
-            .unwrap();
-        scene
-            .add_system("scene_deferred_reload_low_priority".to_owned(), 1)
-            .unwrap();
-        scene
-            .add_system("scene_reload_request".to_owned(), 2)
-            .unwrap();
+        scene.add_component(entity, "Counter".to_owned()).unwrap();
+        set_counter(&mut scene, entity, 7);
+        scene.add_system("reload_counted".to_owned(), 1).unwrap();
+        scene.add_system("low_priority".to_owned(), 1).unwrap();
+        scene.add_system("reload_request".to_owned(), 2).unwrap();
 
         assert!(scene.tick());
 
-        let tick_order = SCENE_RELOAD_TICK_ORDER.lock().unwrap();
+        let tick_order = fx::TICK_ORDER.lock().unwrap();
         assert_eq!(tick_order[0], "reload-request");
         assert!(tick_order.contains(&"low"));
         drop(tick_order);
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Deferred");
-        assert_eq!(get_scene_counter(&scene, entity), 7);
-        assert_eq!(SCENE_DEFERRED_RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
-        assert_eq!(SCENE_DEFERRED_RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
-        assert_eq!(
-            scene.remove_system("scene_deferred_reload_counted_system"),
-            Ok(())
-        );
-        assert_eq!(
-            scene.remove_system("scene_deferred_reload_low_priority"),
-            Ok(())
-        );
-        assert_eq!(scene.remove_system("scene_reload_request"), Ok(()));
+        assert_eq!(get_counter(&scene, entity), 7);
+        assert_eq!(fx::RELOAD_ATTACH_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(fx::RELOAD_DETACH_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(scene.remove_system("reload_counted"), Ok(()));
+        assert_eq!(scene.remove_system("low_priority"), Ok(()));
+        assert_eq!(scene.remove_system("reload_request"), Ok(()));
     }
 
-    #[test]
-    fn scene_tick_loads_when_requested_by_system() {
+    #[rstest]
+    fn scene_tick_loads_when_requested_by_system(mut scene: Scene) {
+        let _guard = fx::SCENE_LOCK.lock().unwrap();
         let mut saved = Scene::new();
         let entity = saved.add_entity();
         saved
             .set_entity_name(entity, "Imported".to_owned())
             .unwrap();
-        saved
-            .add_system("scene_loaded_marker".to_owned(), 1)
-            .unwrap();
+        saved.add_system("loaded_marker".to_owned(), 1).unwrap();
 
         let path = std::env::temp_dir().join(format!("wasserxr-load-{}.scene", Uuid::now_v7()));
         saved.save(&path).unwrap();
-        *SCENE_DEFERRED_LOAD_PATH.lock().unwrap() = Some(path.clone());
+        *fx::LOAD_PATH.lock().unwrap() = Some(path.clone());
 
-        let mut scene = Scene::new();
-        scene
-            .add_system("scene_load_request".to_owned(), 1)
-            .unwrap();
+        scene.add_system("load_request".to_owned(), 1).unwrap();
 
         assert!(scene.tick());
         let _ = std::fs::remove_file(&path);
-        *SCENE_DEFERRED_LOAD_PATH.lock().unwrap() = None;
+        *fx::LOAD_PATH.lock().unwrap() = None;
 
         assert_eq!(scene.get_entity_name(entity).unwrap(), "Imported");
-        assert!(
-            scene
-                .get_systems()
-                .contains(&"scene_loaded_marker".to_owned())
-        );
-        assert!(
-            !scene
-                .get_systems()
-                .contains(&"scene_load_request".to_owned())
-        );
+        assert!(scene.get_systems().contains(&"loaded_marker".to_owned()));
+        assert!(!scene.get_systems().contains(&"load_request".to_owned()));
     }
 
-    #[test]
-    fn scene_deserialize_round_trip() {
-        let mut scene = Scene::new();
+    // ----- serialization / persistence -----
+
+    #[rstest]
+    fn scene_deserialize_round_trip(mut scene: Scene) {
         let entity = scene.add_entity();
         scene.set_entity_name(entity, "Player".to_owned()).unwrap();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-        set_scene_counter(&mut scene, entity, 42);
-        scene
-            .add_system("scene_cleanup_system".to_owned(), 3)
-            .unwrap();
+        scene.add_component(entity, "Counter".to_owned()).unwrap();
+        set_counter(&mut scene, entity, 42);
+        scene.add_system("cleanup".to_owned(), 3).unwrap();
 
         let serialized = scene.serialize().unwrap();
         let mut loaded = Scene::new();
         loaded.deserialize(&serialized).unwrap();
 
         assert_eq!(loaded.get_entity_name(entity).unwrap(), "Player");
-        assert_eq!(get_scene_counter(&loaded, entity), 42);
-        assert_eq!(loaded.remove_system("scene_cleanup_system"), Ok(()));
+        assert_eq!(get_counter(&loaded, entity), 42);
+        assert_eq!(loaded.remove_system("cleanup"), Ok(()));
     }
 
-    #[test]
-    fn scene_deserialize_missing_and_extra_component_fields() {
+    #[rstest]
+    fn scene_deserialize_ignores_extra_component_fields(mut scene: Scene) {
         let entity = Entity::new();
         let entity_data = entity.serialize();
         let data = SceneData {
             entities: vec![entity_data.clone()],
             systems: Vec::new(),
             components: vec![ComponentData {
-                id: "scene_counter".to_owned(),
+                id: "Counter".to_owned(),
                 entity_id: entity_data.id,
                 fields: vec![FieldData {
                     name: "extra".to_owned(),
@@ -2707,14 +2042,13 @@ mod tests {
             }],
         };
 
-        let mut scene = Scene::new();
         scene.deserialize(&data.encode().unwrap()).unwrap();
 
-        assert_eq!(get_scene_counter(&scene, entity_data.id), 1);
+        assert_eq!(get_counter(&scene, entity_data.id), 1);
     }
 
-    #[test]
-    fn scene_deserialize_skips_missing_systems_and_components() {
+    #[rstest]
+    fn scene_deserialize_skips_missing_systems_and_components(mut scene: Scene) {
         let entity = Entity::new();
         let entity_data = entity.serialize();
         let data = SceneData {
@@ -2730,22 +2064,18 @@ mod tests {
             }],
         };
 
-        let mut scene = Scene::new();
         scene.deserialize(&data.encode().unwrap()).unwrap();
 
         assert_eq!(scene.get_entity_name(entity_data.id).unwrap(), "");
         assert!(!scene.has_component(entity_data.id, "missing_component"));
     }
 
-    #[test]
-    fn scene_save_and_load_round_trip() {
-        let mut scene = Scene::new();
+    #[rstest]
+    fn scene_save_and_load_round_trip(mut scene: Scene) {
         let entity = scene.add_entity();
         scene.set_entity_name(entity, "Saved".to_owned()).unwrap();
-        scene
-            .add_component(entity, "scene_counter".to_owned())
-            .unwrap();
-        set_scene_counter(&mut scene, entity, 11);
+        scene.add_component(entity, "Counter".to_owned()).unwrap();
+        set_counter(&mut scene, entity, 11);
 
         let path = std::env::temp_dir().join(format!("wasserxr-{}.scene", Uuid::now_v7()));
         scene.save(&path).unwrap();
@@ -2755,13 +2085,12 @@ mod tests {
         let _ = std::fs::remove_file(&path);
 
         assert_eq!(loaded.get_entity_name(entity).unwrap(), "Saved");
-        assert_eq!(get_scene_counter(&loaded, entity), 11);
+        assert_eq!(get_counter(&loaded, entity), 11);
     }
 
-    #[test]
-    fn scene_load_missing_file() {
+    #[rstest]
+    fn scene_load_missing_file(mut scene: Scene) {
         let path = std::env::temp_dir().join(format!("wasserxr-missing-{}.scene", Uuid::now_v7()));
-        let mut scene = Scene::new();
 
         assert!(matches!(scene.load(path), Err(SceneError::FileIo(_))));
     }

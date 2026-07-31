@@ -41,6 +41,7 @@ pub fn get_asset_path(path: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},
@@ -58,7 +59,7 @@ mod tests {
         format!("wasserxr-{name}-{stamp}")
     }
 
-    #[test]
+    #[rstest]
     fn absolute_path_must_exist() {
         let dir = temp_path("absolute");
         fs::create_dir(&dir).unwrap();
@@ -69,7 +70,7 @@ mod tests {
         fs::remove_dir(&dir).unwrap();
     }
 
-    #[test]
+    #[rstest]
     fn relative_path_falls_back_to_current_dir() {
         assert_eq!(
             get_asset_path("Cargo.toml"),
@@ -83,7 +84,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[rstest]
     fn relative_path_prefers_binary_dir() {
         let name = unique_name("priority");
         let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();

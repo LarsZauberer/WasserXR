@@ -29,9 +29,10 @@ pub unsafe extern "C" fn wxr_get_asset_path(path: *const c_char) -> *mut c_char 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
     use std::ffi::{CStr, CString};
 
-    #[test]
+    #[rstest]
     fn get_asset_path_returns_string() {
         let path = CString::new("Cargo.toml").unwrap();
         let resolved = unsafe { wxr_get_asset_path(path.as_ptr()) };

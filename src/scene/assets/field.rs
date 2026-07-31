@@ -41,32 +41,25 @@ impl Field {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing_plugin_fixture::null_getter;
+    use rstest::rstest;
 
-    unsafe extern "C" fn test_getter(_data: *mut c_void) -> *mut c_void {
-        std::ptr::null_mut()
+    #[rstest]
+    fn field_exposes_type(#[values(FieldType::String, FieldType::Blob)] type_hint: FieldType) {
+        let field = Field::new(type_hint, Some(null_getter));
+
+        assert_eq!(field.get_type(), type_hint);
     }
 
-    #[test]
-    fn field_new() {
-        let field = Field::new(FieldType::String, Some(test_getter));
-
-        assert_eq!(field.get_type(), FieldType::String);
-    }
-
-    #[test]
-    fn field_get_getter_when_present() {
-        let field = Field::new(FieldType::Blob, Some(test_getter));
-
+    #[rstest]
+    fn field_getter_is_returned_when_present_and_errors_when_missing() {
+        let present = Field::new(FieldType::Blob, Some(null_getter));
         assert_eq!(
-            field.get_getter().unwrap() as usize,
-            test_getter as *const () as usize
+            present.get_getter().unwrap() as usize,
+            null_getter as *const () as usize
         );
-    }
 
-    #[test]
-    fn field_get_getter_when_missing() {
-        let field = Field::new(FieldType::Blob, None);
-
-        assert_eq!(field.get_getter(), Err(AssetError::FieldNoGetter));
+        let missing = Field::new(FieldType::Blob, None);
+        assert_eq!(missing.get_getter(), Err(AssetError::FieldNoGetter));
     }
 }

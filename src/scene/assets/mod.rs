@@ -145,10 +145,18 @@ impl Asset {
 mod tests {
     use super::*;
     use crate::{error::PluginError, scene::component::FieldType};
+    use rstest::{fixture, rstest};
     use std::sync::{
         LazyLock, Mutex,
         atomic::{AtomicUsize, Ordering},
     };
+
+    /// A scene plus the static plugin, the pairing every `AssetType::new` needs.
+    /// Kept local because `Plugin` is crate-private.
+    #[fixture]
+    fn statics() -> (Scene, Plugin) {
+        (Scene::new(), Plugin::new_static())
+    }
 
     #[repr(C)]
     struct TestAsset {
@@ -210,21 +218,19 @@ mod tests {
     #[unsafe(no_mangle)]
     unsafe extern "C" fn wxr_asset_destroy_missing_schema(_scene: *mut Scene, _data: *mut c_void) {}
 
-    #[test]
-    fn asset_type_new_with_static_symbols() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn asset_type_new_exposes_id_and_plugin(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(asset_type.get_id(), "unit_asset");
         assert_eq!(asset_type.get_plugin_id(), "");
     }
 
-    #[test]
-    fn asset_type_create_asset() {
+    #[rstest]
+    fn asset_type_create_asset_reads_field(statics: (Scene, Plugin)) {
         let _guard = ASSET_TEST_LOCK.lock().unwrap();
-        let mut scene = Scene::new();
-        let plugin = Plugin::new_static();
+        let (mut scene, plugin) = statics;
         let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
         let asset = asset_type.create_asset(&mut scene, "path").unwrap();
 
@@ -234,10 +240,9 @@ mod tests {
         asset.destroy(&mut scene);
     }
 
-    #[test]
-    fn asset_type_create_asset_rejects_null_asset() {
-        let mut scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn asset_type_create_asset_rejects_null_asset(statics: (Scene, Plugin)) {
+        let (mut scene, plugin) = statics;
         let asset_type = AssetType::new("null_asset".to_owned(), &plugin, &scene).unwrap();
 
         assert_eq!(
@@ -246,41 +251,34 @@ mod tests {
         );
     }
 
-    #[test]
-    fn asset_type_new_without_creator() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
-
-        let result = AssetType::new("missing_creator".to_owned(), &plugin, &scene);
+    #[rstest]
+    fn asset_type_new_without_creator(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
 
         assert!(matches!(
-            result,
+            AssetType::new("missing_creator".to_owned(), &plugin, &scene),
             Err(AssetError::NoCreator(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_asset_create_missing_creator"
         ));
     }
 
-    #[test]
-    fn asset_type_new_without_schema() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
-
-        let result = AssetType::new("missing_schema".to_owned(), &plugin, &scene);
+    #[rstest]
+    fn asset_type_new_without_schema(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
 
         assert!(matches!(
-            result,
+            AssetType::new("missing_schema".to_owned(), &plugin, &scene),
             Err(AssetError::NoSchema(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_asset_schema_missing_schema"
         ));
     }
 
-    #[test]
-    fn asset_drop_existing_asset() {
+    #[rstest]
+    fn asset_drop_runs_destroyer(statics: (Scene, Plugin)) {
         let _guard = ASSET_TEST_LOCK.lock().unwrap();
         DROP_COUNT.store(0, Ordering::Relaxed);
         {
-            let mut scene = Scene::new();
-            let plugin = Plugin::new_static();
+            let (mut scene, plugin) = statics;
             let asset_type = AssetType::new("unit_asset".to_owned(), &plugin, &scene).unwrap();
             let asset = asset_type.create_asset(&mut scene, "path").unwrap();
             asset.destroy(&mut scene);

@@ -1,679 +1,263 @@
-use std::{
-    ffi::c_void,
-    sync::{LazyLock, Mutex},
-};
+//! Integration coverage for the `#[component]`, `#[system]`, `#[attacher]`, and
+//! `#[detacher]` macros. Every component/system under test is declared in the
+//! shared fixture with the real macros; these tests assert the behavior the
+//! macros must produce.
 
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+#[path = "../src/testing_plugin_fixture.rs"]
+mod testing_plugin_fixture;
+
+use rstest::rstest;
+use testing_plugin_fixture as fx;
 use wasserxr::{
-    attacher, component, component_creator, detacher,
     error::{ComponentError, SceneError},
-    scene::{
-        Scene,
-        component::{FieldType, Schema, SerializedBytes},
-    },
-    system,
+    scene::{Scene, component::FieldType},
 };
 
-#[component]
-#[derive(Default)]
-pub struct MacroComponent {
-    #[getter]
-    my_int: i32,
-
-    #[mutable]
-    default_int: i32,
-
-    #[getter]
-    #[mutable]
-    #[serializer]
-    #[deserializer]
-    my_string: String,
-
-    #[mutable]
-    default_string: String,
-
-    #[getter]
-    #[mutable]
-    enabled: bool,
-
-    #[none]
-    #[allow(dead_code)]
-    hidden: i32,
-}
-
-#[component_creator(MacroComponent)]
-pub fn create_macro_component(scene: &mut Scene) -> Option<MacroComponent> {
-    let _ = scene.get_plugins();
-    Some(MacroComponent::default())
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroRoundTripComponent {
-    #[getter]
-    #[mutable]
-    #[serializer]
-    #[deserializer]
-    health: i32,
-
-    #[getter]
-    #[mutable]
-    label: String,
-}
-
-#[component_creator(MacroRoundTripComponent)]
-pub fn create_macro_round_trip_component(_scene: &mut Scene) -> Option<MacroRoundTripComponent> {
-    Some(MacroRoundTripComponent::default())
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroCounter {
-    #[allow(dead_code)]
-    value: i64,
-}
-
-#[component_creator(MacroCounter)]
-pub fn create_macro_counter(_scene: &mut Scene) -> Option<MacroCounter> {
-    Some(MacroCounter::default())
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroMarker {
-    #[allow(dead_code)]
-    value: i64,
-}
-
-#[component_creator(MacroMarker)]
-pub fn create_macro_marker(_scene: &mut Scene) -> Option<MacroMarker> {
-    Some(MacroMarker::default())
-}
-
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct MacroOwnedValue {
-    value: String,
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroOwnershipComponent {
-    #[mutable]
-    value: MacroOwnedValue,
-}
-
-#[component_creator(MacroOwnershipComponent)]
-pub fn create_macro_ownership_component(_scene: &mut Scene) -> Option<MacroOwnershipComponent> {
-    Some(MacroOwnershipComponent::default())
-}
-
-#[component(no_schema)]
-#[derive(Default)]
-pub struct MacroManualSchemaComponent {
-    #[none]
-    value: i32,
-}
-
-#[component_creator(MacroManualSchemaComponent)]
-pub fn create_macro_manual_schema_component(
-    _scene: &mut Scene,
-) -> Option<MacroManualSchemaComponent> {
-    Some(MacroManualSchemaComponent::default())
-}
-
-#[component(no_schema)]
-#[derive(Default)]
-pub struct MacroNoSchemaComponent {
-    #[allow(dead_code)]
-    value: i32,
-}
-
-#[component_creator(MacroNoSchemaComponent)]
-pub fn create_macro_no_schema_component(_scene: &mut Scene) -> Option<MacroNoSchemaComponent> {
-    Some(MacroNoSchemaComponent::default())
-}
-
-unsafe extern "C" fn macro_manual_schema_value_getter(ptr: *mut c_void) -> *mut c_void {
-    unsafe { &mut (*(ptr as *mut MacroManualSchemaComponent)).value as *mut i32 as *mut c_void }
-}
-
-#[unsafe(export_name = "wxr_schema_MacroManualSchemaComponent")]
-#[allow(non_snake_case)]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn wxr_schema_MacroManualSchemaComponent(schema: *mut Schema) {
-    unsafe {
-        (*schema).add_field(
-            "value".to_owned(),
-            FieldType::I32,
-            Some(macro_manual_schema_value_getter),
-            true,
-            None,
-            None,
-        );
-    }
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroCustomHooksComponent {
-    #[getter(macro_custom_value_getter)]
-    #[mutable]
-    #[serializer(macro_custom_value_serializer)]
-    #[deserializer(macro_custom_value_deserializer)]
-    value: usize,
-}
-
-#[component_creator(MacroCustomHooksComponent)]
-pub fn create_macro_custom_hooks_component(
-    _scene: &mut Scene,
-) -> Option<MacroCustomHooksComponent> {
-    Some(MacroCustomHooksComponent::default())
-}
-
-unsafe extern "C" fn macro_custom_value_getter(ptr: *mut c_void) -> *mut c_void {
-    unsafe { &mut (*(ptr as *mut MacroCustomHooksComponent)).value as *mut usize as *mut c_void }
-}
-
-unsafe extern "C" fn macro_custom_value_serializer(_ptr: *const c_void) -> SerializedBytes {
-    SerializedBytes::from_vec(99usize.to_le_bytes().to_vec())
-}
-
-unsafe extern "C" fn macro_custom_value_deserializer(ptr: *mut c_void, data: SerializedBytes) {
-    let bytes = unsafe { data.into_vec() };
-    if let Ok(bytes) = <[u8; std::mem::size_of::<usize>()]>::try_from(bytes.as_slice()) {
-        unsafe {
-            (*(ptr as *mut MacroCustomHooksComponent)).value = usize::from_le_bytes(bytes) + 1;
-        }
-    }
-}
-
-#[component]
-#[virtual_field(x: f32, getter = macro_position_x, mutable)]
-#[virtual_field(y: f32, getter = macro_position_y)]
-#[derive(Default)]
-pub struct MacroPosition {
-    #[mutable]
-    position: [f32; 3],
-}
-
-#[component_creator(MacroPosition)]
-pub fn create_macro_position(_scene: &mut Scene) -> Option<MacroPosition> {
-    Some(MacroPosition::default())
-}
-
-#[component]
-#[derive(Default)]
-pub struct MacroFailingComponent {
-    #[allow(dead_code)]
-    value: i32,
-}
-
-#[component_creator(MacroFailingComponent)]
-pub fn create_macro_failing_component(_scene: &mut Scene) -> Option<MacroFailingComponent> {
-    None
-}
-
-unsafe extern "C" fn macro_position_x(ptr: *mut c_void) -> *mut c_void {
-    unsafe { &mut (*(ptr as *mut MacroPosition)).position[0] as *mut f32 as *mut c_void }
-}
-
-unsafe extern "C" fn macro_position_y(ptr: *mut c_void) -> *mut c_void {
-    unsafe { &mut (*(ptr as *mut MacroPosition)).position[1] as *mut f32 as *mut c_void }
-}
-
-static MACRO_SYSTEM_ENTITIES: LazyLock<Mutex<Vec<Vec<Uuid>>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
-static MACRO_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
-    LazyLock::new(|| Mutex::new(None));
-static MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES: LazyLock<Mutex<Option<Vec<Vec<Uuid>>>>> =
-    LazyLock::new(|| Mutex::new(None));
-static MACRO_ATTACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mutex::new(None));
-static MACRO_DETACH_ENTITY: LazyLock<Mutex<Option<Uuid>>> = LazyLock::new(|| Mutex::new(None));
-
-#[system(entities = [["MacroCounter"], ["MacroMarker"]])]
-pub fn macro_group_counter(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
-    *MACRO_SYSTEM_ENTITIES.lock().unwrap() = entities;
-}
-
-#[system]
-pub fn macro_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
-    *MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
-}
-
-#[system(entities = [])]
-pub fn macro_explicit_empty_system(_scene: &mut Scene, entities: Vec<Vec<Uuid>>) {
-    *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = Some(entities);
-}
-
-#[system]
-pub fn macro_lifecycle_system(_scene: &mut Scene, _entities: Vec<Vec<Uuid>>) {}
-
-#[attacher(macro_lifecycle_system)]
-pub fn attach_macro_lifecycle_system(scene: &mut Scene) {
-    let entity = scene.add_entity();
-    scene
-        .set_entity_name(entity, "attached".to_owned())
-        .unwrap();
-    *MACRO_ATTACH_ENTITY.lock().unwrap() = Some(entity);
-}
-
-#[detacher(macro_lifecycle_system)]
-pub fn detach_macro_lifecycle_system(scene: &mut Scene) {
-    let entity = scene.add_entity();
-    scene
-        .set_entity_name(entity, "detached".to_owned())
-        .unwrap();
-    *MACRO_DETACH_ENTITY.lock().unwrap() = Some(entity);
-}
-
-#[test]
-fn component_macro_round_trip_keeps_component_behavior() {
+/// A scene with one entity carrying `component`.
+fn scene_with(component: &str) -> (Scene, uuid::Uuid) {
     let mut scene = Scene::new();
     let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroRoundTripComponent".to_owned())
-        .unwrap();
-
-    {
-        let (health, label) = scene
-            .query_mut::<(&mut i32, &mut String)>(
-                entity,
-                "MacroRoundTripComponent",
-                &["health", "label"],
-            )
-            .unwrap();
-        *health = 24;
-        *label = "round trip".to_owned();
-    }
-
-    let serialized = scene.serialize().unwrap();
-    let mut loaded = Scene::new();
-    loaded.deserialize(&serialized).unwrap();
-
-    assert!(loaded.has_component(entity, "MacroRoundTripComponent"));
-    let (health, label) = loaded
-        .query::<(&i32, &String)>(entity, "MacroRoundTripComponent", &["health", "label"])
-        .unwrap();
-    assert_eq!(*health, 24);
-    assert_eq!(label, "");
-
-    let (health,) = loaded
-        .query_mut::<(&mut i32,)>(entity, "MacroRoundTripComponent", &["health"])
-        .unwrap();
-    *health = 30;
-    let (health,) = loaded
-        .query::<(&i32,)>(entity, "MacroRoundTripComponent", &["health"])
-        .unwrap();
-    assert_eq!(*health, 30);
+    scene.add_component(entity, component.to_owned()).unwrap();
+    (scene, entity)
 }
 
-#[test]
-fn component_macro_registers_and_accesses_static_component() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
+#[rstest]
+fn component_macro_generates_working_getters_and_mutability() {
+    let (mut scene, entity) = scene_with("Featured");
 
-    scene
-        .add_component(entity, "MacroComponent".to_owned())
-        .unwrap();
-
-    let (my_int, my_string, default_int) = scene
-        .query::<(&i32, &String, &i32)>(
-            entity,
-            "MacroComponent",
-            &["my_int", "my_string", "default_int"],
-        )
-        .unwrap();
-    assert_eq!(*my_int, 0);
-    assert_eq!(my_string, "");
-    assert_eq!(*default_int, 0);
-
+    // `reads_only` is immutable; `reads_writes` and `text` are mutable.
     assert_eq!(
-        scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["my_int"]),
+        scene.query_mut::<(&mut i32,)>(entity, "Featured", &["reads_only"]),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNotMutable
         ))
     );
 
-    let (my_string, default_int) = scene
-        .query_mut::<(&mut String, &mut i32)>(
-            entity,
-            "MacroComponent",
-            &["my_string", "default_int"],
-        )
+    let (reads_writes, text) = scene
+        .query_mut::<(&mut i32, &mut String)>(entity, "Featured", &["reads_writes", "text"])
         .unwrap();
-    *my_string = "updated through query_mut".to_owned();
-    *default_int = 42;
+    *reads_writes = 42;
+    *text = "hello".to_owned();
 
-    let (my_string, default_int) = scene
-        .query::<(&String, &i32)>(entity, "MacroComponent", &["my_string", "default_int"])
+    let (reads_only, reads_writes, text) = scene
+        .query::<(&i32, &i32, &String)>(entity, "Featured", &["reads_only", "reads_writes", "text"])
         .unwrap();
-    assert_eq!(my_string, "updated through query_mut");
-    assert_eq!(*default_int, 42);
     assert_eq!(
-        scene.query::<(&i32,)>(entity, "MacroComponent", &["hidden"]),
+        (*reads_only, *reads_writes, text.as_str()),
+        (0, 42, "hello")
+    );
+
+    // A `#[none]` field is not exposed as a gettable field.
+    assert_eq!(
+        scene.query::<(&i32,)>(entity, "Featured", &["hidden"]),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNoGetter
         ))
     );
-    assert!(matches!(
-        scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["hidden"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNotMutable
-        ))
-    ));
 }
 
-#[test]
-fn component_macro_mutates_non_clone_field() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-
-    scene
-        .add_component(entity, "MacroOwnershipComponent".to_owned())
-        .unwrap();
-
-    scene
-        .query_mut::<(&mut MacroOwnedValue,)>(entity, "MacroOwnershipComponent", &["value"])
-        .unwrap()
-        .0
-        .value
-        .push_str("owned");
-    let (value,) = scene
-        .query::<(&MacroOwnedValue,)>(entity, "MacroOwnershipComponent", &["value"])
-        .unwrap();
-
-    assert_eq!(
-        value,
-        &MacroOwnedValue {
-            value: "owned".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn component_macro_serializes_static_component_fields() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroComponent".to_owned())
-        .unwrap();
-
+#[rstest]
+fn component_macro_serializes_only_serializable_fields() {
+    let (mut scene, entity) = scene_with("Featured");
     {
-        let (my_string, default_int, default_string) = scene
-            .query_mut::<(&mut String, &mut i32, &mut String)>(
-                entity,
-                "MacroComponent",
-                &["my_string", "default_int", "default_string"],
-            )
+        let (reads_writes, text) = scene
+            .query_mut::<(&mut i32, &mut String)>(entity, "Featured", &["reads_writes", "text"])
             .unwrap();
-        *my_string = "serialized through macro".to_owned();
-        *default_int = 12;
-        *default_string = "default serialization".to_owned();
+        *reads_writes = 12;
+        *text = "persisted".to_owned();
     }
 
     let serialized = scene.serialize().unwrap();
     let mut loaded = Scene::new();
     loaded.deserialize(&serialized).unwrap();
 
-    let (my_int, default_int, my_string, default_string) = loaded
-        .query::<(&i32, &i32, &String, &String)>(
-            entity,
-            "MacroComponent",
-            &["my_int", "default_int", "my_string", "default_string"],
-        )
+    // `reads_writes` (generated serializer) and `text` (explicit serializer)
+    // survive; the getter-only `enabled` is left at its default.
+    let (reads_writes, text, enabled) = loaded
+        .query::<(&i32, &String, &bool)>(entity, "Featured", &["reads_writes", "text", "enabled"])
         .unwrap();
-    assert_eq!(*my_int, 0);
-    assert_eq!(*default_int, 12);
-    assert_eq!(my_string, "serialized through macro");
-    assert_eq!(default_string, "default serialization");
+    assert_eq!(
+        (*reads_writes, text.as_str(), *enabled),
+        (12, "persisted", false)
+    );
 }
 
-#[test]
-fn component_macro_allows_custom_schema_function() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
+#[rstest]
+fn component_macro_mutates_non_clone_field_in_place() {
+    let (mut scene, entity) = scene_with("Owner");
+
     scene
-        .add_component(entity, "MacroManualSchemaComponent".to_owned())
-        .unwrap();
+        .query_mut::<(&mut fx::OwnedValue,)>(entity, "Owner", &["writable"])
+        .unwrap()
+        .0
+        .value
+        .push_str("owned");
 
     let (value,) = scene
-        .query_mut::<(&mut i32,)>(entity, "MacroManualSchemaComponent", &["value"])
+        .query::<(&fx::OwnedValue,)>(entity, "Owner", &["writable"])
+        .unwrap();
+    assert_eq!(value.value, "owned");
+}
+
+#[rstest]
+fn component_macro_supports_manual_and_missing_schema() {
+    // `ManualSchema` supplies its schema through a hand-written function.
+    let (mut scene, entity) = scene_with("ManualSchema");
+    let (value,) = scene
+        .query_mut::<(&mut i32,)>(entity, "ManualSchema", &["value"])
         .unwrap();
     *value = 64;
-
     let (value,) = scene
-        .query::<(&i32,)>(entity, "MacroManualSchemaComponent", &["value"])
+        .query::<(&i32,)>(entity, "ManualSchema", &["value"])
         .unwrap();
     assert_eq!(*value, 64);
-}
 
-#[test]
-fn component_macro_allows_missing_schema_function() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroNoSchemaComponent".to_owned())
-        .unwrap();
-
+    // `NoSchema` registers nothing, so every field lookup misses.
+    let (scene, entity) = scene_with("NoSchema");
     assert_eq!(
-        scene.query::<(&i32,)>(entity, "MacroNoSchemaComponent", &["value"]),
+        scene.query::<(&i32,)>(entity, "NoSchema", &["value"]),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNotFound
         ))
     );
 }
 
-#[test]
+#[rstest]
 fn component_macro_reports_failed_creator() {
     let mut scene = Scene::new();
     let entity = scene.add_entity();
 
     assert_eq!(
-        scene.add_component(entity, "MacroFailingComponent".to_owned()),
+        scene.add_component(entity, "FailingCreator".to_owned()),
         Err(SceneError::ComponentCreatorFailed)
     );
 }
 
-#[test]
+#[rstest]
 fn component_macro_registers_custom_field_functions() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroCustomHooksComponent".to_owned())
-        .unwrap();
-
-    let (value,) = scene
-        .query_mut::<(&mut usize,)>(entity, "MacroCustomHooksComponent", &["value"])
-        .unwrap();
-    *value = 12;
+    let (mut scene, entity) = scene_with("CustomHooks");
+    {
+        let (value,) = scene
+            .query_mut::<(&mut usize,)>(entity, "CustomHooks", &["value"])
+            .unwrap();
+        *value = 12;
+    }
 
     let serialized = scene.serialize().unwrap();
     let mut loaded = Scene::new();
     loaded.deserialize(&serialized).unwrap();
 
+    // The custom serializer always writes 99; the custom deserializer adds 1.
     let (value,) = loaded
-        .query::<(&usize,)>(entity, "MacroCustomHooksComponent", &["value"])
+        .query::<(&usize,)>(entity, "CustomHooks", &["value"])
         .unwrap();
     assert_eq!(*value, 100);
 }
 
-#[test]
-fn component_macro_registers_virtual_fields() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroPosition".to_owned())
-        .unwrap();
+#[rstest]
+fn component_macro_registers_virtual_fields_and_parses_vectors() {
+    let (mut scene, entity) = scene_with("Position");
 
-    let (x,) = scene
-        .query_mut::<(&mut f32,)>(entity, "MacroPosition", &["x"])
-        .unwrap();
-    *x = 7.5;
-
+    // Virtual field `x` is mutable and aliases `position[0]`; `y` is read-only.
+    {
+        let (x,) = scene
+            .query_mut::<(&mut f32,)>(entity, "Position", &["x"])
+            .unwrap();
+        *x = 7.5;
+    }
     let (x, y, position) = scene
-        .query::<(&f32, &f32, &[f32; 3])>(entity, "MacroPosition", &["x", "y", "position"])
+        .query::<(&f32, &f32, &[f32; 3])>(entity, "Position", &["x", "y", "position"])
         .unwrap();
-    assert_eq!(*x, 7.5);
-    assert_eq!(*y, 0.0);
-    assert_eq!(position[0], 7.5);
-
+    assert_eq!((*x, *y, position[0]), (7.5, 0.0, 7.5));
     assert_eq!(
-        scene.query_mut::<(&mut f32,)>(entity, "MacroPosition", &["y"]),
+        scene.query_mut::<(&mut f32,)>(entity, "Position", &["y"]),
         Err(SceneError::ComponentFieldError(
             ComponentError::FieldNotMutable
         ))
     );
 
-    let serialized = scene.serialize().unwrap();
-    let mut loaded = Scene::new();
-    loaded.deserialize(&serialized).unwrap();
-    let (x,) = loaded
-        .query::<(&f32,)>(entity, "MacroPosition", &["x"])
+    // The vector field parses from text.
+    scene
+        .parse_field(entity, "Position", "position", "1.0, 2.0, 3.0")
         .unwrap();
-    assert_eq!(*x, 7.5);
+    let (position,) = scene
+        .query::<(&[f32; 3],)>(entity, "Position", &["position"])
+        .unwrap();
+    assert_eq!(*position, [1.0, 2.0, 3.0]);
 }
 
-#[test]
-fn component_macro_registers_exact_field_types() {
-    let mut scene = Scene::new();
-    let component_entity = scene.add_entity();
-    scene
-        .add_component(component_entity, "MacroComponent".to_owned())
-        .unwrap();
-    let hooks_entity = scene.add_entity();
-    scene
-        .add_component(hooks_entity, "MacroCustomHooksComponent".to_owned())
-        .unwrap();
-    let position_entity = scene.add_entity();
-    scene
-        .add_component(position_entity, "MacroPosition".to_owned())
-        .unwrap();
+#[rstest]
+#[case("Featured", "reads_only", FieldType::I32)]
+#[case("Featured", "text", FieldType::String)]
+#[case("Featured", "enabled", FieldType::Boolean)]
+#[case("CustomHooks", "value", FieldType::Usize)]
+#[case("Position", "x", FieldType::F32)]
+#[case("Position", "position", FieldType::F32Vec3)]
+fn component_macro_registers_exact_field_types(
+    #[case] component: &str,
+    #[case] field: &str,
+    #[case] expected: FieldType,
+) {
+    let (scene, entity) = scene_with(component);
 
     assert_eq!(
         scene
-            .get_component_field_type(component_entity, "MacroComponent", "my_int")
+            .get_component_field_type(entity, component, field)
             .unwrap(),
-        FieldType::I32
-    );
-    assert_eq!(
-        scene
-            .get_component_field_type(component_entity, "MacroComponent", "my_string")
-            .unwrap(),
-        FieldType::String
-    );
-    assert_eq!(
-        scene
-            .get_component_field_type(component_entity, "MacroComponent", "enabled")
-            .unwrap(),
-        FieldType::Boolean
-    );
-    assert_eq!(
-        scene
-            .get_component_field_type(hooks_entity, "MacroCustomHooksComponent", "value")
-            .unwrap(),
-        FieldType::Usize
-    );
-    assert_eq!(
-        scene
-            .get_component_field_type(position_entity, "MacroPosition", "x")
-            .unwrap(),
-        FieldType::F32
-    );
-    assert_eq!(
-        scene
-            .get_component_field_type(position_entity, "MacroPosition", "position")
-            .unwrap(),
-        FieldType::F32Vec3
+        expected
     );
 }
 
-#[test]
+#[rstest]
 fn component_macro_renders_and_parses_boolean_field() {
-    let mut scene = Scene::new();
-    let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroComponent".to_owned())
-        .unwrap();
+    let (mut scene, entity) = scene_with("Featured");
 
     assert_eq!(
-        scene
-            .render_field(entity, "MacroComponent", "enabled")
-            .unwrap(),
+        scene.render_field(entity, "Featured", "enabled").unwrap(),
         "false"
     );
-
     scene
-        .parse_field(entity, "MacroComponent", "enabled", "tRuE")
+        .parse_field(entity, "Featured", "enabled", "tRuE")
         .unwrap();
 
     let (enabled,) = scene
-        .query::<(&bool,)>(entity, "MacroComponent", &["enabled"])
+        .query::<(&bool,)>(entity, "Featured", &["enabled"])
         .unwrap();
     assert!(*enabled);
     assert_eq!(
-        scene
-            .render_field(entity, "MacroComponent", "enabled")
-            .unwrap(),
+        scene.render_field(entity, "Featured", "enabled").unwrap(),
         "true"
     );
 }
 
-#[test]
-fn component_macro_parses_mutable_vector_field() {
+#[rstest]
+fn scene_has_component_reports_presence() {
     let mut scene = Scene::new();
     let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroPosition".to_owned())
-        .unwrap();
 
-    scene
-        .parse_field(entity, "MacroPosition", "position", "1.0,2.0,3.0")
-        .unwrap();
-
-    let (position,) = scene
-        .query::<(&[f32; 3],)>(entity, "MacroPosition", &["position"])
-        .unwrap();
-    assert_eq!(*position, [1.0, 2.0, 3.0]);
-
-    scene
-        .parse_field(entity, "MacroPosition", "position", "4.0, 5.0, 6.0")
-        .unwrap();
-
-    let (position,) = scene
-        .query::<(&[f32; 3],)>(entity, "MacroPosition", &["position"])
-        .unwrap();
-    assert_eq!(*position, [4.0, 5.0, 6.0]);
+    assert!(!scene.has_component(entity, "Counter"));
+    scene.add_component(entity, "Counter".to_owned()).unwrap();
+    assert!(scene.has_component(entity, "Counter"));
+    assert!(!scene.has_component(entity, "Pair"));
 }
 
-#[test]
-fn system_macro_registers_and_runs_static_system() {
-    MACRO_SYSTEM_ENTITIES.lock().unwrap().clear();
+#[rstest]
+fn system_macro_selects_entities_by_group() {
+    fx::GROUP_ENTITIES.lock().unwrap().clear();
 
     let mut scene = Scene::new();
     let counter = scene.add_entity();
-    scene
-        .add_component(counter, "MacroCounter".to_owned())
-        .unwrap();
-
-    let marker = scene.add_entity();
-    scene
-        .add_component(marker, "MacroMarker".to_owned())
-        .unwrap();
-
+    scene.add_component(counter, "Counter".to_owned()).unwrap();
+    let owner = scene.add_entity();
+    scene.add_component(owner, "Owner".to_owned()).unwrap();
     let both = scene.add_entity();
-    scene
-        .add_component(both, "MacroCounter".to_owned())
-        .unwrap();
-    scene.add_component(both, "MacroMarker".to_owned()).unwrap();
+    scene.add_component(both, "Counter".to_owned()).unwrap();
+    scene.add_component(both, "Owner".to_owned()).unwrap();
 
-    scene
-        .add_system("macro_group_counter".to_owned(), 1)
-        .unwrap();
-
+    scene.add_system("group_counter".to_owned(), 1).unwrap();
     scene.tick();
 
-    let entities = MACRO_SYSTEM_ENTITIES.lock().unwrap();
+    let entities = fx::GROUP_ENTITIES.lock().unwrap();
     assert_eq!(entities.len(), 2);
     assert_eq!(
         entities.iter().map(Vec::len).collect::<Vec<_>>(),
@@ -681,67 +265,40 @@ fn system_macro_registers_and_runs_static_system() {
     );
     assert!(entities[0].contains(&counter));
     assert!(entities[0].contains(&both));
-    assert_eq!(entities[1], vec![marker]);
+    assert_eq!(entities[1], vec![owner]);
 }
 
-#[test]
-fn attacher_and_detacher_macros_run_system_lifecycle_hooks() {
-    *MACRO_ATTACH_ENTITY.lock().unwrap() = None;
-    *MACRO_DETACH_ENTITY.lock().unwrap() = None;
-
-    let mut scene = Scene::new();
-
-    scene
-        .add_system("macro_lifecycle_system".to_owned(), 1)
-        .unwrap();
-
-    let attach_entity = MACRO_ATTACH_ENTITY.lock().unwrap().unwrap();
-    assert_eq!(scene.get_entity_name(attach_entity), Ok("attached"));
-    assert_eq!(*MACRO_DETACH_ENTITY.lock().unwrap(), None);
-
-    scene.remove_system("macro_lifecycle_system").unwrap();
-
-    let detach_entity = MACRO_DETACH_ENTITY.lock().unwrap().unwrap();
-    assert_eq!(scene.get_entity_name(detach_entity), Ok("detached"));
-}
-
-#[test]
-fn system_macro_allows_empty_entities() {
-    *MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = None;
-    *MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap() = None;
+#[rstest]
+fn system_macro_allows_empty_entity_filter() {
+    *fx::EMPTY_ENTITIES.lock().unwrap() = None;
 
     let mut scene = Scene::new();
     let entity = scene.add_entity();
-    scene
-        .add_component(entity, "MacroCounter".to_owned())
-        .unwrap();
-
-    scene
-        .add_system("macro_empty_system".to_owned(), 1)
-        .unwrap();
-    scene
-        .add_system("macro_explicit_empty_system".to_owned(), 1)
-        .unwrap();
+    scene.add_component(entity, "Counter".to_owned()).unwrap();
+    scene.add_system("empty_system".to_owned(), 1).unwrap();
 
     scene.tick();
 
-    let entities = MACRO_EMPTY_SYSTEM_ENTITIES.lock().unwrap();
-    assert_eq!(entities.as_ref(), Some(&Vec::new()));
-    let entities = MACRO_EXPLICIT_EMPTY_SYSTEM_ENTITIES.lock().unwrap();
-    assert_eq!(entities.as_ref(), Some(&Vec::new()));
+    assert_eq!(
+        fx::EMPTY_ENTITIES.lock().unwrap().as_ref(),
+        Some(&Vec::new())
+    );
 }
 
-#[test]
-fn scene_has_component_reports_component_presence() {
+#[rstest]
+fn attacher_and_detacher_macros_run_system_lifecycle_hooks() {
+    *fx::LIFECYCLE_ATTACH_ENTITY.lock().unwrap() = None;
+    *fx::LIFECYCLE_DETACH_ENTITY.lock().unwrap() = None;
+
     let mut scene = Scene::new();
-    let entity = scene.add_entity();
+    scene.add_system("lifecycle".to_owned(), 1).unwrap();
 
-    assert!(!scene.has_component(entity, "MacroCounter"));
+    let attach_entity = fx::LIFECYCLE_ATTACH_ENTITY.lock().unwrap().unwrap();
+    assert_eq!(scene.get_entity_name(attach_entity), Ok("attached"));
+    assert_eq!(*fx::LIFECYCLE_DETACH_ENTITY.lock().unwrap(), None);
 
-    scene
-        .add_component(entity, "MacroCounter".to_owned())
-        .unwrap();
+    scene.remove_system("lifecycle").unwrap();
 
-    assert!(scene.has_component(entity, "MacroCounter"));
-    assert!(!scene.has_component(entity, "MacroMarker"));
+    let detach_entity = fx::LIFECYCLE_DETACH_ENTITY.lock().unwrap().unwrap();
+    assert_eq!(scene.get_entity_name(detach_entity), Ok("detached"));
 }

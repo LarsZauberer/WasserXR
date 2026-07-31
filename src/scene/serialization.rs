@@ -92,8 +92,9 @@ impl SceneData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
+    #[rstest]
     fn scene_data_round_trip() {
         let entity_id = Uuid::now_v7();
         let data = SceneData {
@@ -118,7 +119,7 @@ mod tests {
         assert_eq!(SceneData::decode(&data.encode().unwrap()).unwrap(), data);
     }
 
-    #[test]
+    #[rstest]
     fn scene_data_rejects_invalid_header() {
         assert!(SceneData::decode(b"bad").is_err());
     }

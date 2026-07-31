@@ -144,7 +144,15 @@ impl System {
 mod tests {
     use super::*;
     use crate::error::PluginError;
+    use rstest::{fixture, rstest};
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A scene plus the static plugin, the pairing every `System::new` needs.
+    /// Kept local because `Plugin` is crate-private.
+    #[fixture]
+    fn statics() -> (Scene, Plugin) {
+        (Scene::new(), Plugin::new_static())
+    }
 
     static SYSTEM_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
     static SYSTEM_DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -186,10 +194,9 @@ mod tests {
     ) {
     }
 
-    #[test]
-    fn system_new_with_all_symbols() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn system_new_reads_all_symbols(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         let system = System::new("system_with_groups".to_owned(), &plugin, 7, &scene).unwrap();
 
         assert_eq!(system.get_id(), "system_with_groups");
@@ -210,10 +217,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn system_new_without_optional_symbols() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn system_new_defaults_missing_optional_symbols(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         let system = System::new("system_with_defaults".to_owned(), &plugin, 1, &scene).unwrap();
 
         assert_eq!(system.get_groups(), 0);
@@ -223,10 +229,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn system_new_without_runner() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn system_new_without_runner(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
 
         assert!(matches!(
             System::new("missing_runner".to_owned(), &plugin, 1, &scene),
@@ -235,10 +240,9 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn system_serialize_round_trip() {
-        let scene = Scene::new();
-        let plugin = Plugin::new_static();
+    #[rstest]
+    fn system_serialize_round_trip(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         let system = System::new("system_with_defaults".to_owned(), &plugin, 7, &scene).unwrap();
 
         let deserialized = System::deserialize(system.serialize(), &plugin, &scene).unwrap();
@@ -247,11 +251,10 @@ mod tests {
         assert_eq!(deserialized.get_priority(), 7);
     }
 
-    #[test]
-    fn system_get_attacher_when_called() {
-        let scene = Scene::new();
+    #[rstest]
+    fn system_get_attacher_runs_hook_when_called(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         SYSTEM_ATTACH_COUNT.store(0, Ordering::SeqCst);
-        let plugin = Plugin::new_static();
         let system = System::new("system_with_groups".to_owned(), &plugin, 1, &scene).unwrap();
 
         unsafe {
@@ -261,11 +264,10 @@ mod tests {
         assert_eq!(SYSTEM_ATTACH_COUNT.load(Ordering::SeqCst), 1);
     }
 
-    #[test]
-    fn system_get_detacher_when_called() {
-        let scene = Scene::new();
+    #[rstest]
+    fn system_get_detacher_runs_hook_when_called(statics: (Scene, Plugin)) {
+        let (scene, plugin) = statics;
         SYSTEM_DETACH_COUNT.store(0, Ordering::SeqCst);
-        let plugin = Plugin::new_static();
         let system = System::new("system_with_groups".to_owned(), &plugin, 1, &scene).unwrap();
 
         unsafe {
