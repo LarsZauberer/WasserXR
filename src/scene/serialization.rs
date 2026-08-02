@@ -7,6 +7,7 @@ pub use error::SerializationError;
 
 const MAGIC: &[u8; 8] = b"WXRSCN\0\0";
 const VERSION: u32 = 1;
+const SCENE_PAYLOAD_LIMIT: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub(crate) struct EntityData {
@@ -46,7 +47,10 @@ impl SceneData {
         data.extend_from_slice(MAGIC);
         data.extend_from_slice(&VERSION.to_le_bytes());
 
-        let mut payload = bincode::serde::encode_to_vec(self, bincode::config::standard())?;
+        let mut payload = bincode::serde::encode_to_vec(
+            self,
+            bincode::config::standard().with_limit::<SCENE_PAYLOAD_LIMIT>(),
+        )?;
         data.append(&mut payload);
 
         Ok(data)
@@ -78,8 +82,10 @@ impl SceneData {
 
         let payload = &data[version_end..];
 
-        let (scene, bytes_read): (Self, usize) =
-            bincode::serde::decode_from_slice(payload, bincode::config::standard())?;
+        let (scene, bytes_read): (Self, usize) = bincode::serde::decode_from_slice(
+            payload,
+            bincode::config::standard().with_limit::<SCENE_PAYLOAD_LIMIT>(),
+        )?;
 
         if bytes_read != payload.len() {
             return Err(SerializationError::TrailingBytes);
@@ -121,5 +127,19 @@ mod tests {
     #[test]
     fn scene_data_rejects_invalid_header() {
         assert!(SceneData::decode(b"bad").is_err());
+    }
+
+    #[test]
+    fn scene_data_rejects_payload_claiming_excessive_allocation() {
+        let mut data = Vec::from(MAGIC);
+        data.extend_from_slice(&VERSION.to_le_bytes());
+        data.extend_from_slice(&[0, 11, 252, 0, 255, 255, 255, 255, 255, 255, 6, 223]);
+
+        assert!(matches!(
+            SceneData::decode(&data),
+            Err(SerializationError::Decode(
+                bincode::error::DecodeError::LimitExceeded
+            ))
+        ));
     }
 }
