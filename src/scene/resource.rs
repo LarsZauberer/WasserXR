@@ -1,5 +1,8 @@
-use crate::error::SceneError;
-use crate::scene::Scene;
+use crate::scene::{Scene, SceneError};
+
+mod error;
+
+pub use error::ResourceError;
 
 use std::collections::hash_map::Entry;
 use std::ffi::c_void;
@@ -80,7 +83,7 @@ impl Scene {
     /// ```
     pub fn add_resource<T>(&mut self, name: String, value: T) -> Result<(), SceneError> {
         match self.resources.entry(name) {
-            Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
+            Entry::Occupied(_) => Err(SceneError::Resource(ResourceError::AlreadyExists)),
             Entry::Vacant(entry) => {
                 entry.insert(Resource::new(value));
                 Ok(())
@@ -95,7 +98,7 @@ impl Scene {
         destroyer: ResourceDestroyer,
     ) -> Result<(), SceneError> {
         match self.resources.entry(name) {
-            Entry::Occupied(_) => Err(SceneError::ResourceAlreadyExists),
+            Entry::Occupied(_) => Err(SceneError::Resource(ResourceError::AlreadyExists)),
             Entry::Vacant(entry) => {
                 entry.insert(Resource::from_raw(data, destroyer));
                 Ok(())
@@ -113,7 +116,7 @@ impl Scene {
         self.resources
             .get(name)
             .map(Resource::get)
-            .ok_or(SceneError::ResourceNotFound)
+            .ok_or(SceneError::Resource(ResourceError::NotFound))
     }
 
     /// Mutably borrows a named resource by type.
@@ -126,14 +129,14 @@ impl Scene {
         self.resources
             .get_mut(name)
             .map(Resource::get_mut)
-            .ok_or(SceneError::ResourceNotFound)
+            .ok_or(SceneError::Resource(ResourceError::NotFound))
     }
 
     pub(crate) fn get_raw_resource(&mut self, name: &str) -> Result<*mut c_void, SceneError> {
         self.resources
             .get_mut(name)
             .map(|resource| resource.data())
-            .ok_or(SceneError::ResourceNotFound)
+            .ok_or(SceneError::Resource(ResourceError::NotFound))
     }
 }
 
@@ -192,7 +195,7 @@ mod tests {
 
         assert_eq!(
             scene.add_resource("counter".to_owned(), 2usize),
-            Err(SceneError::ResourceAlreadyExists)
+            Err(SceneError::Resource(ResourceError::AlreadyExists))
         );
     }
 
@@ -202,7 +205,7 @@ mod tests {
 
         assert_eq!(
             scene.get_resource::<usize>("missing"),
-            Err(SceneError::ResourceNotFound)
+            Err(SceneError::Resource(ResourceError::NotFound))
         );
     }
 

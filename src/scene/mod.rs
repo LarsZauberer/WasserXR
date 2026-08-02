@@ -1,18 +1,34 @@
 //! Scene runtime, ECS storage, plugin loading, and typed query APIs.
 
+macro_rules! ecs_invariant_message {
+    ($detail:literal) => {
+        concat!(
+            "internal ECS invariant violated; this is a WasserXR bug: ",
+            $detail
+        )
+    };
+}
+
 /// Asset type schemas and asset field query support.
 pub mod assets;
 /// Component schemas, field metadata, and serialization byte buffers.
 pub mod component;
-pub(crate) mod entity;
+/// Entity storage and errors.
+pub mod entity;
+mod error;
 /// Scene logging types, callbacks, and exported log macros.
 pub mod logging;
-pub(crate) mod plugin;
+/// Dynamic and static plugin loading errors.
+pub mod plugin;
 pub mod query;
 /// Type-erased scene resources.
 pub mod resource;
-pub(crate) mod serialization;
-pub(crate) mod system;
+/// Serialized scene data and decoding errors.
+pub mod serialization;
+/// System lifecycle errors.
+pub mod system;
+
+pub use error::SceneError;
 
 use assets::{Asset, AssetType};
 use component::{Component, FieldType};
@@ -23,10 +39,14 @@ use resource::Resource;
 use system::System;
 
 use crate::bindings::scene::WXREntity;
-use crate::error::{AssetError, PluginError, SceneError};
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
 use crate::scene::system::{Runner, Selector};
+use assets::AssetError;
+use component::ComponentError;
+use entity::EntityError;
+use plugin::PluginError;
+use system::SystemError;
 
 use std::ffi::c_void;
 use std::{collections::HashMap, fs, path::Path};
@@ -111,6 +131,63 @@ impl Scene {
         Self::default()
     }
 
+    fn debug_assert_consistent(&self) {
+        // Each entity owns exactly one component store, with no orphan stores.
+        debug_assert!(
+            self.entities
+                .keys()
+                .all(|entity| self.components.contains_key(entity))
+                && self
+                    .components
+                    .keys()
+                    .all(|entity| self.entities.contains_key(entity)),
+            ecs_invariant_message!("entities and component storage must have identical keys"),
+        );
+        // Every storage key is the canonical ID of the object stored under it.
+        debug_assert!(
+            self.entities
+                .iter()
+                .all(|(id, entity)| id == &entity.get_id())
+                && self
+                    .systems
+                    .iter()
+                    .all(|(id, system)| id == system.get_id())
+                && self.components.values().all(|components| components
+                    .iter()
+                    .all(|(id, component)| id == component.get_id()))
+                && self
+                    .asset_types
+                    .iter()
+                    .all(|(id, asset_type)| id == asset_type.get_id())
+                && self
+                    .plugins
+                    .iter()
+                    .all(|(id, plugin)| id == plugin.get_id()),
+            ecs_invariant_message!("storage keys must match their stored object IDs"),
+        );
+        // Objects holding plugin function pointers never outlive their provider.
+        debug_assert!(
+            self.systems
+                .values()
+                .all(|system| self.plugins.contains_key(system.get_plugin_id()))
+                && self.components.values().all(|components| components
+                    .values()
+                    .all(|component| self.plugins.contains_key(component.get_plugin_id())))
+                && self
+                    .asset_types
+                    .values()
+                    .all(|asset_type| self.plugins.contains_key(asset_type.get_plugin_id())),
+            ecs_invariant_message!("every plugin-owned object must reference a loaded plugin"),
+        );
+        // Every loaded asset is owned by a currently registered asset type.
+        debug_assert!(
+            self.assets
+                .keys()
+                .all(|asset_type| self.asset_types.contains_key(asset_type)),
+            ecs_invariant_message!("every loaded asset must have a registered asset type"),
+        );
+    }
+
     /// Removes all assets, systems, entities, and components from the scene.
     ///
     /// Loaded plugins and resources stay registered.
@@ -131,6 +208,7 @@ impl Scene {
 
         // Plugins will stay as they are
         crate::info!(self, "Scene reset");
+        self.debug_assert_consistent();
         Ok(())
     }
 
@@ -138,6 +216,7 @@ impl Scene {
     ///
     /// Assets, resources, and loaded plugin handles are not serialized.
     pub fn serialize(&self) -> Result<Vec<u8>, SceneError> {
+        self.debug_assert_consistent();
         let entities: Vec<_> = self.entities.values().map(Entity::serialize).collect();
 
         let systems: Vec<_> = self.systems.values().map(System::serialize).collect();
@@ -153,13 +232,13 @@ impl Scene {
             })
             .collect();
 
-        SceneData {
+        let bytes = SceneData {
             entities,
             systems,
             components,
         }
-        .encode()
-        .map_err(SceneError::Serialization)
+        .encode()?;
+        Ok(bytes)
     }
 
     /// Replaces the scene state with serialized WasserXR scene bytes.
@@ -170,7 +249,7 @@ impl Scene {
     pub fn deserialize(&mut self, data: &[u8]) -> Result<(), SceneError> {
         self.reset()?;
 
-        let scene_data = SceneData::decode(data).map_err(SceneError::Deserialization)?;
+        let scene_data = SceneData::decode(data)?;
 
         for entity_data in scene_data.entities {
             let entity_id = entity_data.id;
@@ -215,13 +294,15 @@ impl Scene {
             }
         }
 
+        self.debug_assert_consistent();
         Ok(())
     }
 
     /// Writes serialized scene bytes to `path`.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), SceneError> {
         let data = self.serialize()?;
-        fs::write(path, data).map_err(|error| SceneError::FileIo(error.to_string()))
+        fs::write(path, data)?;
+        Ok(())
     }
 
     /// Loads serialized scene bytes from `path`.
@@ -229,7 +310,7 @@ impl Scene {
     /// If called while a system is ticking, the load is deferred until the
     /// current system runner returns.
     pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SceneError> {
-        let data = fs::read(path).map_err(|error| SceneError::FileIo(error.to_string()))?;
+        let data = fs::read(path)?;
         if self.is_ticking {
             self.deferred_calls.push(DeferredCall::Load(data));
             return Ok(());
@@ -269,33 +350,14 @@ impl Scene {
     /// types are created.
     pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
         if self.plugins.contains_key(&path) {
-            crate::warn!(self, "Plugin `{}` is already loaded", path);
-            return Err(SceneError::PluginAlreadyLoaded);
+            return Err(PluginError::AlreadyLoaded.into());
         }
 
-        let plugin = match Plugin::new(path.to_owned()) {
-            Ok(plugin) => plugin,
-            Err(error) => {
-                match &error {
-                    PluginError::LinkingError(message) => {
-                        crate::error!(self, "Plugin `{}` could not be loaded: {}", path, message);
-                    }
-                    PluginError::InvalidSymbol => {
-                        crate::error!(self, "Plugin path contains a null byte");
-                    }
-                    PluginError::MissingSymbol(symbol) => {
-                        crate::error!(self, "Plugin `{}` missed symbol `{}`", path, symbol);
-                    }
-                    PluginError::NotFound => {
-                        crate::error!(self, "Plugin `{}` could not be found", path);
-                    }
-                }
-                return Err(SceneError::PluginLoading(error));
-            }
-        };
+        let plugin = Plugin::new(path.to_owned())?;
         self.plugins.insert(path.to_owned(), plugin);
 
         crate::info!(self, "Plugin `{}` loaded", path);
+        self.debug_assert_consistent();
         Ok(())
     }
 
@@ -311,13 +373,11 @@ impl Scene {
         }
 
         if path.is_empty() {
-            crate::warn!(self, "Static plugin cannot be unloaded");
-            return Err(SceneError::StaticPluginUnload);
+            return Err(PluginError::StaticPluginCannotUnload.into());
         }
 
         if !self.plugins.contains_key(path) {
-            crate::warn!(self, "Plugin `{}` is not loaded", path);
-            return Err(SceneError::PluginNotFound);
+            return Err(PluginError::NotLoaded.into());
         }
 
         // Unload all systems that are still loaded with this plugin
@@ -361,10 +421,27 @@ impl Scene {
             self.remove_component(entity, &component_id)?;
         }
 
+        assert!(
+            self.systems
+                .values()
+                .all(|system| system.get_plugin_id() != path)
+                && self.components.values().all(|components| components
+                    .values()
+                    .all(|component| component.get_plugin_id() != path))
+                && self
+                    .asset_types
+                    .values()
+                    .all(|asset_type| asset_type.get_plugin_id() != path),
+            ecs_invariant_message!(
+                "every plugin-owned object must be removed before unloading its function pointers"
+            ),
+        );
+
         // Remove the plugin itself
         self.plugins.remove(path);
 
         crate::info!(self, "Plugin `{}` unloaded", path);
+        self.debug_assert_consistent();
         Ok(())
     }
 
@@ -384,6 +461,7 @@ impl Scene {
         self.entities.insert(uuid, entity);
         self.components.insert(uuid, HashMap::new());
         crate::info!(self, "Entity `{}` added", uuid);
+        self.debug_assert_consistent();
         uuid
     }
 
@@ -398,17 +476,12 @@ impl Scene {
     pub fn remove_entity(&mut self, id: Uuid) -> Result<(), SceneError> {
         let Some(_) = self.entities.remove(&id) else {
             crate::warn!(self, "Entity `{}` was not found for removal", id);
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
-        let Some(components) = self.components.remove(&id) else {
-            crate::error!(
-                self,
-                "Entity `{}` had no components carrier associated. This is a bug. Please report it",
-                id
-            );
-            return Ok(());
-        };
+        let components = self.components.remove(&id).expect(ecs_invariant_message!(
+            "every stored entity must have component storage"
+        ));
 
         for (component_id, component) in components {
             drop(component);
@@ -421,6 +494,7 @@ impl Scene {
         }
 
         crate::info!(self, "Entity `{}` removed", id);
+        self.debug_assert_consistent();
         Ok(())
     }
 
@@ -429,7 +503,7 @@ impl Scene {
             Some(entity) => Ok(entity),
             None => {
                 crate::warn!(self, "Entity `{}` was not found", id);
-                Err(SceneError::EntityNotFound)
+                Err(SceneError::Entity(EntityError::NotFound))
             }
         }
     }
@@ -437,13 +511,12 @@ impl Scene {
     fn get_entity_mut(&mut self, id: Uuid) -> Result<&mut Entity, SceneError> {
         if !self.entities.contains_key(&id) {
             crate::warn!(self, "Entity `{}` was not found", id);
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         }
 
-        Ok(self
-            .entities
-            .get_mut(&id)
-            .expect("entity was checked before mutable lookup"))
+        Ok(self.entities.get_mut(&id).expect(ecs_invariant_message!(
+            "an entity checked as present must remain present during mutable lookup"
+        )))
     }
 
     /// Returns the display name for an entity.
@@ -472,7 +545,7 @@ impl Scene {
         let id = data.id.clone();
         if self.systems.contains_key(&id) {
             crate::warn!(self, "System `{}` already exists", id);
-            return Err(SceneError::SystemAlreadyExists);
+            return Err(SceneError::System(SystemError::AlreadyExists));
         }
 
         let system: Option<System> = self
@@ -494,7 +567,7 @@ impl Scene {
             }
             None => {
                 crate::warn!(self, "System `{}` could not be created", id);
-                Err(SceneError::SystemCreation)
+                Err(SceneError::System(SystemError::TypeNotFound))
             }
         }
     }
@@ -512,7 +585,7 @@ impl Scene {
 
         let Some(system) = self.systems.remove(id) else {
             crate::warn!(self, "System `{}` was not found for removal", id);
-            return Err(SceneError::SystemNotFound);
+            return Err(SceneError::System(SystemError::NotFound));
         };
 
         let detacher = system.get_detacher();
@@ -542,7 +615,7 @@ impl Scene {
                     "System `{}` was not found for priority lookup",
                     system_id
                 );
-                Err(SceneError::SystemNotFound)
+                Err(SceneError::System(SystemError::NotFound))
             }
         }
     }
@@ -557,7 +630,7 @@ impl Scene {
                     "System `{}` was not found for plugin lookup",
                     system_id
                 );
-                Err(SceneError::SystemNotFound)
+                Err(SceneError::System(SystemError::NotFound))
             }
         }
     }
@@ -589,7 +662,7 @@ impl Scene {
                 "Entity `{}` was not found for component addition",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         // Check if this component already exists
@@ -600,7 +673,7 @@ impl Scene {
                 component_id,
                 entity_id
             );
-            return Err(SceneError::ComponentAlreadyExists);
+            return Err(SceneError::Component(ComponentError::AlreadyExists));
         }
 
         // Build the plugin
@@ -609,14 +682,14 @@ impl Scene {
             .find_map(|plugin| Component::symbols(&component_id, plugin, self).ok())
         else {
             crate::warn!(self, "Component `{}` could not be created", component_id);
-            return Err(SceneError::ComponentCreation);
+            return Err(SceneError::Component(ComponentError::TypeNotFound));
         };
 
         let Some(mut component) =
             Component::create_with(component_id.clone(), component_symbols, self)
         else {
             crate::warn!(self, "Component creator for `{}` failed", component_id);
-            return Err(SceneError::ComponentCreatorFailed);
+            return Err(SceneError::Component(ComponentError::CreatorFailed));
         };
 
         component.deserialize_fields(data.fields);
@@ -650,7 +723,7 @@ impl Scene {
                 "Entity `{}` was not found for component removal",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         // Check if this component already exists
@@ -661,7 +734,7 @@ impl Scene {
                 component_id,
                 entity_id
             );
-            return Err(SceneError::ComponentAlreadyExists);
+            return Err(SceneError::Component(ComponentError::AlreadyExists));
         };
 
         drop(component);
@@ -683,7 +756,7 @@ impl Scene {
                 "Entity `{}` was not found for component list lookup",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         let mut components: Vec<String> = entity_components.keys().cloned().collect();
@@ -729,13 +802,8 @@ impl Scene {
                 }
             })
             .collect();
-        let serialization_data = self.serialize().inspect_err(|err| match err {
-            SceneError::Serialization(msg) => {
-                crate::error!(self, "Scene serialization failed: {}", msg);
-            }
-            _ => {
-                crate::error!(self, "Failed to serialize the scene: {:?}", err);
-            }
+        let serialization_data = self.serialize().inspect_err(|error| {
+            crate::error!(self, "Failed to serialize the scene: {error}");
         })?;
 
         // Remove the plugins
@@ -748,13 +816,13 @@ impl Scene {
         // Reload the plugins
         for plugin in plugins {
             match self.load_plugin(plugin) {
-                Err(SceneError::PluginLoading(PluginError::InvalidSymbol)) => {
+                Err(SceneError::Plugin(PluginError::InvalidSymbol(_))) => {
                     crate::error!(
                         self,
                         "Symbol has a null byte during the plugin reloading! This is a bug! Please report this!"
                     );
                 }
-                Err(SceneError::PluginLoading(PluginError::LinkingError(err))) => {
+                Err(SceneError::Plugin(PluginError::Linking(err))) => {
                     crate::error!(
                         self,
                         "Plugin has a linking error while hotreloading: {}",
@@ -766,15 +834,9 @@ impl Scene {
         }
 
         // Deserialize the scene data (Scene reset also happens in here)
-        self.deserialize(&serialization_data)
-            .inspect_err(|err| match err {
-                SceneError::Deserialization(msg) => {
-                    crate::error!(self, "Scene deserialization failed: {}", msg);
-                }
-                _ => {
-                    crate::error!(self, "Failed to deserialize the scene: {:?}", err);
-                }
-            })?;
+        self.deserialize(&serialization_data).inspect_err(|error| {
+            crate::error!(self, "Failed to deserialize the scene: {error}");
+        })?;
 
         Ok(())
     }
@@ -787,6 +849,10 @@ impl Scene {
         runner: Runner,
         delta: f32,
     ) {
+        debug_assert!(
+            self.is_ticking,
+            ecs_invariant_message!("systems may only run during a scene tick"),
+        );
         self.set_logger(system_id.to_owned());
         let mut entities: Vec<Vec<WXREntity>> = vec![Vec::new(); groups];
 
@@ -813,6 +879,12 @@ impl Scene {
     }
 
     fn run_deferred_calls(&mut self) {
+        debug_assert!(
+            !self.is_ticking,
+            ecs_invariant_message!(
+                "deferred scene mutations must run after the active system returns"
+            ),
+        );
         let deferred_calls = std::mem::take(&mut self.deferred_calls);
 
         for deferred_call in deferred_calls {
@@ -880,6 +952,7 @@ impl Scene {
 
         let should_exit = self.should_exit;
         self.should_exit = false;
+        self.debug_assert_consistent();
         !should_exit
     }
 
@@ -890,11 +963,11 @@ impl Scene {
                 "Entity `{}` was not found for component lookup",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         let Some(component) = entity_components.get(component_id) else {
-            return Err(SceneError::ComponentNotFound);
+            return Err(SceneError::Component(ComponentError::NotFound));
         };
 
         Ok(component)
@@ -909,8 +982,13 @@ impl Scene {
         let component = self.get_component(entity_id, component_id)?;
         fields
             .iter()
-            .map(|field| {
-                unsafe { component.get_field_ptr(field) }.map_err(SceneError::ComponentFieldError)
+            .map(|field| -> Result<_, SceneError> {
+                let ptr = unsafe { component.get_field_ptr(field) }?;
+                assert!(
+                    !ptr.is_null(),
+                    "internal ECS invariant violated; this is a component implementation bug: component field getters must return non-null pointers",
+                );
+                Ok(ptr)
             })
             .collect()
     }
@@ -939,8 +1017,8 @@ impl Scene {
         Q: SceneQuery<'scene>,
     {
         if fields.len() != Q::FIELD_COUNT {
-            return Err(SceneError::ComponentFieldError(
-                crate::error::ComponentError::FieldParsing,
+            return Err(SceneError::Component(
+                crate::scene::component::ComponentError::FieldParsing,
             ));
         }
 
@@ -973,8 +1051,8 @@ impl Scene {
         Q: SceneQueryMut<'scene>,
     {
         if fields.len() != Q::FIELD_COUNT {
-            return Err(SceneError::ComponentFieldError(
-                crate::error::ComponentError::FieldParsing,
+            return Err(SceneError::Component(
+                crate::scene::component::ComponentError::FieldParsing,
             ));
         }
 
@@ -982,8 +1060,8 @@ impl Scene {
         // This is not a thorough check but at least a good error prevention
         for index in 0..fields.len() {
             if fields[index + 1..].contains(&fields[index]) {
-                return Err(SceneError::ComponentFieldError(
-                    crate::error::ComponentError::FieldParsing,
+                return Err(SceneError::Component(
+                    crate::scene::component::ComponentError::FieldParsing,
                 ));
             }
         }
@@ -992,12 +1070,12 @@ impl Scene {
         Q::for_each_mutable_field(fields, |field| {
             if component
                 .is_field_mutable(field)
-                .map_err(SceneError::ComponentFieldError)?
+                .map_err(SceneError::Component)?
             {
                 Ok(())
             } else {
-                Err(SceneError::ComponentFieldError(
-                    crate::error::ComponentError::FieldNotMutable,
+                Err(SceneError::Component(
+                    crate::scene::component::ComponentError::FieldNotMutable,
                 ))
             }
         })?;
@@ -1042,7 +1120,7 @@ impl Scene {
 
         let Some(asset_type_data) = asset_type_data else {
             crate::warn!(self, "Asset type `{}` could not be created", asset_type);
-            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+            return Err(SceneError::Asset(AssetError::AssetTypeNotFound));
         };
 
         self.asset_types
@@ -1073,12 +1151,12 @@ impl Scene {
             let asset_type_data = self
                 .asset_types
                 .get(asset_type)
-                .ok_or(SceneError::AssetError(AssetError::AssetTypeNotFound))?;
+                .ok_or(SceneError::Asset(AssetError::AssetTypeNotFound))?;
             (asset_type_data.creator(), asset_type_data.destroyer())
         };
 
         let asset = AssetType::create_asset_with(self, data_string, creator, destroyer)
-            .map_err(SceneError::AssetError)?;
+            .map_err(SceneError::Asset)?;
 
         self.assets
             .entry(asset_type.to_owned())
@@ -1112,7 +1190,7 @@ impl Scene {
                 "Asset type `{}` was not found for asset lookup",
                 asset_type
             );
-            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+            return Err(SceneError::Asset(AssetError::AssetTypeNotFound));
         };
 
         let Some(asset) = assets.get(data_string) else {
@@ -1122,7 +1200,7 @@ impl Scene {
                 asset_type,
                 data_string
             );
-            return Err(SceneError::AssetError(AssetError::InvalidAsset));
+            return Err(SceneError::Asset(AssetError::InvalidAsset));
         };
 
         Ok(asset)
@@ -1140,15 +1218,14 @@ impl Scene {
                 "Asset type `{}` was not found for field lookup",
                 asset_type
             );
-            return Err(SceneError::AssetError(AssetError::AssetTypeNotFound));
+            return Err(SceneError::Asset(AssetError::AssetTypeNotFound));
         };
         let asset = self.get_asset(asset_type, data_string)?;
 
         fields
             .iter()
             .map(|field| {
-                unsafe { asset_type_data.get_field_ptr(asset, field) }
-                    .map_err(SceneError::AssetError)
+                unsafe { asset_type_data.get_field_ptr(asset, field) }.map_err(SceneError::Asset)
             })
             .collect()
     }
@@ -1170,7 +1247,7 @@ impl Scene {
         Q: SceneQuery<'scene>,
     {
         if fields.len() != Q::FIELD_COUNT {
-            return Err(SceneError::AssetError(AssetError::FieldParsing));
+            return Err(SceneError::Asset(AssetError::FieldParsing));
         }
 
         let field_ptrs = unsafe { self.get_asset_field_ptrs(asset_type, data_string, fields)? };
@@ -1212,7 +1289,7 @@ impl Scene {
                 "Entity `{}` was not found for component field list lookup",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         let Some(component) = entity_components.get(component_id) else {
@@ -1222,7 +1299,7 @@ impl Scene {
                 component_id,
                 entity_id
             );
-            return Err(SceneError::ComponentNotFound);
+            return Err(SceneError::Component(ComponentError::NotFound));
         };
 
         let mut fields = component.get_fields();
@@ -1242,7 +1319,7 @@ impl Scene {
                 "Entity `{}` was not found for component plugin lookup",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         let Some(component) = entity_components.get(component_id) else {
@@ -1252,7 +1329,7 @@ impl Scene {
                 component_id,
                 entity_id
             );
-            return Err(SceneError::ComponentNotFound);
+            return Err(SceneError::Component(ComponentError::NotFound));
         };
 
         Ok(component.get_plugin_id())
@@ -1271,7 +1348,7 @@ impl Scene {
                 "Entity `{}` was not found for component field type lookup",
                 entity_id
             );
-            return Err(SceneError::EntityNotFound);
+            return Err(SceneError::Entity(EntityError::NotFound));
         };
 
         let Some(component) = entity_components.get(component_id) else {
@@ -1281,12 +1358,12 @@ impl Scene {
                 component_id,
                 entity_id
             );
-            return Err(SceneError::ComponentNotFound);
+            return Err(SceneError::Component(ComponentError::NotFound));
         };
 
         component
             .get_field_type(field_id)
-            .map_err(SceneError::ComponentFieldError)
+            .map_err(SceneError::Component)
     }
 
     /// Returns whether a component field can be borrowed mutably.
@@ -1300,7 +1377,7 @@ impl Scene {
 
         component
             .is_field_mutable(field_id)
-            .map_err(SceneError::ComponentFieldError)
+            .map_err(SceneError::Component)
     }
 
     /// Returns whether a component field can be edited from a string.
@@ -1314,7 +1391,7 @@ impl Scene {
 
         component
             .is_field_string_parsable(field_id)
-            .map_err(SceneError::ComponentFieldError)
+            .map_err(SceneError::Component)
     }
 
     /// Renders a component field as a string for UI or debugging.
@@ -1331,7 +1408,7 @@ impl Scene {
 
         component
             .render_field(field_id)
-            .map_err(SceneError::ComponentFieldError)
+            .map_err(SceneError::Component)
     }
 
     /// Parses a string and writes it into a component field.
@@ -1352,7 +1429,7 @@ impl Scene {
 
         component
             .parse_field(field_id, input)
-            .map_err(SceneError::ComponentFieldError)
+            .map_err(SceneError::Component)
     }
 
     /// Requests that the next `tick` return `false`.
@@ -1366,12 +1443,9 @@ mod tests {
     #![allow(deprecated)]
 
     use super::*;
-    use crate::{
-        error::ComponentError,
-        scene::{
-            component::{FieldType, Getter, Schema, SerializedBytes},
-            serialization::{ComponentData, FieldData, SceneData},
-        },
+    use crate::scene::{
+        component::{ComponentError, FieldType, Getter, Schema, SerializedBytes},
+        serialization::{ComponentData, FieldData, SceneData},
     };
     use std::sync::{
         LazyLock, Mutex,
@@ -1892,7 +1966,7 @@ mod tests {
 
         assert_eq!(
             scene.get_entity_name(entity),
-            Err(SceneError::EntityNotFound)
+            Err(SceneError::Entity(EntityError::NotFound))
         );
     }
 
@@ -2041,9 +2115,7 @@ mod tests {
 
         assert_eq!(
             scene.query_mut::<(&mut i64, &i64)>(entity, "scene_pair", &["a", "a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
+            Err(SceneError::Component(ComponentError::FieldParsing))
         );
     }
 
@@ -2057,9 +2129,7 @@ mod tests {
 
         assert_eq!(
             scene.query::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
+            Err(SceneError::Component(ComponentError::FieldParsing))
         );
     }
 
@@ -2073,9 +2143,7 @@ mod tests {
 
         assert_eq!(
             scene.query_mut::<(&i64, &i64)>(entity, "scene_pair", &["a"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldParsing
-            ))
+            Err(SceneError::Component(ComponentError::FieldParsing))
         );
     }
 
@@ -2089,9 +2157,7 @@ mod tests {
 
         assert_eq!(
             scene.query_mut::<(&mut SceneOwnedValue,)>(entity, "scene_owner", &["value"]),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNotMutable
-            ))
+            Err(SceneError::Component(ComponentError::FieldNotMutable))
         );
     }
 
@@ -2120,7 +2186,7 @@ mod tests {
 
         assert_eq!(
             scene.add_component(entity, "scene_counter".to_owned()),
-            Err(SceneError::ComponentAlreadyExists)
+            Err(SceneError::Component(ComponentError::AlreadyExists))
         );
     }
 
@@ -2136,7 +2202,7 @@ mod tests {
 
         assert_eq!(
             scene.query::<(&i64,)>(entity, "scene_counter", &["value"]),
-            Err(SceneError::ComponentNotFound)
+            Err(SceneError::Component(ComponentError::NotFound))
         );
     }
 
@@ -2175,7 +2241,7 @@ mod tests {
 
         assert_eq!(
             scene.get_entity_component_plugin_id(entity, "missing"),
-            Err(SceneError::ComponentNotFound)
+            Err(SceneError::Component(ComponentError::NotFound))
         );
     }
 
@@ -2244,15 +2310,11 @@ mod tests {
 
         assert_eq!(
             scene.is_component_field_mutable(entity, "scene_counter", "missing"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNotFound
-            ))
+            Err(SceneError::Component(ComponentError::FieldNotFound))
         );
         assert_eq!(
             scene.is_component_field_string_parsable(entity, "scene_counter", "missing"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNotFound
-            ))
+            Err(SceneError::Component(ComponentError::FieldNotFound))
         );
     }
 
@@ -2297,9 +2359,7 @@ mod tests {
 
         assert_eq!(
             scene.parse_field(entity, "scene_counter", "value", "invalid"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldValueParsing
-            ))
+            Err(SceneError::Component(ComponentError::FieldValueParsing))
         );
         assert_eq!(get_scene_counter(&scene, entity), 1);
     }
@@ -2314,9 +2374,7 @@ mod tests {
 
         assert_eq!(
             scene.parse_field(entity, "scene_pair", "b", "42"),
-            Err(SceneError::ComponentFieldError(
-                ComponentError::FieldNotMutable
-            ))
+            Err(SceneError::Component(ComponentError::FieldNotMutable))
         );
     }
 
@@ -2384,7 +2442,7 @@ mod tests {
 
         assert_eq!(
             scene.get_system_plugin_id("missing"),
-            Err(SceneError::SystemNotFound)
+            Err(SceneError::System(SystemError::NotFound))
         );
     }
 
@@ -2462,11 +2520,11 @@ mod tests {
 
         assert_eq!(
             scene.get_entity_name(entity),
-            Err(SceneError::EntityNotFound)
+            Err(SceneError::Entity(EntityError::NotFound))
         );
         assert_eq!(
             scene.remove_system("scene_cleanup_system"),
-            Err(SceneError::SystemNotFound)
+            Err(SceneError::System(SystemError::NotFound))
         );
     }
 
@@ -2474,7 +2532,10 @@ mod tests {
     fn scene_unload_plugin_rejects_static_plugin() {
         let mut scene = Scene::new();
 
-        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
+        assert_eq!(
+            scene.unload_plugin(""),
+            Err(SceneError::Plugin(PluginError::StaticPluginCannotUnload))
+        );
     }
 
     #[test]
@@ -2488,7 +2549,10 @@ mod tests {
             .add_system("scene_cleanup_system".to_owned(), 1)
             .unwrap();
 
-        assert_eq!(scene.unload_plugin(""), Err(SceneError::StaticPluginUnload));
+        assert_eq!(
+            scene.unload_plugin(""),
+            Err(SceneError::Plugin(PluginError::StaticPluginCannotUnload))
+        );
 
         assert_eq!(get_scene_counter(&scene, entity), 1);
         scene.remove_system("scene_cleanup_system").unwrap();
@@ -2557,7 +2621,7 @@ mod tests {
         );
         assert_eq!(
             scene.remove_system("scene_deferred_remove_target"),
-            Err(SceneError::SystemNotFound)
+            Err(SceneError::System(SystemError::NotFound))
         );
         assert_eq!(scene.remove_system("scene_deferred_remove_request"), Ok(()));
     }
@@ -2784,6 +2848,6 @@ mod tests {
         let path = std::env::temp_dir().join(format!("wasserxr-missing-{}.scene", Uuid::now_v7()));
         let mut scene = Scene::new();
 
-        assert!(matches!(scene.load(path), Err(SceneError::FileIo(_))));
+        assert!(matches!(scene.load(path), Err(SceneError::Io(_))));
     }
 }

@@ -1,5 +1,6 @@
 //! Component schema support used by component plugins and scene queries.
 
+mod error;
 mod field;
 /// Runtime field type hints.
 pub mod field_type;
@@ -12,10 +13,9 @@ pub mod serialized_bytes;
 
 use std::ffi::c_void;
 
-use crate::{
-    error::ComponentError,
-    scene::{Scene, plugin::Plugin},
-};
+use crate::scene::{Scene, plugin::Plugin};
+
+pub use error::ComponentError;
 
 pub use field::Getter;
 pub use field::{Deserializer, Serializer};
@@ -236,7 +236,7 @@ impl Drop for Component {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::PluginError;
+    use crate::scene::plugin::PluginError;
     use std::{
         ffi::c_void,
         sync::atomic::{AtomicUsize, Ordering},

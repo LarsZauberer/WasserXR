@@ -1,0 +1,40 @@
+[package]
+name = "wasserxr-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+libfuzzer-sys = "0.4"
+wasserxr = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[profile.release]
+debug-assertions = true
+
+[[bin]]
+name = "scene_decode"
+path = "fuzz_targets/scene_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "field_text"
+path = "fuzz_targets/field_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "scene_operations"
+path = "fuzz_targets/scene_operations.rs"
+test = false
+doc = false
+bench = false

@@ -1,8 +1,7 @@
 use std::ffi::c_void;
 
-use crate::{
-    error::ComponentError,
-    scene::component::{field_type::FieldType, serialized_bytes::SerializedBytes},
+use crate::scene::component::{
+    ComponentError, field_type::FieldType, serialized_bytes::SerializedBytes,
 };
 
 /// C ABI function that returns a raw pointer to a component field.

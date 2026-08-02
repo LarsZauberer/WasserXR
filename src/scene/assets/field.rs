@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 
-use crate::{error::AssetError, scene::component::FieldType};
+use crate::scene::{assets::AssetError, component::FieldType};
 
 /// C ABI function that returns a raw pointer to an asset field.
 ///

@@ -163,7 +163,7 @@ pub extern "C" fn wxr_reset(scene: *mut WXRScene) -> i32 {
 /// Serializes a scene into an owned byte buffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn wxr_serialize(scene: *const WXRScene) -> WXRBytes {
-    match scene_ref(scene).and_then(|scene| scene.serialize().map_err(Into::into)) {
+    match scene_ref(scene).and_then(|scene| Ok(scene.serialize()?)) {
         Ok(data) => {
             clear_error();
             WXRBytes::from_vec(data)
@@ -344,12 +344,9 @@ pub extern "C" fn wxr_remove_entity(scene: *mut WXRScene, entity: WXREntity) -> 
 /// Returns an entity display name as an owned C string.
 #[unsafe(no_mangle)]
 pub extern "C" fn wxr_get_entity_name(scene: *const WXRScene, entity: WXREntity) -> *mut c_char {
-    match scene_ref(scene).and_then(|scene| {
-        scene
-            .get_entity_name(entity.into_uuid())
-            .map(|name| name.to_owned())
-            .map_err(Into::into)
-    }) {
+    match scene_ref(scene)
+        .and_then(|scene| Ok(scene.get_entity_name(entity.into_uuid())?.to_owned()))
+    {
         Ok(name) => {
             clear_error();
             string_to_ptr(name)
@@ -511,11 +508,7 @@ pub extern "C" fn wxr_get_entity_components(
     scene: *const WXRScene,
     entity: WXREntity,
 ) -> WXRStringArray {
-    match scene_ref(scene).and_then(|scene| {
-        scene
-            .get_entity_components(entity.into_uuid())
-            .map_err(Into::into)
-    }) {
+    match scene_ref(scene).and_then(|scene| Ok(scene.get_entity_components(entity.into_uuid())?)) {
         Ok(components) => {
             clear_error();
             string_array(components)

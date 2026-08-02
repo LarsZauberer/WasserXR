@@ -2,9 +2,12 @@ use std::time::Instant;
 
 use crate::{
     bindings::scene::WXREntity,
-    error::SystemError,
     scene::{Scene, plugin::Plugin, serialization::SystemData},
 };
+
+mod error;
+
+pub use error::SystemError;
 
 pub(crate) type Selector = unsafe extern "C" fn(*const Scene, WXREntity) -> i32;
 pub(crate) type Runner =
@@ -56,7 +59,7 @@ impl System {
             .get_symbol::<Runner>(&runner_symbol)
             .map_err(|error| {
                 crate::debug!(scene, "System `{}` has no runner function", id);
-                SystemError::NoSystemFunction(error)
+                SystemError::NoRunner(error)
             })?;
 
         let groups: usize = if let Ok(ptr) = plugin.get_symbol::<*const usize>(&groups_symbol) {
@@ -165,7 +168,7 @@ impl System {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::PluginError;
+    use crate::scene::plugin::PluginError;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static SYSTEM_ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -254,7 +257,7 @@ mod tests {
 
         assert!(matches!(
             System::new("missing_runner".to_owned(), &plugin, 1, &scene),
-            Err(SystemError::NoSystemFunction(PluginError::MissingSymbol(symbol)))
+            Err(SystemError::NoRunner(PluginError::MissingSymbol(symbol)))
                 if symbol == "wxr_system_missing_runner"
         ));
     }

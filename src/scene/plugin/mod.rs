@@ -1,12 +1,13 @@
 use std::{
     ffi::{CStr, CString},
-    io::ErrorKind,
     os::raw::c_void,
 };
 
 use uuid::Uuid;
 
-use crate::error::PluginError;
+mod error;
+
+pub use error::PluginError;
 
 pub(crate) struct Plugin {
     path: Option<String>,
@@ -16,12 +17,7 @@ pub(crate) struct Plugin {
 impl Plugin {
     pub(crate) fn new(path: String) -> Result<Plugin, PluginError> {
         let fd_file_path = std::env::temp_dir().join(Uuid::now_v7().to_string());
-        if let Err(error) = std::fs::copy(&path, &fd_file_path) {
-            return match error.kind() {
-                ErrorKind::NotFound => Err(PluginError::NotFound),
-                _ => Err(PluginError::LinkingError(error.to_string())),
-            };
-        }
+        std::fs::copy(&path, &fd_file_path).map_err(PluginError::LoadIo)?;
 
         let path_cstring = Self::create_c_string(fd_file_path.to_string_lossy().into_owned())?;
 
@@ -37,7 +33,7 @@ impl Plugin {
                 }
             };
             let _ = std::fs::remove_file(fd_file_path);
-            return Err(PluginError::LinkingError(error));
+            return Err(PluginError::Linking(error));
         }
 
         Ok(Self {
@@ -62,11 +58,13 @@ impl Plugin {
     }
 
     pub(crate) fn get_symbol<T>(&self, symbol: &str) -> Result<T, PluginError> {
-        assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*mut c_void>());
+        assert_eq!(
+            std::mem::size_of::<T>(),
+            std::mem::size_of::<*mut c_void>(),
+            "plugin symbols must be loaded into pointer-sized types",
+        );
 
-        let Ok(symbol_cstring) = CString::new(symbol.to_owned()) else {
-            return Err(PluginError::InvalidSymbol);
-        };
+        let symbol_cstring = CString::new(symbol.to_owned()).map_err(PluginError::InvalidSymbol)?;
 
         // Safety: Will return either null or will return the function pointer
         let ptr = unsafe { libc::dlsym(self.fd, symbol_cstring.as_ptr()) };
@@ -85,7 +83,7 @@ impl Plugin {
     }
 
     fn create_c_string(data: String) -> Result<CString, PluginError> {
-        CString::new(data).map_err(|_| PluginError::InvalidSymbol)
+        CString::new(data).map_err(PluginError::InvalidSymbol)
     }
 }
 
@@ -136,16 +134,16 @@ mod tests {
     fn plugin_get_symbol_for_invalid_symbol() {
         let plugin = Plugin::new_static();
 
-        assert_eq!(
+        assert!(matches!(
             plugin.get_symbol::<*const usize>("invalid\0symbol"),
-            Err(PluginError::InvalidSymbol)
-        );
+            Err(PluginError::InvalidSymbol(_))
+        ));
     }
 
     #[test]
     fn plugin_new_for_missing_path() {
         let result = Plugin::new("/definitely/missing/wasserxr/test/plugin.so".to_owned());
 
-        assert!(matches!(result, Err(PluginError::NotFound)));
+        assert!(matches!(result, Err(PluginError::LoadIo(_))));
     }
 }

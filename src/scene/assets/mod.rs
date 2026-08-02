@@ -1,5 +1,6 @@
 //! Asset schema support used by asset plugins and scene asset queries.
 
+mod error;
 /// Asset field metadata.
 pub mod field;
 /// Asset schema storage.
@@ -7,10 +8,9 @@ pub mod schema;
 
 use std::ffi::{CString, c_char, c_void};
 
-use crate::{
-    error::AssetError,
-    scene::{Scene, plugin::Plugin},
-};
+use crate::scene::{Scene, plugin::Plugin};
+
+pub use error::AssetError;
 
 pub use field::{Field, Getter};
 pub use schema::Schema;
@@ -144,7 +144,7 @@ impl Asset {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{error::PluginError, scene::component::FieldType};
+    use crate::scene::{component::FieldType, plugin::PluginError};
     use std::sync::{
         LazyLock, Mutex,
         atomic::{AtomicUsize, Ordering},

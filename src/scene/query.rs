@@ -36,7 +36,7 @@
 
 use std::ffi::c_void;
 
-use crate::error::SceneError;
+use crate::scene::SceneError;
 
 /// Converts one raw component or asset field pointer into a shared query item.
 ///

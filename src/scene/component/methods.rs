@@ -10,8 +10,7 @@ use std::marker::PhantomData;
 use uuid::Uuid;
 
 use crate::bindings::scene::WXRScene;
-use crate::error::SceneError;
-use crate::scene::Scene;
+use crate::scene::{Scene, SceneError, component::ComponentError, plugin::PluginError};
 
 /// ABI-safe named argument passed to a component method.
 ///
@@ -157,13 +156,13 @@ impl Scene {
 
         // Resolve the method only in the plugin that owns this component.
         let Some(plugin) = self.plugins.get(component.get_plugin_id()) else {
-            return Err(SceneError::PluginNotFound);
+            return Err(PluginError::NotLoaded.into());
         };
 
         let symbol = format!("wxr_method_{}_{}", component_id, name);
         let function = plugin
             .get_symbol::<MethodFn>(&symbol)
-            .map_err(|_| SceneError::MethodNotFound)?;
+            .map_err(|_| ComponentError::MethodNotFound)?;
 
         Ok((function, data))
     }

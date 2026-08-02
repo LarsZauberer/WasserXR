@@ -9,10 +9,11 @@ use wasserxr::{
         },
         wxr_error,
     },
-    component, component_creator,
-    error::SceneError,
-    method,
-    scene::{Scene, component::methods::WXRMethodStatus},
+    component, component_creator, method,
+    scene::{
+        Scene, SceneError,
+        component::{ComponentError, methods::WXRMethodStatus},
+    },
 };
 
 #[component]
@@ -188,7 +189,7 @@ fn get_method_reports_unknown_method() {
             .get_method(entity, "MethodComponent", "does_not_exist")
             .map(|_| ())
             .unwrap_err(),
-        SceneError::MethodNotFound
+        SceneError::Component(ComponentError::MethodNotFound)
     );
 }
 
@@ -202,7 +203,7 @@ fn get_method_reports_missing_component() {
             .get_method(entity, "MethodComponent", "add")
             .map(|_| ())
             .unwrap_err(),
-        SceneError::ComponentNotFound
+        SceneError::Component(ComponentError::NotFound)
     );
 }
 

@@ -10,7 +10,11 @@ use std::{
     ffi::{CStr, CString, c_char},
 };
 
-use crate::error::{AssetError, ComponentError, PluginError, SceneError};
+use crate::scene::{
+    SceneError, assets::AssetError, component::ComponentError, entity::EntityError,
+    plugin::PluginError, resource::ResourceError, serialization::SerializationError,
+    system::SystemError,
+};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,33 +133,42 @@ pub unsafe extern "C" fn wxr_free_string(value: *mut c_char) {
 impl From<SceneError> for WXRSceneError {
     fn from(value: SceneError) -> Self {
         match value {
-            SceneError::EntityNotFound => Self::EntityNotFound,
-            SceneError::ComponentAlreadyExists => Self::ComponentAlreadyExists,
-            SceneError::ResourceAlreadyExists => Self::ResourceAlreadyExists,
-            SceneError::SystemAlreadyExists => Self::SystemAlreadyExists,
-            SceneError::PluginAlreadyLoaded => Self::PluginAlreadyLoaded,
-            SceneError::SystemNotFound => Self::SystemNotFound,
-            SceneError::ResourceNotFound => Self::ResourceNotFound,
-            SceneError::PluginNotFound => Self::PluginNotFound,
-            SceneError::StaticPluginUnload => Self::StaticPluginUnload,
-            SceneError::ComponentNotFound => Self::ComponentNotFound,
-            SceneError::MethodNotFound => Self::MethodNotFound,
-            SceneError::ComponentFieldError(_) => Self::ComponentFieldError,
-            SceneError::AssetError(_) => Self::AssetError,
-            SceneError::PluginLoading(_) => Self::PluginLoading,
-            SceneError::SystemCreation => Self::SystemCreation,
-            SceneError::ComponentCreation => Self::ComponentCreation,
-            SceneError::ComponentCreatorFailed => Self::ComponentCreatorFailed,
-            SceneError::Serialization(_) => Self::Serialization,
-            SceneError::Deserialization(_) => Self::Deserialization,
-            SceneError::FileIo(_) => Self::FileIo,
+            SceneError::Entity(error) => error.into(),
+            SceneError::Component(error) => error.into(),
+            SceneError::Resource(error) => error.into(),
+            SceneError::System(error) => error.into(),
+            SceneError::Plugin(error) => error.into(),
+            SceneError::Asset(error) => error.into(),
+            SceneError::Serialization(error) => error.into(),
+            SceneError::Io(_) => Self::FileIo,
         }
     }
 }
 
+impl From<EntityError> for WXRSceneError {
+    fn from(_: EntityError) -> Self {
+        Self::EntityNotFound
+    }
+}
+
 impl From<ComponentError> for WXRSceneError {
-    fn from(_: ComponentError) -> Self {
-        Self::ComponentFieldError
+    fn from(value: ComponentError) -> Self {
+        match value {
+            ComponentError::AlreadyExists => Self::ComponentAlreadyExists,
+            ComponentError::NotFound => Self::ComponentNotFound,
+            ComponentError::MethodNotFound => Self::MethodNotFound,
+            ComponentError::TypeNotFound
+            | ComponentError::NoCreator(_)
+            | ComponentError::NoDestroyer(_) => Self::ComponentCreation,
+            ComponentError::CreatorFailed => Self::ComponentCreatorFailed,
+            ComponentError::FieldNotFound
+            | ComponentError::FieldNoGetter
+            | ComponentError::FieldNotMutable
+            | ComponentError::FieldNoSerializer
+            | ComponentError::FieldNoDeserializer
+            | ComponentError::FieldParsing
+            | ComponentError::FieldValueParsing => Self::ComponentFieldError,
+        }
     }
 }
 
@@ -166,7 +179,47 @@ impl From<AssetError> for WXRSceneError {
 }
 
 impl From<PluginError> for WXRSceneError {
-    fn from(_: PluginError) -> Self {
-        Self::PluginLoading
+    fn from(value: PluginError) -> Self {
+        match value {
+            PluginError::AlreadyLoaded => Self::PluginAlreadyLoaded,
+            PluginError::NotLoaded => Self::PluginNotFound,
+            PluginError::StaticPluginCannotUnload => Self::StaticPluginUnload,
+            PluginError::LoadIo(_)
+            | PluginError::Linking(_)
+            | PluginError::MissingSymbol(_)
+            | PluginError::InvalidSymbol(_) => Self::PluginLoading,
+        }
+    }
+}
+
+impl From<ResourceError> for WXRSceneError {
+    fn from(value: ResourceError) -> Self {
+        match value {
+            ResourceError::AlreadyExists => Self::ResourceAlreadyExists,
+            ResourceError::NotFound => Self::ResourceNotFound,
+        }
+    }
+}
+
+impl From<SystemError> for WXRSceneError {
+    fn from(value: SystemError) -> Self {
+        match value {
+            SystemError::AlreadyExists => Self::SystemAlreadyExists,
+            SystemError::NotFound => Self::SystemNotFound,
+            SystemError::TypeNotFound | SystemError::NoRunner(_) => Self::SystemCreation,
+        }
+    }
+}
+
+impl From<SerializationError> for WXRSceneError {
+    fn from(value: SerializationError) -> Self {
+        match value {
+            SerializationError::Encode(_) => Self::Serialization,
+            SerializationError::InvalidHeader
+            | SerializationError::MissingVersion
+            | SerializationError::UnsupportedVersion(_)
+            | SerializationError::Decode(_)
+            | SerializationError::TrailingBytes => Self::Deserialization,
+        }
     }
 }

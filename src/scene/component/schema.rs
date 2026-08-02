@@ -1,11 +1,9 @@
 use std::{collections::HashMap, ffi::c_void};
 
-use crate::{
-    error::ComponentError,
-    scene::component::{
-        field::{Deserializer, Field, Getter, Serializer},
-        field_type::FieldType,
-    },
+use crate::scene::component::{
+    ComponentError,
+    field::{Deserializer, Field, Getter, Serializer},
+    field_type::FieldType,
 };
 
 /// Runtime schema for one component type.

@@ -1,5 +1,9 @@
 use uuid::Uuid;
 
+mod error;
+
+pub use error::EntityError;
+
 use crate::scene::serialization::EntityData;
 
 /// Entity identity and display name stored by a scene.
