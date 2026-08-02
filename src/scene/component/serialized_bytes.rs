@@ -30,7 +30,10 @@ impl SerializedBytes {
     #[doc(hidden)]
     pub fn from_serializable<T: serde::Serialize>(value: &T) -> Self {
         Self::from_vec(
-            bincode::serde::encode_to_vec(value, bincode::config::standard()).unwrap_or_default(),
+            bincode::serde::encode_to_vec(value, bincode::config::standard())
+                .expect(
+                    "internal ECS invariant violated; this is a WasserXR or component implementation bug: generated component fields must serialize successfully",
+                ),
         )
     }
 
@@ -42,9 +45,17 @@ impl SerializedBytes {
     /// must not have already been consumed. Rebuilding arbitrary raw parts or
     /// consuming the same value twice can corrupt memory.
     pub unsafe fn into_vec(self) -> Vec<u8> {
-        if self.ptr.is_null() || self.cap == 0 || self.len > self.cap {
+        assert!(
+            self.len <= self.cap,
+            "serialized byte length must not exceed its allocation capacity",
+        );
+        if self.cap == 0 {
             return Vec::new();
         }
+        assert!(
+            !self.ptr.is_null(),
+            "serialized bytes with allocated capacity must have a non-null pointer",
+        );
 
         unsafe { Vec::from_raw_parts(self.ptr, self.len, self.cap) }
     }

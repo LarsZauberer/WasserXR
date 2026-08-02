@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+mod error;
+
+pub use error::SerializationError;
+
 const MAGIC: &[u8; 8] = b"WXRSCN\0\0";
 const VERSION: u32 = 1;
 
@@ -37,52 +41,48 @@ pub(crate) struct SceneData {
 }
 
 impl SceneData {
-    pub(crate) fn encode(&self) -> Result<Vec<u8>, String> {
+    pub(crate) fn encode(&self) -> Result<Vec<u8>, SerializationError> {
         let mut data = Vec::new();
         data.extend_from_slice(MAGIC);
         data.extend_from_slice(&VERSION.to_le_bytes());
 
-        let mut payload = bincode::serde::encode_to_vec(self, bincode::config::standard())
-            .map_err(|error| error.to_string())?;
+        let mut payload = bincode::serde::encode_to_vec(self, bincode::config::standard())?;
         data.append(&mut payload);
 
         Ok(data)
     }
 
-    pub(crate) fn decode(data: &[u8]) -> Result<Self, String> {
+    pub(crate) fn decode(data: &[u8]) -> Result<Self, SerializationError> {
         let Some(header) = data.get(..MAGIC.len()) else {
-            return Err("invalid scene serialization header".to_owned());
+            return Err(SerializationError::InvalidHeader);
         };
 
         if header != MAGIC {
-            return Err("invalid scene serialization header".to_owned());
+            return Err(SerializationError::InvalidHeader);
         }
 
         let version_start = MAGIC.len();
         let version_end = version_start + std::mem::size_of::<u32>();
         let version_bytes: [u8; 4] = data
             .get(version_start..version_end)
-            .ok_or_else(|| "missing scene serialization version".to_owned())?
+            .ok_or(SerializationError::MissingVersion)?
             .try_into()
-            .map_err(|_| "invalid scene serialization version".to_owned())?;
+            .expect(ecs_invariant_message!(
+                "the validated serialization version slice must contain exactly four bytes"
+            ));
 
         let version = u32::from_le_bytes(version_bytes);
         if version != VERSION {
-            return Err(format!(
-                "unsupported scene serialization version `{version}`"
-            ));
+            return Err(SerializationError::UnsupportedVersion(version));
         }
 
-        let payload = data
-            .get(version_end..)
-            .ok_or_else(|| "missing scene serialization payload".to_owned())?;
+        let payload = &data[version_end..];
 
         let (scene, bytes_read): (Self, usize) =
-            bincode::serde::decode_from_slice(payload, bincode::config::standard())
-                .map_err(|error| error.to_string())?;
+            bincode::serde::decode_from_slice(payload, bincode::config::standard())?;
 
         if bytes_read != payload.len() {
-            return Err("trailing bytes after scene serialization data".to_owned());
+            return Err(SerializationError::TrailingBytes);
         }
 
         Ok(scene)

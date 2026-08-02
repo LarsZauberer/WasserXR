@@ -1,11 +1,11 @@
 use std::{collections::HashMap, ffi::c_void};
 
-use crate::{
-    error::AssetError,
-    scene::{
-        assets::field::{Field, Getter},
-        component::FieldType,
+use crate::scene::{
+    assets::{
+        AssetError,
+        field::{Field, Getter},
     },
+    component::FieldType,
 };
 
 /// Runtime schema for one asset type.

@@ -7,10 +7,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wasserxr::{
     attacher, component, component_creator, detacher,
-    error::{ComponentError, SceneError},
     scene::{
-        Scene,
-        component::{FieldType, Schema, SerializedBytes},
+        Scene, SceneError,
+        component::{ComponentError, FieldType, Schema, SerializedBytes},
     },
     system,
 };
@@ -330,9 +329,7 @@ fn component_macro_registers_and_accesses_static_component() {
 
     assert_eq!(
         scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["my_int"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNotMutable
-        ))
+        Err(SceneError::Component(ComponentError::FieldNotMutable))
     );
 
     let (my_string, default_int) = scene
@@ -352,15 +349,11 @@ fn component_macro_registers_and_accesses_static_component() {
     assert_eq!(*default_int, 42);
     assert_eq!(
         scene.query::<(&i32,)>(entity, "MacroComponent", &["hidden"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNoGetter
-        ))
+        Err(SceneError::Component(ComponentError::FieldNoGetter))
     );
     assert!(matches!(
         scene.query_mut::<(&mut i32,)>(entity, "MacroComponent", &["hidden"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNotMutable
-        ))
+        Err(SceneError::Component(ComponentError::FieldNotMutable))
     ));
 }
 
@@ -458,9 +451,7 @@ fn component_macro_allows_missing_schema_function() {
 
     assert_eq!(
         scene.query::<(&i32,)>(entity, "MacroNoSchemaComponent", &["value"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNotFound
-        ))
+        Err(SceneError::Component(ComponentError::FieldNotFound))
     );
 }
 
@@ -471,7 +462,7 @@ fn component_macro_reports_failed_creator() {
 
     assert_eq!(
         scene.add_component(entity, "MacroFailingComponent".to_owned()),
-        Err(SceneError::ComponentCreatorFailed)
+        Err(SceneError::Component(ComponentError::CreatorFailed))
     );
 }
 
@@ -520,9 +511,7 @@ fn component_macro_registers_virtual_fields() {
 
     assert_eq!(
         scene.query_mut::<(&mut f32,)>(entity, "MacroPosition", &["y"]),
-        Err(SceneError::ComponentFieldError(
-            ComponentError::FieldNotMutable
-        ))
+        Err(SceneError::Component(ComponentError::FieldNotMutable))
     );
 
     let serialized = scene.serialize().unwrap();

@@ -8,8 +8,11 @@ use std::{
 
 use wasserxr::{
     asset_type, asset_type_creator,
-    error::{AssetError, SceneError},
-    scene::{Scene, assets::Schema, component::FieldType},
+    scene::{
+        Scene, SceneError,
+        assets::{AssetError, Schema},
+        component::FieldType,
+    },
 };
 
 static ASSET_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -214,7 +217,7 @@ fn asset_query_rejects_missing_file() {
 
     assert_eq!(
         scene.asset_query::<(&String,)>("MacroFileAsset", &path, &["content"]),
-        Err(SceneError::AssetError(AssetError::InvalidAsset))
+        Err(SceneError::Asset(AssetError::InvalidAsset))
     );
 }
 
@@ -228,6 +231,6 @@ fn asset_query_rejects_none_field() {
 
     assert_eq!(
         scene.asset_query::<(&String,)>("MacroFileAsset", &path, &["hidden"]),
-        Err(SceneError::AssetError(AssetError::FieldNotFound))
+        Err(SceneError::Asset(AssetError::FieldNotFound))
     );
 }
