@@ -45,6 +45,7 @@
             nightlyRust
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
+            pkgs.cargo-fuzz
             pkgs.rust-cbindgen
             pkgs.cargo-release
             pkgs.gcc
