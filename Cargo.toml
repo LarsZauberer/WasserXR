@@ -20,8 +20,15 @@ serde = { version = "1.0.228", features = ["derive"] }
 wasserxr-macros = { path = "wasserxr-macros", version = "0.2.4" }
 uuid = { version = "1.23.2", features = ["serde", "v7"] }
 
+[dev-dependencies]
+criterion = "0.8"
+
 [build-dependencies]
 cbindgen = "0.29"
 
 [lib]
 crate-type = ["staticlib", "rlib"]
+
+[[bench]]
+name = "scene"
+harness = false

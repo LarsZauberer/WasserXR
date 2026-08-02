@@ -8,8 +8,16 @@ on:
 
 jobs:
   ci:
-    name: Rust CI (nix flake check)
+    name: Rust CI (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit tests
+            command: cargo test --release -j 4
+          - name: Benchmark compilation
+            command: cargo bench --no-run -j 4
 
     steps:
       - name: Checkout
@@ -30,5 +38,5 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Run nix flake check
-        run: nix develop -c cargo test --release -j 4
+      - name: Run ${{ matrix.name }}
+        run: nix develop -c ${{ matrix.command }}
