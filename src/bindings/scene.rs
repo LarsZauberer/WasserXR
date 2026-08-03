@@ -928,6 +928,7 @@ pub unsafe extern "C" fn wxr_parse_field(
 }
 
 /// Adds a raw C resource to the scene.
+#[deprecated(note = "resources are deprecated and will be removed in a future release")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_add_resource(
     scene: *mut WXRScene,
@@ -952,6 +953,7 @@ pub unsafe extern "C" fn wxr_add_resource(
 }
 
 /// Returns a raw C resource pointer by name.
+#[deprecated(note = "resources are deprecated and will be removed in a future release")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_get_resource(
     scene: *mut WXRScene,
@@ -1116,6 +1118,8 @@ pub unsafe extern "C" fn wxr_method_destroy(method: *mut WXRMethod) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use crate::{
         bindings::wxr_error,
