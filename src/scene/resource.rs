@@ -20,6 +20,7 @@ pub struct Resource {
 
 impl Resource {
     /// Stores any `'static` Rust value as a type-erased resource.
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn new<T>(value: T) -> Self {
         Self {
             data: Box::into_raw(Box::new(value)).cast(),
@@ -42,6 +43,7 @@ impl Resource {
     /// This function is safe to call but type-erased internally. The caller
     /// must request the same `T` that was used with `Resource::new`; requesting
     /// a different type creates an invalid reference.
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn get<T>(&self) -> &T {
         unsafe { &*self.data.cast::<T>() }
     }
@@ -53,6 +55,7 @@ impl Resource {
     /// This function is safe to call but type-erased internally. The caller
     /// must request the same `T` that was used with `Resource::new`; requesting
     /// a different type creates an invalid mutable reference.
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn get_mut<T>(&mut self) -> &mut T {
         unsafe { &mut *self.data.cast::<T>() }
     }
@@ -81,6 +84,7 @@ impl Scene {
     /// scene.add_resource("score".to_owned(), 0usize).unwrap();
     /// assert_eq!(*scene.get_resource::<usize>("score").unwrap(), 0);
     /// ```
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn add_resource<T>(&mut self, name: String, value: T) -> Result<(), SceneError> {
         match self.resources.entry(name) {
             Entry::Occupied(_) => Err(SceneError::Resource(ResourceError::AlreadyExists)),
@@ -112,6 +116,7 @@ impl Scene {
     ///
     /// The stored value is type-erased. The requested `T` must match the type
     /// originally passed to `add_resource`.
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn get_resource<T>(&self, name: &str) -> Result<&T, SceneError> {
         self.resources
             .get(name)
@@ -125,6 +130,7 @@ impl Scene {
     ///
     /// The stored value is type-erased. The requested `T` must match the type
     /// originally passed to `add_resource`.
+    #[deprecated(note = "resources are deprecated and will be removed in a future release")]
     pub fn get_mut_resource<T>(&mut self, name: &str) -> Result<&mut T, SceneError> {
         self.resources
             .get_mut(name)
@@ -142,6 +148,8 @@ impl Scene {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
 
     use std::sync::{

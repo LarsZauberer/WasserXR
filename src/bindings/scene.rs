@@ -928,6 +928,7 @@ pub unsafe extern "C" fn wxr_parse_field(
 }
 
 /// Adds a raw C resource to the scene.
+#[deprecated(note = "resources are deprecated and will be removed in a future release")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_add_resource(
     scene: *mut WXRScene,
@@ -940,11 +941,18 @@ pub unsafe extern "C" fn wxr_add_resource(
         return -1;
     }
 
-    match (scene_mut(scene), unsafe { str_from_ptr(name) }) {
-        (Ok(scene), Ok(name)) => {
-            result_code(scene.add_raw_resource(name.to_owned(), data, destroyer))
+    match scene_mut(scene) {
+        Ok(scene) => {
+            crate::warn!(scene, "Resource bindings are deprecated");
+            match unsafe { str_from_ptr(name) } {
+                Ok(name) => result_code(scene.add_raw_resource(name.to_owned(), data, destroyer)),
+                Err(error) => {
+                    set_error(error);
+                    -1
+                }
+            }
         }
-        (Err(error), _) | (_, Err(error)) => {
+        Err(error) => {
             set_error(error);
             -1
         }
@@ -952,23 +960,33 @@ pub unsafe extern "C" fn wxr_add_resource(
 }
 
 /// Returns a raw C resource pointer by name.
+#[deprecated(note = "resources are deprecated and will be removed in a future release")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_get_resource(
     scene: *mut WXRScene,
     name: *const c_char,
 ) -> *mut c_void {
-    match (scene_mut(scene), unsafe { str_from_ptr(name) }) {
-        (Ok(scene), Ok(name)) => match scene.get_raw_resource(name) {
-            Ok(data) => {
-                clear_error();
-                data
+    match scene_mut(scene) {
+        Ok(scene) => {
+            crate::warn!(scene, "Resource bindings are deprecated");
+            match unsafe { str_from_ptr(name) } {
+                Ok(name) => match scene.get_raw_resource(name) {
+                    Ok(data) => {
+                        clear_error();
+                        data
+                    }
+                    Err(error) => {
+                        set_scene_error(error);
+                        ptr::null_mut()
+                    }
+                },
+                Err(error) => {
+                    set_error(error);
+                    ptr::null_mut()
+                }
             }
-            Err(error) => {
-                set_scene_error(error);
-                ptr::null_mut()
-            }
-        },
-        (Err(error), _) | (_, Err(error)) => {
+        }
+        Err(error) => {
             set_error(error);
             ptr::null_mut()
         }
@@ -1116,6 +1134,8 @@ pub unsafe extern "C" fn wxr_method_destroy(method: *mut WXRMethod) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use crate::{
         bindings::wxr_error,
@@ -1266,6 +1286,15 @@ mod tests {
         );
         let value = unsafe { wxr_get_resource(scene, name.as_ptr()) };
         assert_eq!(unsafe { *(value as *const usize) }, 42);
+
+        let logs = unsafe { &*(scene as *const Scene) }
+            .iter_logs()
+            .collect::<Vec<_>>();
+        assert_eq!(logs.len(), 2);
+        assert!(logs.iter().all(|entry| {
+            entry.get_level() == crate::scene::logging::LogLevel::WARN
+                && entry.get_message() == "Resource bindings are deprecated"
+        }));
 
         unsafe {
             wxr_destroy_scene(scene);
