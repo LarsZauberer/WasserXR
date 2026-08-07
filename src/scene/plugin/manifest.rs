@@ -163,3 +163,185 @@ pub(crate) unsafe fn descriptor_slice<'a, T>(
     Ok(unsafe { slice::from_raw_parts(pointer, count) })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::c_void;
+
+    use crate::{
+        bindings::scene::{WXREntity, WXRScene},
+        scene::{
+            Scene,
+            assets::{WXRAssetDescriptor, WXRAssetFieldDescriptor},
+            component::{
+                WXRComponentDescriptor, WXRComponentFieldDescriptor,
+                methods::{
+                    WXRComponentMethodDescriptor, WXRMethodArgumentDescriptor, WXRMethodResult,
+                    WXRMethodStatus,
+                },
+            },
+            plugin::Version,
+            system::{WXRSystemDescriptor, WXRSystemEntityGroupDescriptor},
+        },
+    };
+
+    unsafe extern "C" fn component_creator(_scene: *mut Scene) -> *mut c_void {
+        std::ptr::dangling_mut::<u8>().cast()
+    }
+    unsafe extern "C" fn component_destroyer(_data: *mut c_void) {}
+    unsafe extern "C" fn getter(_data: *mut c_void) -> *mut c_void {
+        std::ptr::dangling_mut::<u8>().cast()
+    }
+    unsafe extern "C" fn asset_creator(_scene: *mut Scene, _data: *const c_char) -> *mut c_void {
+        std::ptr::dangling_mut::<u8>().cast()
+    }
+    unsafe extern "C" fn asset_destroyer(_scene: *mut Scene, _data: *mut c_void) {}
+    unsafe extern "C" fn method_callback(
+        _scene: *mut WXRScene,
+        _component: *mut c_void,
+        _arguments: *const *mut c_void,
+        _argument_count: usize,
+    ) -> WXRMethodResult {
+        WXRMethodResult {
+            status: WXRMethodStatus::Success,
+            action_error: 0,
+            value: std::ptr::null_mut(),
+        }
+    }
+    unsafe extern "C" fn system_runner(
+        _scene: *mut Scene,
+        _delta: f32,
+        _entities: *const *const WXREntity,
+        _counts: *const usize,
+        _group_count: usize,
+    ) {
+    }
+
+    fn slice_ptr<T>(values: &[T]) -> *const T {
+        if values.is_empty() {
+            std::ptr::null()
+        } else {
+            values.as_ptr()
+        }
+    }
+
+    fn component<'a>(
+        fields: &'a [WXRComponentFieldDescriptor],
+        methods: &'a [WXRComponentMethodDescriptor],
+    ) -> WXRComponentDescriptor {
+        WXRComponentDescriptor {
+            name: c"component".as_ptr(),
+            creator: Some(component_creator),
+            destroyer: Some(component_destroyer),
+            fields: slice_ptr(fields),
+            field_count: fields.len(),
+            methods: slice_ptr(methods),
+            method_count: methods.len(),
+        }
+    }
+
+    fn asset(fields: &[WXRAssetFieldDescriptor]) -> WXRAssetDescriptor {
+        WXRAssetDescriptor {
+            name: c"asset".as_ptr(),
+            creator: Some(asset_creator),
+            destroyer: Some(asset_destroyer),
+            fields: slice_ptr(fields),
+            field_count: fields.len(),
+        }
+    }
+
+    fn system(groups: &[WXRSystemEntityGroupDescriptor]) -> WXRSystemDescriptor {
+        WXRSystemDescriptor {
+            name: c"system".as_ptr(),
+            runner: Some(system_runner),
+            attach: None,
+            detach: None,
+            entity_groups: slice_ptr(groups),
+            entity_group_count: groups.len(),
+        }
+    }
+
+    #[test]
+    fn version_compatibility_boundaries() {
+        assert!(
+            Version {
+                major: 0,
+                minor: 2,
+                patch: 4
+            }
+            .is_compatible(Version {
+                major: 0,
+                minor: 2,
+                patch: 99
+            })
+        );
+        assert!(
+            !Version {
+                major: 0,
+                minor: 2,
+                patch: 4
+            }
+            .is_compatible(Version {
+                major: 0,
+                minor: 3,
+                patch: 0
+            })
+        );
+        assert!(
+            Version {
+                major: 1,
+                minor: 2,
+                patch: 4
+            }
+            .is_compatible(Version {
+                major: 1,
+                minor: 99,
+                patch: 99
+            })
+        );
+        assert!(
+            !Version {
+                major: 1,
+                minor: 2,
+                patch: 4
+            }
+            .is_compatible(Version {
+                major: 2,
+                minor: 0,
+                patch: 0
+            })
+        );
+    }
+
+    #[test]
+    fn pointer_count_requires_canonical_empty_pair() {
+        let value = 1_u8;
+        assert!(unsafe { descriptor_slice(&value, 0, "test") }.is_err());
+        assert!(unsafe { descriptor_slice::<u8>(std::ptr::null(), 1, "test") }.is_err());
+        assert!(
+            unsafe { descriptor_slice::<u8>(std::ptr::null(), 0, "test") }
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn names_reject_null_empty_and_invalid_utf8() {
+        static INVALID_UTF8: [u8; 2] = [0xff, 0];
+
+        assert_eq!(
+            unsafe { copy_name(std::ptr::null(), "test") },
+            Err(ManifestError::NullName("test"))
+        );
+        assert_eq!(
+            unsafe { copy_name(c"".as_ptr(), "test") },
+            Err(ManifestError::EmptyName("test"))
+        );
+        assert_eq!(
+            unsafe { copy_name(INVALID_UTF8.as_ptr().cast(), "test") },
+            Err(ManifestError::InvalidUtf8("test"))
+        );
+    }
+
+    #[test]
+    fn component_nested_shapes_callbacks_duplicates_and_flags_are_validated() {
