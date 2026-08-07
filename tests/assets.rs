@@ -10,8 +10,9 @@ use wasserxr::{
     asset_type, asset_type_creator,
     scene::{
         Scene, SceneError,
-        assets::{AssetError, Schema},
+        assets::{AssetError, WXRAssetDescriptor, WXRAssetFieldDescriptor},
         component::FieldType,
+        plugin::{Version, WXRPluginDescriptor},
     },
 };
 
@@ -45,6 +46,54 @@ fn create_macro_file_asset(_scene: &mut Scene, path: &str) -> Option<MacroFileAs
     })
 }
 
+static ASSET_FIELDS: [WXRAssetFieldDescriptor; 4] = [
+    WXRAssetFieldDescriptor {
+        name: c"content".as_ptr(),
+        field_type: FieldType::String as u32,
+        getter: Some(wxr_asset_get_MacroFileAsset_content),
+    },
+    WXRAssetFieldDescriptor {
+        name: c"bytes".as_ptr(),
+        field_type: FieldType::Usize as u32,
+        getter: Some(wxr_asset_get_MacroFileAsset_bytes),
+    },
+    WXRAssetFieldDescriptor {
+        name: c"position".as_ptr(),
+        field_type: FieldType::F64Vec2 as u32,
+        getter: Some(wxr_asset_get_MacroFileAsset_position),
+    },
+    WXRAssetFieldDescriptor {
+        name: c"available".as_ptr(),
+        field_type: FieldType::Boolean as u32,
+        getter: Some(wxr_asset_get_MacroFileAsset_available),
+    },
+];
+
+static ASSET_TYPES: [WXRAssetDescriptor; 1] = [WXRAssetDescriptor {
+    name: c"MacroFileAsset".as_ptr(),
+    creator: Some(wxr_asset_create_MacroFileAsset),
+    destroyer: Some(wxr_asset_destroy_MacroFileAsset),
+    fields: ASSET_FIELDS.as_ptr(),
+    field_count: ASSET_FIELDS.len(),
+}];
+
+static ASSET_PLUGIN: WXRPluginDescriptor = WXRPluginDescriptor {
+    version: Version::CURRENT,
+    name: c"asset-tests".as_ptr(),
+    components: std::ptr::null(),
+    component_count: 0,
+    assets: ASSET_TYPES.as_ptr(),
+    asset_count: ASSET_TYPES.len(),
+    systems: std::ptr::null(),
+    system_count: 0,
+};
+
+fn test_scene() -> Scene {
+    let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&ASSET_PLUGIN) }.unwrap();
+    scene
+}
+
 fn temp_asset_file(name: &str, content: &str) -> String {
     let path = std::env::temp_dir().join(format!("wasserxr-{name}-{}.txt", uuid::Uuid::now_v7()));
     fs::write(&path, content).unwrap();
@@ -68,7 +117,7 @@ fn asset_query_reads_file_content() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = temp_asset_file("content", "asset content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     let (content,) = scene
         .asset_query::<(&String,)>("MacroFileAsset", &path, &["content"])
@@ -84,7 +133,7 @@ fn asset_query_reuses_cached_asset() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = temp_asset_file("cache", "cached content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     {
         let (content,) = scene
@@ -109,7 +158,7 @@ fn ensure_asset_loaded_allows_read_only_asset_query() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = temp_asset_file("loaded", "loaded content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     scene.ensure_asset_loaded("MacroFileAsset", &path).unwrap();
 
@@ -128,7 +177,7 @@ fn asset_query_loaded_allows_multiple_shared_asset_borrows() {
 
     let first_path = temp_asset_file("first-loaded", "first content");
     let second_path = temp_asset_file("second-loaded", "second content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     scene
         .ensure_asset_loaded("MacroFileAsset", &first_path)
@@ -158,7 +207,7 @@ fn get_loaded_asset_data_strings_lists_loaded_assets() {
     let second_path = temp_asset_file("list-second", "second content");
     let mut expected = vec![first_path.clone(), second_path.clone()];
     expected.sort();
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     scene
         .ensure_asset_loaded("MacroFileAsset", &second_path)
@@ -183,7 +232,7 @@ fn asset_query_supports_tuple_fields() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = temp_asset_file("tuple", "tuple content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     let (content, bytes, available) = scene
         .asset_query::<(&String, &usize, &bool)>(
@@ -199,21 +248,12 @@ fn asset_query_supports_tuple_fields() {
 }
 
 #[test]
-fn asset_macro_registers_vector_and_boolean_field_types() {
-    let mut schema = Schema::default();
-    unsafe { wxr_asset_schema_MacroFileAsset(&mut schema) };
-
-    assert_eq!(schema.get_field_type("position"), Ok(FieldType::F64Vec2));
-    assert_eq!(schema.get_field_type("available"), Ok(FieldType::Boolean));
-}
-
-#[test]
 fn asset_query_rejects_missing_file() {
     let _guard = ASSET_TEST_LOCK.lock().unwrap();
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = missing_asset_file("invalid");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     assert_eq!(
         scene.asset_query::<(&String,)>("MacroFileAsset", &path, &["content"]),
@@ -227,7 +267,7 @@ fn asset_query_rejects_none_field() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
 
     let path = temp_asset_file("none", "hidden content");
-    let mut scene = Scene::new();
+    let mut scene = test_scene();
 
     assert_eq!(
         scene.asset_query::<(&String,)>("MacroFileAsset", &path, &["hidden"]),
