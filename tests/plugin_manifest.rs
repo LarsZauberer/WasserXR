@@ -241,3 +241,23 @@ fn empty_static_plugin_is_identified_and_unloaded_by_manifest_name() {
     assert!(scene.get_plugins().is_empty());
 }
 
+#[test]
+fn plugin_install_is_atomic_across_global_definition_collisions() {
+    let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&FIRST_PLUGIN) }.unwrap();
+
+    assert_eq!(
+        unsafe { scene.load_static_plugin(&COLLIDING_PLUGIN) },
+        Err(SceneError::Plugin(PluginError::DefinitionCollision(
+            "taken".to_owned()
+        )))
+    );
+    assert_eq!(scene.get_plugins(), ["first"]);
+
+    let entity = scene.add_entity();
+    assert!(matches!(
+        scene.add_component(entity, "new_component".to_owned()),
+        Err(SceneError::Component(_))
+    ));
+}
+
