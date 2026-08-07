@@ -1,6 +1,12 @@
 use std::hint::black_box;
 
-use wasserxr::scene::Scene;
+use wasserxr::scene::{
+    Scene,
+    assets::{WXRAssetDescriptor, WXRAssetFieldDescriptor},
+    component::{FieldType, WXRComponentDescriptor, WXRComponentFieldDescriptor},
+    plugin::{Version, WXRPluginDescriptor},
+    system::{WXRSystemDescriptor, WXRSystemEntityGroupDescriptor},
+};
 use wasserxr::{Uuid, asset_type, asset_type_creator, component, component_creator, system};
 
 pub(crate) const COMPONENT: &str = "BenchCounter";
@@ -78,12 +84,12 @@ fn increment(scene: &mut Scene, entities: &[Vec<Uuid>]) {
     }
 }
 
-#[system(entities = [["BenchCounter"]])]
+#[system]
 fn bench_system_one(scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     increment(scene, &entities);
 }
 
-#[system(entities = [["BenchCounter"]])]
+#[system]
 fn bench_system_two(scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     for entity in &entities[0] {
         let (value,) = scene
@@ -93,18 +99,103 @@ fn bench_system_two(scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     }
 }
 
-#[system(entities = [["BenchCounter"]])]
+#[system]
 fn bench_system_three(scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     increment(scene, &entities);
 }
 
-#[system(entities = [["BenchCounter"]])]
+#[system]
 fn bench_system_four(scene: &mut Scene, _delta: f32, entities: Vec<Vec<Uuid>>) {
     increment(scene, &entities);
 }
 
-pub(crate) fn entity_fixture(count: usize, with_components: bool) -> (Scene, Vec<Uuid>) {
+static COUNTER_FIELDS: [WXRComponentFieldDescriptor; 1] = [WXRComponentFieldDescriptor {
+    name: c"value".as_ptr(),
+    field_type: FieldType::I64 as u32,
+    getter: Some(wxr_get_BenchCounter_value),
+    mutable: 1,
+    serializer: Some(wxr_serialize_BenchCounter_value),
+    deserializer: Some(wxr_deserialize_BenchCounter_value),
+}];
+static COMPONENTS: [WXRComponentDescriptor; 1] = [WXRComponentDescriptor {
+    name: c"BenchCounter".as_ptr(),
+    creator: Some(wxr_create_BenchCounter),
+    destroyer: Some(wxr_destroy_BenchCounter),
+    fields: COUNTER_FIELDS.as_ptr(),
+    field_count: COUNTER_FIELDS.len(),
+    methods: std::ptr::null(),
+    method_count: 0,
+}];
+static ASSET_FIELDS: [WXRAssetFieldDescriptor; 1] = [WXRAssetFieldDescriptor {
+    name: c"value".as_ptr(),
+    field_type: FieldType::Usize as u32,
+    getter: Some(wxr_asset_get_BenchAsset_value),
+}];
+static ASSETS: [WXRAssetDescriptor; 1] = [WXRAssetDescriptor {
+    name: c"BenchAsset".as_ptr(),
+    creator: Some(wxr_asset_create_BenchAsset),
+    destroyer: Some(wxr_asset_destroy_BenchAsset),
+    fields: ASSET_FIELDS.as_ptr(),
+    field_count: ASSET_FIELDS.len(),
+}];
+const GROUP_COMPONENTS: [*const std::ffi::c_char; 1] = [c"BenchCounter".as_ptr()];
+static GROUPS: [WXRSystemEntityGroupDescriptor; 1] = [WXRSystemEntityGroupDescriptor {
+    components: GROUP_COMPONENTS.as_ptr(),
+    component_count: GROUP_COMPONENTS.len(),
+}];
+static SYSTEM_DESCRIPTORS: [WXRSystemDescriptor; 4] = [
+    WXRSystemDescriptor {
+        name: c"bench_system_one".as_ptr(),
+        runner: Some(wxr_system_bench_system_one),
+        attach: None,
+        detach: None,
+        entity_groups: GROUPS.as_ptr(),
+        entity_group_count: GROUPS.len(),
+    },
+    WXRSystemDescriptor {
+        name: c"bench_system_two".as_ptr(),
+        runner: Some(wxr_system_bench_system_two),
+        attach: None,
+        detach: None,
+        entity_groups: GROUPS.as_ptr(),
+        entity_group_count: GROUPS.len(),
+    },
+    WXRSystemDescriptor {
+        name: c"bench_system_three".as_ptr(),
+        runner: Some(wxr_system_bench_system_three),
+        attach: None,
+        detach: None,
+        entity_groups: GROUPS.as_ptr(),
+        entity_group_count: GROUPS.len(),
+    },
+    WXRSystemDescriptor {
+        name: c"bench_system_four".as_ptr(),
+        runner: Some(wxr_system_bench_system_four),
+        attach: None,
+        detach: None,
+        entity_groups: GROUPS.as_ptr(),
+        entity_group_count: GROUPS.len(),
+    },
+];
+static PLUGIN: WXRPluginDescriptor = WXRPluginDescriptor {
+    version: Version::CURRENT,
+    name: c"benchmark-fixtures".as_ptr(),
+    components: COMPONENTS.as_ptr(),
+    component_count: COMPONENTS.len(),
+    assets: ASSETS.as_ptr(),
+    asset_count: ASSETS.len(),
+    systems: SYSTEM_DESCRIPTORS.as_ptr(),
+    system_count: SYSTEM_DESCRIPTORS.len(),
+};
+
+pub(crate) fn fixture_scene() -> Scene {
     let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&PLUGIN) }.unwrap();
+    scene
+}
+
+pub(crate) fn entity_fixture(count: usize, with_components: bool) -> (Scene, Vec<Uuid>) {
+    let mut scene = fixture_scene();
     let mut entities = Vec::with_capacity(count);
     for _ in 0..count {
         let entity = scene.add_entity();
@@ -123,7 +214,7 @@ pub(crate) fn add_resource(scene: &mut Scene, index: usize) {
 }
 
 pub(crate) fn resource_fixture(count: usize) -> Scene {
-    let mut scene = Scene::new();
+    let mut scene = fixture_scene();
     for index in 0..count {
         add_resource(&mut scene, index);
     }
@@ -137,7 +228,7 @@ pub(crate) fn add_asset(scene: &mut Scene, index: usize) {
 }
 
 pub(crate) fn asset_fixture(count: usize) -> Scene {
-    let mut scene = Scene::new();
+    let mut scene = fixture_scene();
     for index in 0..count {
         add_asset(&mut scene, index);
     }

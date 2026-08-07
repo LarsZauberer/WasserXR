@@ -7,7 +7,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use wasserxr::scene::Scene;
 
 use super::fixtures::{
-    COMPONENT, SCALES, Scale, add_collections, add_systems, entity_fixture, representative_scene,
+    COMPONENT, SCALES, Scale, add_collections, add_systems, entity_fixture, fixture_scene,
+    representative_scene,
 };
 
 /// Times complete representative Scene construction from an empty Scene.
@@ -75,7 +76,7 @@ pub(crate) fn serialization(c: &mut Criterion) {
         });
         group.bench_function(BenchmarkId::new("deserialize", scale.entity_id()), |b| {
             b.iter_batched(
-                Scene::new,
+                fixture_scene,
                 |mut scene| black_box(scene.deserialize(black_box(&bytes)).unwrap()),
                 BatchSize::SmallInput,
             );
@@ -103,7 +104,7 @@ pub(crate) fn mixed(c: &mut Criterion) {
                     black_box(*value);
                 }
                 let bytes = scene.serialize().unwrap();
-                let mut loaded = Scene::new();
+                let mut loaded = fixture_scene();
                 loaded.deserialize(&bytes).unwrap();
                 for entity in entities.into_iter().take(scale.entities / 2) {
                     loaded.remove_entity(entity).unwrap();
@@ -158,7 +159,7 @@ fn dynamic_plugin() -> &'static str {
 #[cfg(target_os = "linux")]
 fn dynamic_scene(scale: Scale) -> Scene {
     let mut scene = Scene::new();
-    scene.load_plugin(dynamic_plugin().to_owned()).unwrap();
+    unsafe { scene.load_plugin(dynamic_plugin().to_owned()) }.unwrap();
     for _ in 0..scale.entities {
         let entity = scene.add_entity();
         scene
@@ -183,7 +184,7 @@ pub(crate) fn hotreload(c: &mut Criterion) {
         group.throughput(Throughput::Elements(scale.entities as u64));
         group.bench_function(BenchmarkId::new("reload", scale.entity_id()), |b| {
             let mut scene = dynamic_scene(scale);
-            b.iter(|| black_box(scene.reload().unwrap()));
+            b.iter(|| black_box(unsafe { scene.reload() }.unwrap()));
         });
     }
     group.finish();
