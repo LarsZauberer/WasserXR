@@ -1,8 +1,8 @@
 //! Procedural macros that generate WasserXR's C ABI plugin bindings.
 //!
 //! These macros let plugin authors write normal Rust systems, components, and
-//! asset types while emitting the `wxr_*` functions the runtime resolves from
-//! loaded plugins.
+//! asset types while generating callbacks referenced by an explicit plugin
+//! descriptor.
 
 mod asset;
 mod component;
@@ -23,7 +23,8 @@ use syn::{Error, ItemFn, ItemStruct, parse_macro_input};
 /// }
 /// ```
 ///
-/// The macro exports `wxr_attach_<system>`.
+/// The macro generates a public `wxr_attach_<system>` callback for a system
+/// descriptor to reference.
 #[proc_macro_attribute]
 pub fn attacher(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as system::LifecycleArgs);
@@ -45,7 +46,8 @@ pub fn attacher(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The macro exports `wxr_detach_<system>`.
+/// The macro generates a public `wxr_detach_<system>` callback for a system
+/// descriptor to reference.
 #[proc_macro_attribute]
 pub fn detacher(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as system::LifecycleArgs);
@@ -61,14 +63,14 @@ pub fn detacher(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Use it on a function with this shape:
 ///
 /// ```ignore
-/// #[system(entities = [["Transform", "Mesh"], ["Camera"]])]
+/// #[system]
 /// fn render(scene: &mut wasserxr::scene::Scene, delta: f32, entities: Vec<Vec<uuid::Uuid>>) {
-///     // `delta` is the seconds elapsed since this system last ran.
+///     // Entity groups are declared in WXRSystemDescriptor and preserve order.
 /// }
 /// ```
 ///
-/// The macro exports `WXR_GROUPS_<SYSTEM>`, `wxr_select_<system>`, and
-/// `wxr_system_<system>`. The first matching entity group wins.
+/// The macro generates a public `wxr_system_<system>` callback. Every entity
+/// group declared in the descriptor is populated independently.
 #[proc_macro_attribute]
 pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as system::Args);
@@ -84,8 +86,7 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Use it on a named-field struct:
 ///
 /// ```ignore
-/// #[component(no_schema)]
-/// #[virtual_field(x: f32, getter = custom_x_getter, mutable)]
+/// #[component]
 /// #[derive(Default)]
 /// struct MyComponent {
 ///     value: i32,
@@ -97,19 +98,20 @@ pub fn system(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The macro exports destroy and schema functions for the component.
-/// Use `#[component(no_schema)]` to skip schema generation and provide a custom
-/// `wxr_schema_<Component>` function yourself.
+/// The macro generates a destroyer and any requested field callbacks. Component
+/// fields, their types, mutability, and callback pointers are declared in the
+/// plugin descriptor.
 /// Fields without field function attributes get generated getter, serializer,
-/// and deserializer functions by default. Use `#[mutable]` to allow mutable
-/// references through `Scene::query_mut`. If at least one field function
-/// attribute is present, only the requested functions are generated. Field
-/// function attributes can also take a custom function path, for example
-/// `#[getter(my_getter)]`. Use `#[none]` to register a field without generated
-/// field functions. Generated serializers for complex fields use serde through
+/// and deserializer functions by default. `#[mutable]` ensures a getter is
+/// generated; the descriptor's `mutable` flag controls `Scene::query_mut`. If
+/// at least one field function attribute is present, only the requested
+/// functions are generated. Field function attributes can also take a custom
+/// function path, for example `#[getter(my_getter)]`. Use `#[none]` to generate
+/// no callbacks for a field.
+/// Generated serializers for complex fields use serde through
 /// bincode, so those field types must implement serde's serialize and
-/// deserialize traits. Use `#[virtual_field(name: Type, getter = my_getter)]`
-/// to register a queryable field that is not stored directly in the struct.
+/// deserialize traits. Structural or computed fields can be declared directly
+/// in the descriptor with custom callbacks.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as component::Args);
@@ -120,7 +122,7 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Turns a Rust function into an exported WasserXR component method binding.
+/// Turns a Rust function into a WasserXR component method callback.
 ///
 /// Use it on a function with this shape:
 ///
@@ -136,11 +138,13 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The macro exports `wxr_method_<Component>_<my_method_name>`. The first
+/// The macro generates `wxr_method_<Component>_<my_method_name>`. The first
 /// parameter must be exactly `&mut Scene`, the second a mutable reference to the
 /// component type named in the attribute, and every remaining parameter a
-/// mutable reference with a simple identifier name resolved by that name. The
-/// return type must be exactly `Result<*mut c_void, i32>`.
+/// argument is `&mut T` or `Option<&mut T>` with a simple identifier. The
+/// descriptor declares each argument's name, type, and nullability, and the
+/// host validates and orders arguments before calling the generated callback.
+/// The return type must be exactly `Result<*mut c_void, i32>`.
 #[proc_macro_attribute]
 pub fn method(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as method::Args);
@@ -153,7 +157,7 @@ pub fn method(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Wraps `fn create(scene: &mut Scene) -> Option<Component>` as a component creator.
 ///
-/// The macro exports `wxr_create_<Component>` and maps `None` to a null pointer.
+/// The macro generates `wxr_create_<Component>` and maps `None` to a null pointer.
 #[proc_macro_attribute]
 pub fn component_creator(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as component::CreatorArgs);
@@ -166,8 +170,9 @@ pub fn component_creator(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Turns a Rust asset struct into the C ABI functions WasserXR needs.
 ///
-/// The macro exports destroy, schema, and getter functions for the asset type.
-/// Every named field is queryable unless it has `#[none]`.
+/// The macro generates destroy and getter callbacks for the asset type. Every
+/// named field gets a getter unless it has `#[none]`; the plugin descriptor
+/// decides which generated callbacks form the public asset schema.
 #[proc_macro_attribute]
 pub fn asset_type(args: TokenStream, item: TokenStream) -> TokenStream {
     if !args.is_empty() {
@@ -188,8 +193,8 @@ pub fn asset_type(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Wraps `fn create(scene: &mut Scene, data: &str) -> Option<AssetType>` as an asset creator.
 ///
-/// The macro exports `wxr_asset_create_<AssetType>` and maps `None` or invalid
-/// C strings to a null pointer.
+/// The macro generates `wxr_asset_create_<AssetType>` and maps `None` or
+/// invalid C strings to a null pointer.
 #[proc_macro_attribute]
 pub fn asset_type_creator(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as asset::CreatorArgs);
