@@ -2,7 +2,6 @@
 
 pub mod logging;
 pub mod scene;
-pub mod schema;
 pub mod utils;
 
 use std::{
@@ -34,19 +33,17 @@ pub enum WXRSceneError {
     ResourceAlreadyExists,
     /// A system with this id is already registered.
     SystemAlreadyExists,
-    /// A plugin with this path is already loaded.
+    /// A plugin with this manifest name is already loaded.
     PluginAlreadyLoaded,
     /// The system id is not present in the scene.
     SystemNotFound,
     /// The resource name is not present in the scene.
     ResourceNotFound,
-    /// The plugin id or path is not present in the scene.
+    /// The plugin manifest name is not present in the scene.
     PluginNotFound,
-    /// The built-in static plugin cannot be unloaded.
-    StaticPluginUnload,
     /// The component id is not present on the requested entity.
     ComponentNotFound,
-    /// The owning plugin does not export the requested method symbol.
+    /// The requested component method is not declared by its plugin.
     MethodNotFound,
     /// A component field operation failed.
     ComponentFieldError,
@@ -54,9 +51,9 @@ pub enum WXRSceneError {
     AssetError,
     /// Loading a plugin failed.
     PluginLoading,
-    /// A system could not be created from any loaded plugin.
+    /// A system type is not declared by any loaded plugin.
     SystemCreation,
-    /// Component symbols could not be resolved from any loaded plugin.
+    /// A component type is not declared by any loaded plugin.
     ComponentCreation,
     /// The component creator returned a null pointer.
     ComponentCreatorFailed,
@@ -157,9 +154,7 @@ impl From<ComponentError> for WXRSceneError {
             ComponentError::AlreadyExists => Self::ComponentAlreadyExists,
             ComponentError::NotFound => Self::ComponentNotFound,
             ComponentError::MethodNotFound => Self::MethodNotFound,
-            ComponentError::TypeNotFound
-            | ComponentError::NoCreator(_)
-            | ComponentError::NoDestroyer(_) => Self::ComponentCreation,
+            ComponentError::TypeNotFound => Self::ComponentCreation,
             ComponentError::CreatorFailed => Self::ComponentCreatorFailed,
             ComponentError::FieldNotFound
             | ComponentError::FieldNoGetter
@@ -181,13 +176,14 @@ impl From<AssetError> for WXRSceneError {
 impl From<PluginError> for WXRSceneError {
     fn from(value: PluginError) -> Self {
         match value {
-            PluginError::AlreadyLoaded => Self::PluginAlreadyLoaded,
+            PluginError::AlreadyLoaded(_) => Self::PluginAlreadyLoaded,
             PluginError::NotLoaded => Self::PluginNotFound,
-            PluginError::StaticPluginCannotUnload => Self::StaticPluginUnload,
-            PluginError::LoadIo(_)
+            PluginError::DefinitionCollision(_)
+            | PluginError::LoadIo(_)
             | PluginError::Linking(_)
-            | PluginError::MissingSymbol(_)
-            | PluginError::InvalidSymbol(_) => Self::PluginLoading,
+            | PluginError::MissingManifestSymbol
+            | PluginError::InvalidPath(_)
+            | PluginError::InvalidManifest(_) => Self::PluginLoading,
         }
     }
 }
@@ -206,7 +202,7 @@ impl From<SystemError> for WXRSceneError {
         match value {
             SystemError::AlreadyExists => Self::SystemAlreadyExists,
             SystemError::NotFound => Self::SystemNotFound,
-            SystemError::TypeNotFound | SystemError::NoRunner(_) => Self::SystemCreation,
+            SystemError::TypeNotFound => Self::SystemCreation,
         }
     }
 }
