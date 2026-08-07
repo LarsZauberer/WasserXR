@@ -4,7 +4,7 @@ mod common;
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use wasserxr::scene::{Scene, SceneError, component::ComponentError};
+use wasserxr::scene::{SceneError, component::ComponentError};
 
 #[derive(Arbitrary, Debug)]
 struct Input {
@@ -25,7 +25,7 @@ const FIELDS: [&str; 7] = [
 // Run: cargo fuzz run field_text
 // Reproduce: cargo fuzz run field_text fuzz/artifacts/field_text/<artifact>
 fuzz_target!(|input: Input| {
-    let mut scene = Scene::new();
+    let mut scene = common::fixture_scene();
     let entity = scene.add_entity();
     scene
         .add_component(entity, "FuzzFields".to_owned())

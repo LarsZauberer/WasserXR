@@ -72,7 +72,7 @@ fn verify(scene: &Scene, entities: &[EntityModel], has_system: bool, resource: O
 // Run: cargo fuzz run scene_operations
 // Reproduce: cargo fuzz run scene_operations fuzz/artifacts/scene_operations/<artifact>
 fuzz_target!(|input: Input| {
-    let mut scene = Scene::new();
+    let mut scene = common::fixture_scene();
     let mut entities = Vec::<EntityModel>::new();
     let mut has_system = false;
     let mut resource = None;
