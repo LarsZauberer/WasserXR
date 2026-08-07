@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
-use wasserxr::{component, component_creator, scene::Scene};
+use wasserxr::{
+    component, component_creator,
+    scene::{
+        Scene,
+        component::{FieldType, WXRComponentDescriptor, WXRComponentFieldDescriptor},
+        plugin::{Version, WXRPluginDescriptor},
+    },
+};
 
 #[component]
 struct MyStruct {
@@ -23,9 +30,40 @@ fn create_my_struct(_scene: &mut Scene) -> Option<MyStruct> {
     })
 }
 
+static MY_STRUCT_FIELDS: [WXRComponentFieldDescriptor; 1] = [WXRComponentFieldDescriptor {
+    name: c"data".as_ptr(),
+    field_type: FieldType::Blob as u32,
+    getter: Some(wxr_get_MyStruct_data),
+    mutable: 1,
+    serializer: Some(wxr_serialize_MyStruct_data),
+    deserializer: Some(wxr_deserialize_MyStruct_data),
+}];
+
+static COMPONENTS: [WXRComponentDescriptor; 1] = [WXRComponentDescriptor {
+    name: c"MyStruct".as_ptr(),
+    creator: Some(wxr_create_MyStruct),
+    destroyer: Some(wxr_destroy_MyStruct),
+    fields: MY_STRUCT_FIELDS.as_ptr(),
+    field_count: MY_STRUCT_FIELDS.len(),
+    methods: std::ptr::null(),
+    method_count: 0,
+}];
+
+static PLUGIN: WXRPluginDescriptor = WXRPluginDescriptor {
+    version: Version::CURRENT,
+    name: c"serialization-tests".as_ptr(),
+    components: COMPONENTS.as_ptr(),
+    component_count: COMPONENTS.len(),
+    assets: std::ptr::null(),
+    asset_count: 0,
+    systems: std::ptr::null(),
+    system_count: 0,
+};
+
 #[test]
 fn test_nested_serialization() {
     let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&PLUGIN) }.unwrap();
 
     let entity = scene.add_entity();
     scene
@@ -42,7 +80,7 @@ fn test_nested_serialization() {
 
     let _ = data;
 
-    let _ = scene.reload();
+    unsafe { scene.reload() }.unwrap();
 
     let (data,) = scene
         .query::<(&Data,)>(entity, "MyStruct", &["data"])
