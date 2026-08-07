@@ -261,3 +261,16 @@ fn plugin_install_is_atomic_across_global_definition_collisions() {
     ));
 }
 
+#[test]
+fn static_plugin_definitions_are_removed_on_unload() {
+    let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&FIRST_PLUGIN) }.unwrap();
+    let entity = scene.add_entity();
+    scene.add_component(entity, "taken".to_owned()).unwrap();
+
+    scene.unload_plugin("first").unwrap();
+
+    assert!(!scene.has_component(entity, "taken"));
+    assert!(scene.add_component(entity, "taken".to_owned()).is_err());
+}
+
