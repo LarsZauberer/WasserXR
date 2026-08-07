@@ -586,3 +586,29 @@ mod tests {
 
     #[test]
     fn definitions_share_one_namespace_within_a_manifest() {
+        let component = WXRComponentDescriptor {
+            name: c"same".as_ptr(),
+            ..component(&[], &[])
+        };
+        let asset = WXRAssetDescriptor {
+            name: c"same".as_ptr(),
+            ..asset(&[])
+        };
+        let descriptor = WXRPluginDescriptor {
+            version: Version::CURRENT,
+            name: c"plugin".as_ptr(),
+            components: &component,
+            component_count: 1,
+            assets: &asset,
+            asset_count: 1,
+            systems: std::ptr::null(),
+            system_count: 0,
+        };
+        assert_eq!(
+            unsafe { ValidatedManifest::from_descriptor(&descriptor) }
+                .err()
+                .unwrap(),
+            ManifestError::DuplicateDefinition("same".to_owned())
+        );
+    }
+}
