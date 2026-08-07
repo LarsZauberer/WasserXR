@@ -1,7 +1,5 @@
 use std::{error::Error, fmt};
 
-use crate::scene::plugin::PluginError;
-
 /// Recoverable component lookup, creation, field, and serialization failures.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ComponentError {
@@ -15,8 +13,6 @@ pub enum ComponentError {
     FieldNotMutable,
     FieldNoSerializer,
     FieldNoDeserializer,
-    NoCreator(PluginError),
-    NoDestroyer(PluginError),
     FieldParsing,
     FieldValueParsing,
 }
@@ -34,10 +30,6 @@ impl fmt::Display for ComponentError {
             Self::FieldNotMutable => f.write_str("component field is not mutable"),
             Self::FieldNoSerializer => f.write_str("component field has no serializer"),
             Self::FieldNoDeserializer => f.write_str("component field has no deserializer"),
-            Self::NoCreator(error) => write!(f, "component creator could not be resolved: {error}"),
-            Self::NoDestroyer(error) => {
-                write!(f, "component destroyer could not be resolved: {error}")
-            }
             Self::FieldParsing => {
                 f.write_str("component query fields do not match the requested type")
             }
@@ -48,11 +40,4 @@ impl fmt::Display for ComponentError {
     }
 }
 
-impl Error for ComponentError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::NoCreator(error) | Self::NoDestroyer(error) => Some(error),
-            _ => None,
-        }
-    }
-}
+impl Error for ComponentError {}
