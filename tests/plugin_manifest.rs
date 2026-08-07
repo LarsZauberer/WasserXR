@@ -328,3 +328,16 @@ fn plugin_name_collisions_are_rejected() {
     );
 }
 
+#[test]
+fn unresolved_group_component_names_are_not_reserved() {
+    let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&LATE_SYSTEM_PLUGIN) }.unwrap();
+    unsafe { scene.load_static_plugin(&LATE_COMPONENT_PLUGIN) }.unwrap();
+
+    let entity = scene.add_entity();
+    scene
+        .add_component(entity, "late_component".to_owned())
+        .unwrap();
+    scene.add_system("late_system".to_owned(), 0).unwrap();
+    assert!(scene.tick());
+}
