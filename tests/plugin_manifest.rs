@@ -274,3 +274,28 @@ fn static_plugin_definitions_are_removed_on_unload() {
     assert!(scene.add_component(entity, "taken".to_owned()).is_err());
 }
 
+#[test]
+fn invalid_manifest_shapes_and_callbacks_are_rejected() {
+    for (descriptor, expected) in [
+        (
+            &INVALID_POINTER_COUNT_PLUGIN,
+            ManifestError::InvalidPointerCount("components"),
+        ),
+        (
+            &MISSING_CALLBACK_PLUGIN,
+            ManifestError::MissingCallback("component `missing_creator` creator".to_owned()),
+        ),
+        (
+            &UNKNOWN_FIELD_TYPE_PLUGIN,
+            ManifestError::UnknownFieldType(u32::MAX),
+        ),
+    ] {
+        let mut scene = Scene::new();
+        assert_eq!(
+            unsafe { scene.load_static_plugin(descriptor) },
+            Err(SceneError::Plugin(PluginError::InvalidManifest(expected)))
+        );
+        assert!(scene.get_plugins().is_empty());
+    }
+}
+
