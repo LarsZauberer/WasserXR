@@ -222,7 +222,7 @@ mod tests {
         let mut scene = Scene::new();
         scene.add_resource("counter".to_owned(), 1usize).unwrap();
 
-        scene.reload().unwrap();
+        unsafe { scene.reload() }.unwrap();
 
         assert_eq!(*scene.get_resource::<usize>("counter").unwrap(), 1);
     }

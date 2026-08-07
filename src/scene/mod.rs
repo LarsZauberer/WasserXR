@@ -31,17 +31,17 @@ pub mod system;
 pub use error::SceneError;
 
 use assets::{Asset, AssetType};
-use component::{Component, FieldType};
+use component::{Component, ComponentDefinition, FieldType};
 use entity::Entity;
 use plugin::Plugin;
 use query::{SceneQuery, SceneQueryMut};
 use resource::Resource;
-use system::System;
+use system::{System, SystemDefinition};
 
 use crate::bindings::scene::WXREntity;
 use crate::scene::logging::LogManager;
 use crate::scene::serialization::{ComponentData, SceneData, SystemData};
-use crate::scene::system::{Runner, Selector};
+use crate::scene::system::{Runner, SelectionGroup};
 use assets::AssetError;
 use component::ComponentError;
 use entity::EntityError;
@@ -49,6 +49,7 @@ use plugin::PluginError;
 use system::SystemError;
 
 use std::ffi::c_void;
+use std::rc::Rc;
 use std::{collections::HashMap, fs, path::Path};
 
 use uuid::Uuid;
@@ -79,7 +80,6 @@ pub struct Scene {
     systems: HashMap<String, System>,
     components: HashMap<Uuid, HashMap<String, Component>>,
     resources: HashMap<String, Resource>,
-    asset_types: HashMap<String, AssetType>,
     assets: HashMap<String, HashMap<String, Asset>>,
 
     // Deferred Calls
@@ -95,15 +95,12 @@ pub struct Scene {
 
 impl Default for Scene {
     fn default() -> Self {
-        let mut plugins = HashMap::new();
-        plugins.insert("".to_owned(), Plugin::new_static());
         Self {
             entities: HashMap::new(),
-            plugins,
+            plugins: HashMap::new(),
             systems: HashMap::new(),
             components: HashMap::new(),
             resources: HashMap::new(),
-            asset_types: HashMap::new(),
             assets: HashMap::new(),
 
             // Deferred Calls
@@ -126,9 +123,27 @@ impl Drop for Scene {
 }
 
 impl Scene {
-    /// Creates an empty scene with the built-in static plugin registered.
+    /// Creates an empty scene with no plugins registered.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn component_definition(&self, id: &str) -> Option<Rc<ComponentDefinition>> {
+        self.plugins
+            .values()
+            .find_map(|plugin| plugin.component_definition(id))
+    }
+
+    fn asset_definition(&self, id: &str) -> Option<Rc<AssetType>> {
+        self.plugins
+            .values()
+            .find_map(|plugin| plugin.asset_definition(id))
+    }
+
+    fn system_definition(&self, id: &str) -> Option<Rc<SystemDefinition>> {
+        self.plugins
+            .values()
+            .find_map(|plugin| plugin.system_definition(id))
     }
 
     fn debug_assert_consistent(&self) {
@@ -156,14 +171,14 @@ impl Scene {
                     .iter()
                     .all(|(id, component)| id == component.get_id()))
                 && self
-                    .asset_types
-                    .iter()
-                    .all(|(id, asset_type)| id == asset_type.get_id())
-                && self
                     .plugins
                     .iter()
                     .all(|(id, plugin)| id == plugin.get_id()),
             ecs_invariant_message!("storage keys must match their stored object IDs"),
+        );
+        debug_assert!(
+            self.plugins.values().all(Plugin::is_consistent),
+            ecs_invariant_message!("every manifest definition must reference its owning plugin"),
         );
         // Objects holding plugin function pointers never outlive their provider.
         debug_assert!(
@@ -172,18 +187,14 @@ impl Scene {
                 .all(|system| self.plugins.contains_key(system.get_plugin_id()))
                 && self.components.values().all(|components| components
                     .values()
-                    .all(|component| self.plugins.contains_key(component.get_plugin_id())))
-                && self
-                    .asset_types
-                    .values()
-                    .all(|asset_type| self.plugins.contains_key(asset_type.get_plugin_id())),
+                    .all(|component| self.plugins.contains_key(component.get_plugin_id()))),
             ecs_invariant_message!("every plugin-owned object must reference a loaded plugin"),
         );
         // Every loaded asset is owned by a currently registered asset type.
         debug_assert!(
             self.assets
                 .keys()
-                .all(|asset_type| self.asset_types.contains_key(asset_type)),
+                .all(|asset_type| self.asset_definition(asset_type).is_some()),
             ecs_invariant_message!("every loaded asset must have a registered asset type"),
         );
     }
@@ -319,64 +330,80 @@ impl Scene {
         self.deserialize(&data)
     }
 
-    /// Returns sorted ids for dynamically loaded plugins.
-    ///
-    /// The built-in static plugin is intentionally omitted.
+    /// Returns all loaded plugin manifest names in sorted order.
     pub fn get_plugins(&self) -> Vec<String> {
-        let mut plugins: Vec<String> = self
-            .plugins
-            .keys()
-            .filter(|id| !id.is_empty())
-            .cloned()
-            .collect();
+        let mut plugins: Vec<String> = self.plugins.keys().cloned().collect();
         plugins.sort();
         plugins
     }
 
-    fn plugins_dynamic_first(&self) -> impl Iterator<Item = &Plugin> {
-        self.plugins
-            .values()
-            .filter(|plugin| !plugin.get_id().is_empty())
-            .chain(
-                self.plugins
-                    .values()
-                    .filter(|plugin| plugin.get_id().is_empty()),
-            )
+    /// Loads, validates, and atomically registers a dynamic plugin.
+    ///
+    /// # Safety
+    /// The library must export an immutable process-lifetime `wxr_plugin`
+    /// descriptor graph. Every pointer/count pair must reference readable,
+    /// correctly aligned storage of the declared length, and every name must
+    /// reference a readable NUL-terminated string. All callbacks must use their
+    /// declared signatures, preserve Rust aliasing rules for every supplied
+    /// pointer, obey the documented allocation and ownership rules, return
+    /// valid ABI values with the required lifetimes, and never unwind across
+    /// the C boundary. A callback must not remove its currently executing
+    /// component, asset, or system, destroy the scene, or unload the plugin
+    /// whose code is executing. Registration from a callback is unsupported.
+    pub unsafe fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
+        let plugin = unsafe { Plugin::load_dynamic(path) }?;
+        self.install_plugin(plugin)
     }
 
-    /// Loads a dynamic plugin from `path`.
+    /// Validates and atomically registers a statically linked plugin.
     ///
-    /// Plugin symbols are resolved lazily when systems, components, or asset
-    /// types are created.
-    pub fn load_plugin(&mut self, path: String) -> Result<(), SceneError> {
-        if self.plugins.contains_key(&path) {
-            return Err(PluginError::AlreadyLoaded.into());
+    /// # Safety
+    /// The descriptor graph and callbacks must satisfy the same contract as
+    /// [`Self::load_plugin`].
+    pub unsafe fn load_static_plugin(
+        &mut self,
+        descriptor: &'static plugin::WXRPluginDescriptor,
+    ) -> Result<(), SceneError> {
+        let plugin = unsafe { Plugin::load_static(descriptor) }?;
+        self.install_plugin(plugin)
+    }
+
+    fn install_plugin(&mut self, plugin: Plugin) -> Result<(), SceneError> {
+        let name = plugin.get_id().to_owned();
+        if self.plugins.contains_key(&name) {
+            return Err(PluginError::AlreadyLoaded(name).into());
+        }
+        // Check if there are any Plugin Definition Collisions (no two plugins should create the
+        // same definition)
+        for definition in plugin.definition_names() {
+            if self
+                .plugins
+                .values()
+                .any(|loaded| loaded.has_definition(definition))
+            {
+                return Err(PluginError::DefinitionCollision(definition.to_owned()).into());
+            }
         }
 
-        let plugin = Plugin::new(path.to_owned())?;
-        self.plugins.insert(path.to_owned(), plugin);
+        self.plugins.insert(name.clone(), plugin);
 
-        crate::info!(self, "Plugin `{}` loaded", path);
+        crate::info!(self, "Plugin `{}` loaded", name);
         self.debug_assert_consistent();
         Ok(())
     }
 
-    /// Unloads a dynamic plugin and removes its systems, asset types, and components.
+    /// Unregisters a plugin by manifest name and removes its live objects.
     ///
     /// If called while a system is ticking, the unload is deferred until the
     /// current system runner returns.
-    pub fn unload_plugin(&mut self, path: &str) -> Result<(), SceneError> {
+    pub fn unload_plugin(&mut self, name: &str) -> Result<(), SceneError> {
         if self.is_ticking {
             self.deferred_calls
-                .push(DeferredCall::UnloadPlugin(path.to_owned()));
+                .push(DeferredCall::UnloadPlugin(name.to_owned()));
             return Ok(());
         }
 
-        if path.is_empty() {
-            return Err(PluginError::StaticPluginCannotUnload.into());
-        }
-
-        if !self.plugins.contains_key(path) {
+        if !self.plugins.contains_key(name) {
             return Err(PluginError::NotLoaded.into());
         }
 
@@ -384,7 +411,7 @@ impl Scene {
         let systems: Vec<String> = self
             .systems
             .values()
-            .filter(|system| system.get_plugin_id() == path)
+            .filter(|system| system.get_plugin_id() == name)
             .map(|system| system.get_id().to_owned())
             .collect();
 
@@ -393,15 +420,13 @@ impl Scene {
         }
 
         // Unload all the asset types that are still loaded with this plugin
-        let asset_types: Vec<String> = self
-            .asset_types
-            .values()
-            .filter(|asset_type| asset_type.get_plugin_id() == path)
-            .map(|asset_type| asset_type.get_id().to_owned())
+        let asset_names: Vec<String> = self.plugins[name]
+            .asset_names()
+            .map(str::to_owned)
             .collect();
 
-        for asset_type in asset_types {
-            self.remove_asset_type(&asset_type);
+        for asset_type in asset_names {
+            self.remove_assets_for_type(&asset_type);
         }
 
         // Unload all the components that are still loaded with this plugin
@@ -411,7 +436,7 @@ impl Scene {
             .flat_map(|(entity, components)| {
                 components
                     .values()
-                    .filter(|component| component.get_plugin_id() == path)
+                    .filter(|component| component.get_plugin_id() == name)
                     .map(|component| (*entity, component.get_id().to_owned()))
                     .collect::<Vec<_>>()
             })
@@ -424,23 +449,21 @@ impl Scene {
         assert!(
             self.systems
                 .values()
-                .all(|system| system.get_plugin_id() != path)
+                .all(|system| system.get_plugin_id() != name)
                 && self.components.values().all(|components| components
                     .values()
-                    .all(|component| component.get_plugin_id() != path))
-                && self
-                    .asset_types
-                    .values()
-                    .all(|asset_type| asset_type.get_plugin_id() != path),
+                    .all(|component| component.get_plugin_id() != name))
+                && self.plugins[name]
+                    .asset_names()
+                    .all(|asset_type| !self.assets.contains_key(asset_type)),
             ecs_invariant_message!(
                 "every plugin-owned object must be removed before unloading its function pointers"
             ),
         );
 
-        // Remove the plugin itself
-        self.plugins.remove(path);
+        self.plugins.remove(name);
 
-        crate::info!(self, "Plugin `{}` unloaded", path);
+        crate::info!(self, "Plugin `{}` unloaded", name);
         self.debug_assert_consistent();
         Ok(())
     }
@@ -535,8 +558,8 @@ impl Scene {
 
     /// Adds a system by id and priority.
     ///
-    /// The runtime looks for `wxr_system_<id>` and its companion binding
-    /// functions in loaded plugins. Higher priorities run earlier in `tick`.
+    /// The system must be declared by a loaded plugin descriptor. Higher
+    /// priorities run earlier in `tick`.
     pub fn add_system(&mut self, id: String, priority: usize) -> Result<(), SceneError> {
         self.add_system_from_data(SystemData { id, priority })
     }
@@ -548,28 +571,26 @@ impl Scene {
             return Err(SceneError::System(SystemError::AlreadyExists));
         }
 
-        let system: Option<System> = self
-            .plugins_dynamic_first()
-            .find_map(|plugin| System::deserialize(data.clone(), plugin, self).ok());
-
-        match system {
-            Some(system) => {
-                let system_id = system.get_id().to_owned();
-                let attacher = system.get_attacher();
-                self.set_logger(system_id.clone());
-                unsafe {
-                    attacher(self as *mut Scene);
-                }
-                self.reset_logger();
-                crate::info!(self, "System `{}` added", system_id);
-                self.systems.insert(id, system);
-                Ok(())
-            }
-            None => {
-                crate::warn!(self, "System `{}` could not be created", id);
-                Err(SceneError::System(SystemError::TypeNotFound))
-            }
+        let definition = self
+            .system_definition(&id)
+            .ok_or(SceneError::System(SystemError::TypeNotFound))?;
+        let system = System::new(Rc::clone(&definition), data.priority);
+        let system_id = system.get_id().to_owned();
+        self.set_logger(system_id.clone());
+        if let Some(attacher) = system.get_attacher() {
+            unsafe { attacher(self as *mut Scene) };
         }
+        self.reset_logger();
+        if !self
+            .system_definition(&id)
+            .as_ref()
+            .is_some_and(|current| Rc::ptr_eq(current, &definition))
+        {
+            return Err(SceneError::System(SystemError::TypeNotFound));
+        }
+        crate::info!(self, "System `{}` added", system_id);
+        self.systems.insert(id, system);
+        Ok(())
     }
 
     /// Removes a system and calls its detach binding.
@@ -588,10 +609,9 @@ impl Scene {
             return Err(SceneError::System(SystemError::NotFound));
         };
 
-        let detacher = system.get_detacher();
         self.set_logger(id.to_owned());
-        unsafe {
-            detacher(self as *mut Scene);
+        if let Some(detacher) = system.get_detacher() {
+            unsafe { detacher(self as *mut Scene) };
         }
         self.reset_logger();
         crate::info!(self, "System `{}` removed", id);
@@ -637,8 +657,7 @@ impl Scene {
 
     /// Adds a component to an entity by component id.
     ///
-    /// The runtime resolves `wxr_create_<component>`, `wxr_destroy_<component>`,
-    /// and schema bindings from loaded plugins.
+    /// The component must be declared by a loaded plugin descriptor.
     pub fn add_component(
         &mut self,
         entity_id: Uuid,
@@ -676,28 +695,29 @@ impl Scene {
             return Err(SceneError::Component(ComponentError::AlreadyExists));
         }
 
-        // Build the plugin
-        let Some(component_symbols) = self
-            .plugins_dynamic_first()
-            .find_map(|plugin| Component::symbols(&component_id, plugin, self).ok())
-        else {
+        let Some(definition) = self.component_definition(&component_id) else {
             crate::warn!(self, "Component `{}` could not be created", component_id);
             return Err(SceneError::Component(ComponentError::TypeNotFound));
         };
 
-        let Some(mut component) =
-            Component::create_with(component_id.clone(), component_symbols, self)
-        else {
+        let Some(mut component) = Component::create(Rc::clone(&definition), self) else {
             crate::warn!(self, "Component creator for `{}` failed", component_id);
             return Err(SceneError::Component(ComponentError::CreatorFailed));
         };
 
         component.deserialize_fields(data.fields);
 
-        let entity_components = self
-            .components
-            .get_mut(&entity_id)
-            .expect("entity was checked before creating the component");
+        if !self
+            .component_definition(&component_id)
+            .as_ref()
+            .is_some_and(|current| Rc::ptr_eq(current, &definition))
+        {
+            return Err(SceneError::Component(ComponentError::TypeNotFound));
+        }
+
+        let Some(entity_components) = self.components.get_mut(&entity_id) else {
+            return Err(SceneError::Entity(EntityError::NotFound));
+        };
         let component_id_for_log = component_id.clone();
         entity_components.insert(component_id, component);
 
@@ -784,22 +804,25 @@ impl Scene {
     /// and then the serialized state is deserialized. If called while a system
     /// is ticking, the reload is deferred until the current system runner
     /// returns.
-    pub fn reload(&mut self) -> Result<(), SceneError> {
+    ///
+    /// # Safety
+    /// Every dynamically loaded plugin must continue to export a valid static
+    /// descriptor graph and uphold all callback contracts described by
+    /// [`Self::load_plugin`] when its source path is loaded again.
+    pub unsafe fn reload(&mut self) -> Result<(), SceneError> {
         if self.is_ticking {
             self.deferred_calls.push(DeferredCall::Reload);
             return Ok(());
         }
 
         // Serialize the important data
-        let plugins: Vec<String> = self
+        let plugins: Vec<(String, String)> = self
             .plugins
-            .keys()
-            .filter_map(|id| {
-                if id.is_empty() {
-                    None
-                } else {
-                    Some(id.to_owned())
-                }
+            .iter()
+            .filter_map(|(name, plugin)| {
+                plugin
+                    .source_path()
+                    .map(|path| (name.clone(), path.to_owned()))
             })
             .collect();
         let serialization_data = self.serialize().inspect_err(|error| {
@@ -807,29 +830,22 @@ impl Scene {
         })?;
 
         // Remove the plugins
-        for plugin in &plugins {
-            if self.unload_plugin(plugin).is_err() {
-                crate::error!(self, "Failed to unload the plugin: {}", plugin);
+        for (name, _) in &plugins {
+            if self.unload_plugin(name).is_err() {
+                crate::error!(self, "Failed to unload the plugin: {}", name);
             }
         }
 
         // Reload the plugins
-        for plugin in plugins {
-            match self.load_plugin(plugin) {
-                Err(SceneError::Plugin(PluginError::InvalidSymbol(_))) => {
-                    crate::error!(
-                        self,
-                        "Symbol has a null byte during the plugin reloading! This is a bug! Please report this!"
-                    );
-                }
-                Err(SceneError::Plugin(PluginError::Linking(err))) => {
-                    crate::error!(
-                        self,
-                        "Plugin has a linking error while hotreloading: {}",
-                        err
-                    );
-                }
-                _ => {}
+        for (_, path) in plugins {
+            if let Err(SceneError::Plugin(PluginError::Linking(err))) =
+                unsafe { self.load_plugin(path) }
+            {
+                crate::error!(
+                    self,
+                    "Plugin has a linking error while hotreloading: {}",
+                    err
+                );
             }
         }
 
@@ -844,8 +860,7 @@ impl Scene {
     fn run_system(
         &mut self,
         system_id: &str,
-        groups: usize,
-        selector: Selector,
+        groups: &[SelectionGroup],
         runner: Runner,
         delta: f32,
     ) {
@@ -854,26 +869,49 @@ impl Scene {
             ecs_invariant_message!("systems may only run during a scene tick"),
         );
         self.set_logger(system_id.to_owned());
-        let mut entities: Vec<Vec<WXREntity>> = vec![Vec::new(); groups];
-
-        for i in self.entities.keys() {
-            let entity = WXREntity::from_uuid(*i);
-            let selection = unsafe { selector(self as *const Scene, entity) };
-            if selection >= 0
-                && let Some(group) = entities.get_mut(selection as usize)
-            {
-                group.push(entity);
+        let mut entities: Vec<Vec<WXREntity>> = Vec::with_capacity(groups.len());
+        for group in groups {
+            let mut selected = Vec::new();
+            for entity in self.entities.keys().copied() {
+                let entity_components = &self.components[&entity];
+                if group.matches(|component| entity_components.contains_key(component)) {
+                    selected.push(WXREntity::from_uuid(entity));
+                }
             }
+            entities.push(selected);
         }
 
         let sizes: Vec<usize> = entities.iter().map(|group| group.len()).collect();
-        let sizes_ptr = sizes.as_ptr();
+        let sizes_ptr = if sizes.is_empty() {
+            std::ptr::null()
+        } else {
+            sizes.as_ptr()
+        };
 
-        let entities: Vec<*const WXREntity> = entities.iter().map(|group| group.as_ptr()).collect();
-        let entities_ptr = entities.as_ptr();
+        let entity_pointers: Vec<*const WXREntity> = entities
+            .iter()
+            .map(|group| {
+                if group.is_empty() {
+                    std::ptr::null()
+                } else {
+                    group.as_ptr()
+                }
+            })
+            .collect();
+        let entities_ptr = if entity_pointers.is_empty() {
+            std::ptr::null()
+        } else {
+            entity_pointers.as_ptr()
+        };
 
         unsafe {
-            runner(self as *mut Scene, delta, entities_ptr, sizes_ptr);
+            runner(
+                self as *mut Scene,
+                delta,
+                entities_ptr,
+                sizes_ptr,
+                groups.len(),
+            );
         }
         self.reset_logger();
     }
@@ -890,7 +928,7 @@ impl Scene {
         for deferred_call in deferred_calls {
             match deferred_call {
                 DeferredCall::Reload => {
-                    if self.reload().is_err() {
+                    if unsafe { self.reload() }.is_err() {
                         crate::warn!(
                             self,
                             "Reload Failed! The scene has maybe been partially been reloaded."
@@ -938,13 +976,11 @@ impl Scene {
                 continue;
             };
 
-            let groups = system.get_groups();
-            let selector = system.get_selector();
-            let runner = system.get_runner();
+            let definition = system.definition();
             let delta = system.tick_delta();
 
             self.is_ticking = true;
-            self.run_system(&system_id, groups, selector, runner, delta);
+            self.run_system(&system_id, definition.groups(), definition.runner(), delta);
             self.is_ticking = false;
 
             self.run_deferred_calls();
@@ -1096,7 +1132,7 @@ impl Scene {
         }
     }
 
-    fn remove_asset_type(&mut self, asset_type: &str) {
+    fn remove_assets_for_type(&mut self, asset_type: &str) {
         if let Some(assets) = self.assets.remove(asset_type) {
             for asset in assets.into_values() {
                 self.set_logger(asset_type.to_owned());
@@ -1105,33 +1141,13 @@ impl Scene {
             }
         }
 
-        self.asset_types.remove(asset_type);
-        crate::info!(self, "Asset type `{}` removed", asset_type);
-    }
-
-    fn ensure_asset_type(&mut self, asset_type: &str) -> Result<(), SceneError> {
-        if self.asset_types.contains_key(asset_type) {
-            return Ok(());
-        }
-
-        let asset_type_data = self
-            .plugins_dynamic_first()
-            .find_map(|plugin| AssetType::new(asset_type.to_owned(), plugin, self).ok());
-
-        let Some(asset_type_data) = asset_type_data else {
-            crate::warn!(self, "Asset type `{}` could not be created", asset_type);
-            return Err(SceneError::Asset(AssetError::AssetTypeNotFound));
-        };
-
-        self.asset_types
-            .insert(asset_type.to_owned(), asset_type_data);
-        Ok(())
+        crate::info!(self, "Assets of type `{}` removed", asset_type);
     }
 
     /// Ensures an asset of `asset_type` with `data_string` is loaded.
     ///
-    /// If the asset already exists, this is a no-op. Otherwise the asset type
-    /// is registered on demand and its creator binding is called.
+    /// If the asset already exists, this is a no-op. Otherwise its
+    /// manifest-registered asset creator is called.
     pub fn ensure_asset_loaded(
         &mut self,
         asset_type: &str,
@@ -1145,18 +1161,21 @@ impl Scene {
             return Ok(());
         }
 
-        self.ensure_asset_type(asset_type)?;
-
-        let (creator, destroyer) = {
-            let asset_type_data = self
-                .asset_types
-                .get(asset_type)
-                .ok_or(SceneError::Asset(AssetError::AssetTypeNotFound))?;
-            (asset_type_data.creator(), asset_type_data.destroyer())
-        };
-
-        let asset = AssetType::create_asset_with(self, data_string, creator, destroyer)
+        let asset_type_data = self
+            .asset_definition(asset_type)
+            .ok_or(SceneError::Asset(AssetError::AssetTypeNotFound))?;
+        let asset = asset_type_data
+            .create_asset(self, data_string)
             .map_err(SceneError::Asset)?;
+
+        if !self
+            .asset_definition(asset_type)
+            .as_ref()
+            .is_some_and(|current| Rc::ptr_eq(current, &asset_type_data))
+        {
+            asset.destroy(self);
+            return Err(SceneError::Asset(AssetError::AssetTypeNotFound));
+        }
 
         self.assets
             .entry(asset_type.to_owned())
@@ -1212,7 +1231,7 @@ impl Scene {
         data_string: &str,
         fields: &[&str],
     ) -> Result<Vec<*mut c_void>, SceneError> {
-        let Some(asset_type_data) = self.asset_types.get(asset_type) else {
+        let Some(asset_type_data) = self.asset_definition(asset_type) else {
             crate::debug!(
                 self,
                 "Asset type `{}` was not found for field lookup",
