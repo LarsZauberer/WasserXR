@@ -1,7 +1,6 @@
 use quote::{format_ident, quote};
 use syn::{
     Error, FnArg, ItemFn, Pat, Path, Result, ReturnType, Type,
-    ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
@@ -23,8 +22,8 @@ impl Parse for Args {
 
 struct Argument {
     ident: syn::Ident,
-    name: String,
     ty: Type,
+    nullable: bool,
 }
 
 pub(crate) fn expand(args: Args, item: ItemFn) -> Result<proc_macro2::TokenStream> {
@@ -75,57 +74,68 @@ pub(crate) fn expand(args: Args, item: ItemFn) -> Result<proc_macro2::TokenStrea
     let symbol = format!("wxr_method_{}_{}", component_id, method_name);
     let wrapper_ident = format_ident!("{}", symbol);
 
-    let resolvers = arguments.iter().map(|argument| {
+    let resolvers = arguments.iter().enumerate().map(|(index, argument)| {
         let ident = &argument.ident;
         let ty = &argument.ty;
-        let name = std::ffi::CString::new(argument.name.as_str())
-            .expect("argument name cannot contain a null byte");
-        let name = proc_macro2::Literal::c_string(&name);
-
-        quote! {
-            let #ident: &mut #ty =
-                match ::wasserxr::scene::component::methods::find_argument::<#ty>(
-                    __arguments,
-                    #name,
-                ) {
-                    Ok(__reference) => __reference,
-                    Err(__status) => {
-                        return ::wasserxr::scene::component::methods::WXRMethodResult {
-                            status: __status,
-                            action_error: 0,
-                            value: ::std::ptr::null_mut(),
-                        };
-                    }
+        if argument.nullable {
+            quote! {
+                let #ident: ::std::option::Option<&mut #ty> =
+                    if __arguments[#index].is_null() {
+                        ::std::option::Option::None
+                    } else {
+                        ::std::option::Option::Some(unsafe {
+                            &mut *(__arguments[#index] as *mut #ty)
+                        })
+                    };
+            }
+        } else {
+            quote! {
+                if __arguments[#index].is_null() {
+                    return ::wasserxr::scene::component::methods::WXRMethodResult {
+                        status: ::wasserxr::scene::component::methods::WXRMethodStatus::NullArgument,
+                        action_error: 0,
+                        value: ::std::ptr::null_mut(),
+                    };
+                }
+                let #ident: &mut #ty = unsafe {
+                    &mut *(__arguments[#index] as *mut #ty)
                 };
+            }
         }
     });
 
     let argument_idents = arguments.iter().map(|argument| &argument.ident);
+    let argument_count = arguments.len();
 
     Ok(quote! {
         #item
 
         #[doc = "Generated WasserXR component method binding."]
         #[doc = ""]
-        #[doc = "Resolves named arguments, casts them unchecked, and calls the annotated method."]
+        #[doc = "Casts manifest-ordered arguments and calls the annotated method."]
         #[doc = ""]
         #[doc = "# Safety"]
         #[doc = ""]
         #[doc = "`scene` and `component` must be valid pointers for this component type, and every argument pointer must point to the type declared by the matching parameter."]
-        #[unsafe(export_name = #symbol)]
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #wrapper_ident(
             scene: *mut ::wasserxr::bindings::scene::WXRScene,
             component: *mut ::std::ffi::c_void,
-            arguments: *const ::wasserxr::scene::component::methods::WXRArgument,
+            arguments: *const *mut ::std::ffi::c_void,
             argument_count: usize,
         ) -> ::wasserxr::scene::component::methods::WXRMethodResult {
-            let __arguments: &[::wasserxr::scene::component::methods::WXRArgument] =
-                if arguments.is_null() {
-                    &[]
-                } else {
-                    unsafe { ::std::slice::from_raw_parts(arguments, argument_count) }
+            if argument_count != #argument_count || (argument_count != 0 && arguments.is_null()) {
+                return ::wasserxr::scene::component::methods::WXRMethodResult {
+                    status: ::wasserxr::scene::component::methods::WXRMethodStatus::MissingArgument,
+                    action_error: 0,
+                    value: ::std::ptr::null_mut(),
                 };
+            }
+            let __arguments: &[*mut ::std::ffi::c_void] = if argument_count == 0 {
+                &[]
+            } else {
+                unsafe { ::std::slice::from_raw_parts(arguments, argument_count) }
+            };
 
             #(#resolvers)*
 
@@ -178,7 +188,8 @@ fn expect_mut_reference_named(input: &FnArg, name: &str, message: &str) -> Resul
 }
 
 fn parse_argument(input: &FnArg) -> Result<Argument> {
-    let message = "method arguments must be `&mut T` with a simple identifier name";
+    let message =
+        "method arguments must be `&mut T` or `Option<&mut T>` with a simple identifier name";
 
     let FnArg::Typed(pat_type) = input else {
         return Err(Error::new_spanned(input, message));
@@ -192,22 +203,43 @@ fn parse_argument(input: &FnArg) -> Result<Argument> {
         return Err(Error::new_spanned(input, message));
     }
 
-    let Type::Reference(reference) = pat_type.ty.as_ref() else {
-        return Err(Error::new_spanned(input, message));
-    };
-
-    if reference.mutability.is_none() {
-        return Err(Error::new_spanned(input, message));
-    }
-
     let ident = pat_ident.ident.clone();
-    let name = ident.unraw().to_string();
+    let (ty, nullable) = parse_argument_type(pat_type.ty.as_ref())
+        .ok_or_else(|| Error::new_spanned(input, message))?;
 
     Ok(Argument {
         ident,
-        name,
-        ty: reference.elem.as_ref().clone(),
+        ty,
+        nullable,
     })
+}
+
+fn parse_argument_type(ty: &Type) -> Option<(Type, bool)> {
+    if let Type::Reference(reference) = ty
+        && reference.mutability.is_some()
+    {
+        return Some((reference.elem.as_ref().clone(), false));
+    }
+
+    let Type::Path(path) = ty else {
+        return None;
+    };
+    let segment = path.path.segments.last()?;
+    if segment.ident != "Option" {
+        return None;
+    }
+    let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    if arguments.args.len() != 1 {
+        return None;
+    }
+    let syn::GenericArgument::Type(Type::Reference(reference)) = arguments.args.first()? else {
+        return None;
+    };
+    reference
+        .mutability
+        .map(|_| (reference.elem.as_ref().clone(), true))
 }
 
 fn check_return_type(output: &ReturnType) -> Result<()> {
