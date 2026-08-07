@@ -316,3 +316,15 @@ fn incompatible_version_and_order_insensitive_duplicate_groups_are_rejected() {
     );
 }
 
+#[test]
+fn plugin_name_collisions_are_rejected() {
+    let mut scene = Scene::new();
+    unsafe { scene.load_static_plugin(&EMPTY_PLUGIN) }.unwrap();
+    assert_eq!(
+        unsafe { scene.load_static_plugin(&EMPTY_PLUGIN) },
+        Err(SceneError::Plugin(PluginError::AlreadyLoaded(
+            "empty".to_owned()
+        )))
+    );
+}
+
