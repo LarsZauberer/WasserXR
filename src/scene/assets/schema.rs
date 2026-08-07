@@ -10,10 +10,10 @@ use crate::scene::{
 
 /// Runtime schema for one asset type.
 ///
-/// Asset schemas are filled by generated `wxr_asset_schema_<Asset>` functions
-/// and later used by `Scene::asset_query`.
-#[derive(Default)]
-pub struct Schema {
+/// Asset schemas are built from validated manifest descriptors and later used
+/// by `Scene::asset_query`. They are not exposed across the plugin ABI.
+#[derive(Clone, Default)]
+pub(crate) struct Schema {
     fields: HashMap<String, Field>,
 }
 
@@ -23,8 +23,8 @@ impl Schema {
         Schema::default()
     }
 
-    /// Registers one asset field in the schema.
-    pub fn add_field(&mut self, id: String, type_hint: FieldType, getter: Option<Getter>) {
+    /// Adds one already-validated manifest field to the internal schema.
+    pub(crate) fn add_field(&mut self, id: String, type_hint: FieldType, getter: Option<Getter>) {
         let field = Field::new(type_hint, getter);
         self.fields.insert(id, field);
     }
@@ -34,19 +34,6 @@ impl Schema {
             Some(field) => field.get_getter(),
             None => Err(AssetError::FieldNotFound),
         }
-    }
-
-    /// Returns the type hint for a registered asset field.
-    pub fn get_field_type(&self, id: &str) -> Result<FieldType, AssetError> {
-        match self.fields.get(id) {
-            Some(field) => Ok(field.get_type()),
-            None => Err(AssetError::FieldNotFound),
-        }
-    }
-
-    /// Returns all registered field ids.
-    pub fn get_fields(&self) -> Vec<&String> {
-        self.fields.keys().collect()
     }
 
     pub(crate) unsafe fn get_field_ptr(
@@ -68,17 +55,6 @@ mod tests {
     }
 
     #[test]
-    fn schema_add_field() {
-        let mut schema = Schema::new();
-
-        schema.add_field("content".to_owned(), FieldType::String, Some(test_getter));
-
-        let fields = schema.get_fields();
-        assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0], "content");
-    }
-
-    #[test]
     fn schema_get_getter_for_existing_field() {
         let mut schema = Schema::new();
 
@@ -95,14 +71,5 @@ mod tests {
         let schema = Schema::new();
 
         assert_eq!(schema.get_getter("content"), Err(AssetError::FieldNotFound));
-    }
-
-    #[test]
-    fn schema_get_field_type() {
-        let mut schema = Schema::new();
-
-        schema.add_field("content".to_owned(), FieldType::String, Some(test_getter));
-
-        assert_eq!(schema.get_field_type("content"), Ok(FieldType::String));
     }
 }
