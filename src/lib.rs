@@ -22,9 +22,12 @@
 //!     let mut scene = Scene::new();
 //!     scene.register_callback_logger(file_logger);
 //!
-//!     scene
-//!         .load_plugin("./libwasserxr_core.so".to_owned())
-//!         .expect("Failed to load core plugin");
+//!     // Safety: this application trusts the core plugin to uphold every
+//!     // callback contract declared by its static descriptor.
+//!     unsafe {
+//!         scene.load_plugin("./libwasserxr_core.so".to_owned())
+//!     }
+//!     .expect("Failed to load core plugin");
 //!
 //!     scene
 //!         .add_system("console".to_owned(), 100)

@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CString, c_char, c_void},
+    ffi::{c_char, c_void},
     ptr, slice,
 };
 
@@ -12,9 +12,8 @@ use crate::{
     },
     scene::{
         Scene,
-        component::methods::{
-            Method, WXRArgument, WXRMethodResult, WXRMethodStatus, find_argument,
-        },
+        component::methods::{Method, WXRArgument, WXRMethodResult, WXRMethodStatus},
+        plugin::WXRPluginDescriptor,
     },
 };
 
@@ -230,10 +229,15 @@ pub unsafe extern "C" fn wxr_load(scene: *mut WXRScene, path: *const c_char) -> 
 }
 
 /// Loads a dynamic plugin by path.
+///
+/// # Safety
+/// `scene` must be a live scene and `path` a valid NUL-terminated UTF-8 string.
+/// The loaded library's descriptor graph and callbacks must satisfy the full
+/// contract documented by [`Scene::load_plugin`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_load_plugin(scene: *mut WXRScene, path: *const c_char) -> i32 {
     match (scene_mut(scene), unsafe { str_from_ptr(path) }) {
-        (Ok(scene), Ok(path)) => result_code(scene.load_plugin(path.to_owned())),
+        (Ok(scene), Ok(path)) => result_code(unsafe { scene.load_plugin(path.to_owned()) }),
         (Err(error), _) | (_, Err(error)) => {
             set_error(error);
             -1
@@ -241,7 +245,26 @@ pub unsafe extern "C" fn wxr_load_plugin(scene: *mut WXRScene, path: *const c_ch
     }
 }
 
-/// Returns the sorted paths of dynamically loaded plugins.
+/// Loads a statically linked plugin descriptor.
+///
+/// # Safety
+/// `scene` must be a live scene. `descriptor` and its complete pointer graph
+/// must remain immutable and readable for the process lifetime, and every
+/// callback must have its declared ABI, uphold its pointer and ownership
+/// contract, return valid ABI values, and never unwind across the C boundary.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wxr_load_static_plugin(
+    scene: *mut WXRScene,
+    descriptor: *const WXRPluginDescriptor,
+) -> i32 {
+    let (Ok(scene), Some(descriptor)) = (scene_mut(scene), unsafe { descriptor.as_ref() }) else {
+        set_error(WXRSceneError::NullPointer);
+        return -1;
+    };
+    result_code(unsafe { scene.load_static_plugin(descriptor) })
+}
+
+/// Returns the sorted manifest names of all loaded plugins.
 #[unsafe(no_mangle)]
 pub extern "C" fn wxr_get_plugins(scene: *const WXRScene) -> WXRStringArray {
     match scene_ref(scene) {
@@ -259,11 +282,14 @@ pub extern "C" fn wxr_get_plugins(scene: *const WXRScene) -> WXRStringArray {
     }
 }
 
-/// Unloads a dynamic plugin by path.
+/// Unloads a plugin by manifest name.
+///
+/// # Safety
+/// `scene` must be a live scene and `name` a valid NUL-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wxr_unload_plugin(scene: *mut WXRScene, path: *const c_char) -> i32 {
-    match (scene_mut(scene), unsafe { str_from_ptr(path) }) {
-        (Ok(scene), Ok(path)) => result_code(scene.unload_plugin(path)),
+pub unsafe extern "C" fn wxr_unload_plugin(scene: *mut WXRScene, name: *const c_char) -> i32 {
+    match (scene_mut(scene), unsafe { str_from_ptr(name) }) {
+        (Ok(scene), Ok(name)) => result_code(scene.unload_plugin(name)),
         (Err(error), _) | (_, Err(error)) => {
             set_error(error);
             -1
@@ -565,9 +591,9 @@ pub unsafe extern "C" fn wxr_has_component(
 
 /// Hot-reloads all dynamic plugins while preserving serializable scene state.
 #[unsafe(no_mangle)]
-pub extern "C" fn wxr_reload(scene: *mut WXRScene) -> i32 {
+pub unsafe extern "C" fn wxr_reload(scene: *mut WXRScene) -> i32 {
     match scene_mut(scene) {
-        Ok(scene) => result_code(scene.reload()),
+        Ok(scene) => result_code(unsafe { scene.reload() }),
         Err(error) => {
             set_error(error);
             -1
@@ -1009,53 +1035,24 @@ pub extern "C" fn wxr_should_exit(scene: *mut WXRScene) -> i32 {
     }
 }
 
-/// Opaque heap-allocated handle for a resolved component method.
-pub type WXRMethod = Method<'static>;
-
-/// Resolves a named argument for C callers.
+/// Opaque heap-allocated handle for a component method invocation.
 ///
-/// On success the resolved data pointer is written to `value_out` and
-/// `WXRMethodStatus::Success` is returned. The lookup has the same semantics as
-/// the macro-generated wrappers: a missing name yields `MissingArgument`, a
-/// duplicated name yields `DuplicateArgument`, unknown names are ignored, and
-/// data pointers are not checked for null.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wxr_method_find_argument(
-    arguments: *const WXRArgument,
-    argument_count: usize,
-    name: *const c_char,
-    value_out: *mut *mut c_void,
-) -> WXRMethodStatus {
-    let arguments = if arguments.is_null() {
-        &[][..]
-    } else {
-        unsafe { slice::from_raw_parts(arguments, argument_count) }
-    };
-
-    // A name that cannot be read matches nothing, so it is reported as missing.
-    let Ok(name) = (unsafe { str_from_ptr(name) })
-        .and_then(|name| CString::new(name).map_err(|_| WXRSceneError::InvalidString))
-    else {
-        return WXRMethodStatus::MissingArgument;
-    };
-
-    match find_argument::<c_void>(arguments, &name) {
-        Ok(value) => {
-            if !value_out.is_null() {
-                unsafe {
-                    *value_out = value as *mut c_void;
-                }
-            }
-            WXRMethodStatus::Success
-        }
-        Err(status) => status,
-    }
+/// The target is resolved again when the handle is called, so removing the
+/// component or unloading its plugin turns the call into an error instead of
+/// retaining a dangling component pointer.
+pub struct WXRMethod {
+    scene: *mut WXRScene,
+    entity: Uuid,
+    component_id: String,
+    method_name: String,
+    arguments: Vec<WXRArgument>,
 }
 
 /// Resolves a component method handle, or null on failure.
 ///
 /// On failure the error is recorded for `wxr_error`. The returned handle must
 /// be consumed by `wxr_method_call` or abandoned with `wxr_method_destroy`.
+/// The scene must remain alive until either operation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_get_method(
     scene: *mut WXRScene,
@@ -1070,9 +1067,15 @@ pub unsafe extern "C" fn wxr_get_method(
     ) {
         (Ok(scene_ref), Ok(component_id), Ok(method_name)) => {
             match scene_ref.resolve_method(entity.into_uuid(), component_id, method_name) {
-                Ok((function, component)) => {
+                Ok(_) => {
                     clear_error();
-                    Box::into_raw(Box::new(Method::new(scene, function, component)))
+                    Box::into_raw(Box::new(WXRMethod {
+                        scene,
+                        entity: entity.into_uuid(),
+                        component_id: component_id.to_owned(),
+                        method_name: method_name.to_owned(),
+                        arguments: Vec::new(),
+                    }))
                 }
                 Err(error) => {
                     set_scene_error(error);
@@ -1091,14 +1094,25 @@ pub unsafe extern "C" fn wxr_get_method(
 ///
 /// The name and data stay owned by the caller and must remain valid until the
 /// consuming `wxr_method_call`.
+///
+/// # Safety
+/// `method` must be a live method handle, `name` must be a valid
+/// NUL-terminated UTF-8 string, and non-null `data` must match `field_type`.
+/// Null `data` is allowed and is checked against the manifest declaration when
+/// the method is called.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wxr_method_argument(
     method: *mut WXRMethod,
     name: *const c_char,
+    field_type: u32,
     data: *mut c_void,
 ) {
     if let Some(method) = unsafe { method.as_mut() } {
-        method.push_argument(name, data);
+        method.arguments.push(WXRArgument {
+            name,
+            field_type,
+            data,
+        });
     }
 }
 
@@ -1115,10 +1129,36 @@ pub unsafe extern "C" fn wxr_method_call(method: *mut WXRMethod) -> WXRMethodRes
         };
     }
 
-    let result = unsafe { (*method).call() };
-    unsafe {
-        wxr_method_destroy(method);
-    }
+    let method = unsafe { Box::from_raw(method) };
+    let result = match scene_mut(method.scene) {
+        Ok(scene) => {
+            match scene.resolve_method(method.entity, &method.component_id, &method.method_name) {
+                Ok((definition, component)) => {
+                    let mut resolved = Method::new(method.scene, definition, component);
+                    for argument in method.arguments {
+                        resolved.push_argument(argument.name, argument.field_type, argument.data);
+                    }
+                    resolved.call()
+                }
+                Err(error) => {
+                    set_scene_error(error);
+                    WXRMethodResult {
+                        status: WXRMethodStatus::ActionError,
+                        action_error: -1,
+                        value: ptr::null_mut(),
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            set_error(error);
+            WXRMethodResult {
+                status: WXRMethodStatus::ActionError,
+                action_error: -1,
+                value: ptr::null_mut(),
+            }
+        }
+    };
     result
 }
 
@@ -1131,7 +1171,6 @@ pub unsafe extern "C" fn wxr_method_destroy(method: *mut WXRMethod) {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     #![allow(deprecated)]
@@ -1139,7 +1178,12 @@ mod tests {
     use super::*;
     use crate::{
         bindings::wxr_error,
-        scene::component::{FieldType, Schema, SerializedBytes},
+        scene::{
+            component::{
+                FieldType, SerializedBytes, WXRComponentDescriptor, WXRComponentFieldDescriptor,
+            },
+            plugin::{Version, WXRPluginDescriptor},
+        },
     };
     use std::{
         ffi::{CStr, CString},
@@ -1170,31 +1214,43 @@ mod tests {
         }
     }
 
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_create_ffi_counter(_scene: *mut Scene) -> *mut c_void {
+    unsafe extern "C" fn create_ffi_counter(_scene: *mut Scene) -> *mut c_void {
         Box::into_raw(Box::new(FfiCounter { value: 5 })) as *mut c_void
     }
 
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_destroy_ffi_counter(data: *mut c_void) {
+    unsafe extern "C" fn destroy_ffi_counter(data: *mut c_void) {
         unsafe {
             drop(Box::from_raw(data as *mut FfiCounter));
         }
     }
 
-    #[unsafe(no_mangle)]
-    unsafe extern "C" fn wxr_schema_ffi_counter(schema: *mut Schema) {
-        unsafe {
-            (*schema).add_field(
-                "value".to_owned(),
-                FieldType::I64,
-                Some(ffi_counter_getter),
-                true,
-                Some(ffi_counter_serializer),
-                Some(ffi_counter_deserializer),
-            );
-        }
-    }
+    static FFI_COUNTER_FIELDS: [WXRComponentFieldDescriptor; 1] = [WXRComponentFieldDescriptor {
+        name: c"value".as_ptr(),
+        field_type: FieldType::I64 as u32,
+        getter: Some(ffi_counter_getter),
+        mutable: 1,
+        serializer: Some(ffi_counter_serializer),
+        deserializer: Some(ffi_counter_deserializer),
+    }];
+    static FFI_COMPONENTS: [WXRComponentDescriptor; 1] = [WXRComponentDescriptor {
+        name: c"ffi_counter".as_ptr(),
+        creator: Some(create_ffi_counter),
+        destroyer: Some(destroy_ffi_counter),
+        fields: FFI_COUNTER_FIELDS.as_ptr(),
+        field_count: FFI_COUNTER_FIELDS.len(),
+        methods: ptr::null(),
+        method_count: 0,
+    }];
+    static FFI_PLUGIN: WXRPluginDescriptor = WXRPluginDescriptor {
+        version: Version::CURRENT,
+        name: c"bindings-tests".as_ptr(),
+        components: FFI_COMPONENTS.as_ptr(),
+        component_count: FFI_COMPONENTS.len(),
+        assets: ptr::null(),
+        asset_count: 0,
+        systems: ptr::null(),
+        system_count: 0,
+    };
 
     static RESOURCE_DROPS: AtomicUsize = AtomicUsize::new(0);
 
@@ -1249,6 +1305,11 @@ mod tests {
     #[test]
     fn scene_query_returns_field_pointer() {
         let scene = wxr_create_scene();
+        unsafe {
+            (&mut *(scene as *mut Scene))
+                .load_static_plugin(&FFI_PLUGIN)
+                .unwrap();
+        }
         let entity = wxr_add_entity(scene);
         let component = CString::new("ffi_counter").unwrap();
         let field = CString::new("value").unwrap();
@@ -1300,36 +1361,5 @@ mod tests {
             wxr_destroy_scene(scene);
         }
         assert_eq!(RESOURCE_DROPS.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn c_find_argument_writes_value_out() {
-        let mut value = 42_i32;
-        let name = CString::new("force").unwrap();
-        let arguments = [WXRArgument {
-            name: name.as_ptr(),
-            data: &mut value as *mut i32 as *mut c_void,
-        }];
-        let mut out: *mut c_void = ptr::null_mut();
-
-        let status = unsafe {
-            wxr_method_find_argument(arguments.as_ptr(), arguments.len(), name.as_ptr(), &mut out)
-        };
-
-        assert_eq!(status, WXRMethodStatus::Success);
-        assert_eq!(unsafe { *(out as *const i32) }, 42);
-    }
-
-    #[test]
-    fn c_find_argument_reports_missing() {
-        let name = CString::new("force").unwrap();
-        let arguments: [WXRArgument; 0] = [];
-        let mut out: *mut c_void = ptr::null_mut();
-
-        let status =
-            unsafe { wxr_method_find_argument(arguments.as_ptr(), 0, name.as_ptr(), &mut out) };
-
-        assert_eq!(status, WXRMethodStatus::MissingArgument);
-        assert!(out.is_null());
     }
 }
