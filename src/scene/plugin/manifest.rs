@@ -345,3 +345,151 @@ mod tests {
 
     #[test]
     fn component_nested_shapes_callbacks_duplicates_and_flags_are_validated() {
+        let mut descriptor = component(&[], &[]);
+        descriptor.fields = std::ptr::dangling();
+        assert_eq!(
+            unsafe { descriptor.validate("plugin") }.err().unwrap(),
+            ManifestError::InvalidPointerCount("component fields")
+        );
+        descriptor = component(&[], &[]);
+        descriptor.destroyer = None;
+        assert!(matches!(
+            unsafe { descriptor.validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+
+        let mutable_without_getter = [WXRComponentFieldDescriptor {
+            name: c"field".as_ptr(),
+            field_type: FieldType::U8 as u32,
+            getter: None,
+            mutable: 1,
+            serializer: None,
+            deserializer: None,
+        }];
+        assert_eq!(
+            unsafe { component(&mutable_without_getter, &[]).validate("plugin") }
+                .err()
+                .unwrap(),
+            ManifestError::MutableWithoutGetter("field".to_owned())
+        );
+
+        let duplicate_fields = [
+            WXRComponentFieldDescriptor {
+                name: c"field".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                getter: Some(getter),
+                mutable: 0,
+                serializer: None,
+                deserializer: None,
+            },
+            WXRComponentFieldDescriptor {
+                name: c"field".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                getter: Some(getter),
+                mutable: 0,
+                serializer: None,
+                deserializer: None,
+            },
+        ];
+        assert!(matches!(
+            unsafe { component(&duplicate_fields, &[]).validate("plugin") },
+            Err(ManifestError::DuplicateName {
+                kind: "component field",
+                ..
+            })
+        ));
+
+        let arguments = [
+            WXRMethodArgumentDescriptor {
+                name: c"argument".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                nullable: 9,
+            },
+            WXRMethodArgumentDescriptor {
+                name: c"argument".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                nullable: 0,
+            },
+        ];
+        let method = WXRComponentMethodDescriptor {
+            name: c"method".as_ptr(),
+            callback: Some(method_callback),
+            arguments: arguments.as_ptr(),
+            argument_count: arguments.len(),
+        };
+        assert!(matches!(
+            unsafe { component(&[], &[method]).validate("plugin") },
+            Err(ManifestError::DuplicateName {
+                kind: "method argument",
+                ..
+            })
+        ));
+
+        let argument = [WXRMethodArgumentDescriptor {
+            name: c"argument".as_ptr(),
+            field_type: FieldType::U8 as u32,
+            nullable: 9,
+        }];
+        let methods = [WXRComponentMethodDescriptor {
+            name: c"method".as_ptr(),
+            callback: Some(method_callback),
+            arguments: argument.as_ptr(),
+            argument_count: 1,
+        }];
+        let fields = [WXRComponentFieldDescriptor {
+            name: c"field".as_ptr(),
+            field_type: FieldType::U8 as u32,
+            getter: Some(getter),
+            mutable: 9,
+            serializer: None,
+            deserializer: None,
+        }];
+        let validated = unsafe { component(&fields, &methods).validate("plugin") }
+            .expect("nonzero flags are accepted");
+        assert!(validated.field_is_mutable("field"));
+        assert!(validated.method_argument_is_nullable("method", 0));
+
+        let missing_method = [WXRComponentMethodDescriptor {
+            name: c"method".as_ptr(),
+            callback: None,
+            arguments: std::ptr::null(),
+            argument_count: 0,
+        }];
+        assert!(matches!(
+            unsafe { component(&[], &missing_method).validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+
+        let mut invalid_arguments = WXRComponentMethodDescriptor {
+            name: c"method".as_ptr(),
+            callback: Some(method_callback),
+            arguments: std::ptr::dangling(),
+            argument_count: 0,
+        };
+        assert_eq!(
+            unsafe { component(&[], std::slice::from_ref(&invalid_arguments)).validate("plugin") }
+                .err()
+                .unwrap(),
+            ManifestError::InvalidPointerCount("method arguments")
+        );
+        invalid_arguments.arguments = std::ptr::null();
+        let duplicate_methods = [
+            invalid_arguments,
+            WXRComponentMethodDescriptor {
+                name: c"method".as_ptr(),
+                callback: Some(method_callback),
+                arguments: std::ptr::null(),
+                argument_count: 0,
+            },
+        ];
+        assert!(matches!(
+            unsafe { component(&[], &duplicate_methods).validate("plugin") },
+            Err(ManifestError::DuplicateName {
+                kind: "component method",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn asset_and_system_require_nested_callbacks_and_canonical_pairs() {
