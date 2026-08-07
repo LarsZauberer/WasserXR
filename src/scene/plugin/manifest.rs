@@ -493,3 +493,96 @@ mod tests {
 
     #[test]
     fn asset_and_system_require_nested_callbacks_and_canonical_pairs() {
+        let field = [WXRAssetFieldDescriptor {
+            name: c"field".as_ptr(),
+            field_type: FieldType::U8 as u32,
+            getter: None,
+        }];
+        assert!(matches!(
+            unsafe { asset(&field).validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+        let mut descriptor = asset(&[]);
+        descriptor.creator = None;
+        assert!(matches!(
+            unsafe { descriptor.validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+        descriptor.creator = Some(asset_creator);
+        descriptor.destroyer = None;
+        assert!(matches!(
+            unsafe { descriptor.validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+        descriptor.destroyer = Some(asset_destroyer);
+        descriptor.fields = std::ptr::dangling();
+        assert_eq!(
+            unsafe { descriptor.validate("plugin") }.err().unwrap(),
+            ManifestError::InvalidPointerCount("asset fields")
+        );
+        let duplicate_asset_fields = [
+            WXRAssetFieldDescriptor {
+                name: c"field".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                getter: Some(getter),
+            },
+            WXRAssetFieldDescriptor {
+                name: c"field".as_ptr(),
+                field_type: FieldType::U8 as u32,
+                getter: Some(getter),
+            },
+        ];
+        assert!(matches!(
+            unsafe { asset(&duplicate_asset_fields).validate("plugin") },
+            Err(ManifestError::DuplicateName {
+                kind: "asset field",
+                ..
+            })
+        ));
+        descriptor.creator = Some(asset_creator);
+        descriptor.destroyer = None;
+        assert!(matches!(
+            unsafe { descriptor.validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+
+        let mut system_descriptor = system(&[]);
+        system_descriptor.runner = None;
+        assert!(matches!(
+            unsafe { system_descriptor.validate("plugin") },
+            Err(ManifestError::MissingCallback(_))
+        ));
+        system_descriptor = system(&[]);
+        system_descriptor.entity_groups = std::ptr::dangling();
+        assert_eq!(
+            unsafe { system_descriptor.validate("plugin") }
+                .err()
+                .unwrap(),
+            ManifestError::InvalidPointerCount("system entity groups")
+        );
+        let invalid_group = [WXRSystemEntityGroupDescriptor {
+            components: std::ptr::dangling(),
+            component_count: 0,
+        }];
+        assert_eq!(
+            unsafe { system(&invalid_group).validate("plugin") }
+                .err()
+                .unwrap(),
+            ManifestError::InvalidPointerCount("entity group components")
+        );
+        let duplicate_names = [c"component".as_ptr(), c"component".as_ptr()];
+        let duplicate_group = [WXRSystemEntityGroupDescriptor {
+            components: duplicate_names.as_ptr(),
+            component_count: duplicate_names.len(),
+        }];
+        assert!(matches!(
+            unsafe { system(&duplicate_group).validate("plugin") },
+            Err(ManifestError::DuplicateName {
+                kind: "entity group component",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn definitions_share_one_namespace_within_a_manifest() {
