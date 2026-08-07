@@ -299,3 +299,20 @@ fn invalid_manifest_shapes_and_callbacks_are_rejected() {
     }
 }
 
+#[test]
+fn incompatible_version_and_order_insensitive_duplicate_groups_are_rejected() {
+    let mut scene = Scene::new();
+    assert!(matches!(
+        unsafe { scene.load_static_plugin(&INCOMPATIBLE_PLUGIN) },
+        Err(SceneError::Plugin(PluginError::InvalidManifest(
+            ManifestError::IncompatibleVersion { .. }
+        )))
+    ));
+    assert_eq!(
+        unsafe { scene.load_static_plugin(&DUPLICATE_GROUP_PLUGIN) },
+        Err(SceneError::Plugin(PluginError::InvalidManifest(
+            ManifestError::DuplicateEntityGroup("duplicate_groups".to_owned())
+        )))
+    );
+}
+
