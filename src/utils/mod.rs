@@ -1,8 +1,7 @@
 //! Utility helpers shared by WasserXR runtime modules.
 
-/// Filesystem path resolution helpers.
+/// Filesystem path resolution helpers for enhanced asset loading
 pub mod paths;
-/// Fixed-capacity ring buffer.
+
+/// Simple Ring Buffer of fixed size
 pub mod ring;
-/// String conversion helpers.
-pub mod strings;
