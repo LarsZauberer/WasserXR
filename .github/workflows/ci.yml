@@ -48,9 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - scene_decode
-          - field_text
-          - scene_operations
+          - basic
 
     steps:
       - name: Checkout
