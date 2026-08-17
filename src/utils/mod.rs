@@ -5,3 +5,6 @@ pub mod paths;
 
 /// Simple Ring Buffer of fixed size
 pub mod ring;
+
+/// Simple module which carries macros for internal use in WasserXR
+pub(crate) mod macros;
