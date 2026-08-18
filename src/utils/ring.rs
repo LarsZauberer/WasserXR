@@ -98,6 +98,12 @@ impl<T> Ring<T> {
         self.data.iter()
     }
 
+    /// Same as [Self::iter] but with mutable references
+    pub fn iter_mut(&mut self) -> std::collections::vec_deque::IterMut<'_, T> {
+        self.check();
+        self.data.iter_mut()
+    }
+
     /// Returns the element at the index as a reference.
     /// In case that the index is out of bounds, it will return None
     ///
@@ -119,6 +125,21 @@ impl<T> Ring<T> {
         self.check();
         self.data.clear();
     }
+
+    // Return the capacity of the ring.
+    pub fn cap(&self) -> usize {
+        self.check();
+        self.cap
+    }
+
+    // Return the length of the ring. It counts the amount of all the allocated objects.
+    //
+    // Invariant: [`Self::len()`] <= [`Self::cap()`]
+    pub fn len(&self) -> usize {
+        self.check();
+        self.data.len()
+    }
+
     /// Invariant checker to see if all the ring object is consistent with the invariants. The
     /// invariants are described in [`Self`]
     fn check(&self) {
