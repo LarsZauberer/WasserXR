@@ -17,6 +17,8 @@ macro_rules! invariant_msg {
     };
 }
 
+pub(crate) use invariant_msg;
+
 #[cfg(test)]
 mod test {
     #[test]
