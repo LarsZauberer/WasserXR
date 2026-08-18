@@ -2,6 +2,8 @@
 
 use std::collections::VecDeque;
 
+use crate::utils::macros::invariant_msg;
+
 #[derive(Debug, Clone)]
 /// The `Ring` struct defines a simple ring buffer with a fixed size, where you can push stuff onto. Until the
 /// capacity is reached, it acts similar to a normal `Vec`. After the capacity has been reached, new
@@ -9,6 +11,10 @@ use std::collections::VecDeque;
 ///
 /// It has a generic type which specifies what kind of type is stored inside of the ring. The
 /// generic type doesn't require any trait implementations.
+///
+/// ## Invariants
+///
+/// - There are at most capacity many elements in the ring: [`Self::len()`] <= [`Self::cap()`]
 ///
 /// ## Usage
 ///
@@ -63,6 +69,7 @@ impl<T> Ring<T> {
     /// assert_eq!(ring.get(1), None);
     /// ```
     pub fn set_capacity(&mut self, cap: usize) {
+        self.check();
         if cap < self.cap {
             // New cap is smaller (need to throw away old log)
             for _ in 0..(self.cap - cap) {
@@ -71,19 +78,23 @@ impl<T> Ring<T> {
         }
 
         self.cap = cap;
+        self.check();
     }
 
     /// Appends a value to the ring. If the ring has reached it's capacity and the element would be
     /// larger than it's capacity, it drops the oldest value if the ring is full.
     pub fn push(&mut self, value: T) {
+        self.check();
         if self.data.len() == self.cap {
             self.data.pop_front();
         }
         self.data.push_back(value);
+        self.check();
     }
 
     /// Iterates over values from oldest to newest.
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
+        self.check();
         self.data.iter()
     }
 
@@ -93,16 +104,28 @@ impl<T> Ring<T> {
     /// Index 0 will point to the oldest element that is still stored with respect to the ring
     /// capacity.
     pub fn get(&self, index: usize) -> Option<&T> {
+        self.check();
         self.data.get(index)
     }
 
     /// Operates the same way as [`Self::get`] but instead returns a mutable reference.
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.check();
         self.data.get_mut(index)
     }
 
     /// Drops all the elements in the ring. It keeps the same capacity.
     pub fn clear(&mut self) {
+        self.check();
         self.data.clear();
+    }
+    /// Invariant checker to see if all the ring object is consistent with the invariants. The
+    /// invariants are described in [`Self`]
+    fn check(&self) {
+        debug_assert!(
+            self.data.len() <= self.cap,
+            "{}",
+            invariant_msg!("Ring data length is larger than the capacity")
+        );
     }
 }
