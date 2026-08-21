@@ -17,6 +17,12 @@ pub trait AsyncRuntimeHandle {
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static;
+
+    /// Spawns a blocking task on the runtime.
+    fn spawn_blocking<F, R>(&self, func: F) -> impl Future<Output = Result<R, Self::JoinError>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static;
 }
 
 impl AsyncRuntimeHandle for tokio::runtime::Handle {
@@ -36,5 +42,13 @@ impl AsyncRuntimeHandle for tokio::runtime::Handle {
         F::Output: Send + 'static,
     {
         tokio::runtime::Handle::block_on(self, future)
+    }
+
+    fn spawn_blocking<F, R>(&self, func: F) -> impl Future<Output = Result<R, Self::JoinError>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        tokio::runtime::Handle::spawn_blocking(&self, func)
     }
 }
