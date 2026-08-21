@@ -59,8 +59,8 @@ pub(crate) trait Logger {
     /// doesn't provide any output.
     async fn send_log(&self, entry: &WasserXRLogEntry);
 
-    fn add_handler(&self, handler: LogHandler);
-    fn remove_handler(&self, handler: LogHandler);
+    fn add_handler(&mut self, handler: LogHandler);
+    fn remove_handler(&mut self, handler: LogHandler);
 
     fn debug(&self, msg: &str);
     fn info(&self, msg: &str);
@@ -78,53 +78,99 @@ pub struct WasserXRLogEntry {
 
 impl Display for WasserXRLogEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "[{:?}] {}", self.level, self.message)
     }
 }
 
 pub struct WasserXRLogger<R: AsyncRuntimeHandle> {
     runtime_handle: R,
+    handlers: Vec<LogHandler>,
 }
 
 impl<R: AsyncRuntimeHandle> WasserXRLogger<R> {
     pub fn new(handle: R) -> Self {
         Self {
             runtime_handle: handle,
+            handlers: Vec::new(),
         }
     }
 }
 
 impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
     async fn send_log(&self, entry: &WasserXRLogEntry) {
-        todo!()
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self
+                .runtime_handle
+                .spawn_blocking(move || handler(&entry))
+                .await;
+        }
     }
 
-    fn add_handler(&self, handler: LogHandler) {
-        todo!()
+    fn add_handler(&mut self, handler: LogHandler) {
+        self.handlers.push(handler);
     }
 
-    fn remove_handler(&self, handler: LogHandler) {
-        todo!()
+    fn remove_handler(&mut self, handler: LogHandler) {
+        self.handlers
+            .retain(|registered| !std::ptr::fn_addr_eq(*registered, handler));
     }
 
     fn debug(&self, msg: &str) {
-        todo!()
+        let entry = WasserXRLogEntry {
+            level: LogLevel::Debug,
+            message: msg.to_owned(),
+        };
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
+        }
     }
 
     fn info(&self, msg: &str) {
-        todo!()
+        let entry = WasserXRLogEntry {
+            level: LogLevel::Info,
+            message: msg.to_owned(),
+        };
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
+        }
     }
 
     fn warn(&self, msg: &str) {
-        todo!()
+        let entry = WasserXRLogEntry {
+            level: LogLevel::Warning,
+            message: msg.to_owned(),
+        };
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
+        }
     }
 
     fn error(&self, msg: &str) {
-        todo!()
+        let entry = WasserXRLogEntry {
+            level: LogLevel::Error,
+            message: msg.to_owned(),
+        };
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
+        }
     }
 
     fn critical(&self, msg: &str) {
-        todo!()
+        let entry = WasserXRLogEntry {
+            level: LogLevel::Critical,
+            message: msg.to_owned(),
+        };
+        for handler in self.handlers.iter().copied() {
+            let entry = entry.clone();
+            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
+        }
+
+        panic!("{msg}");
     }
 }
 
@@ -157,7 +203,7 @@ mod simple_logging {
     #[case(LogLevel::Warning)]
     #[case(LogLevel::Error)]
     fn test_log_handling(
-        simple_logger: WasserXRLogger<tokio::runtime::Handle>,
+        mut simple_logger: WasserXRLogger<tokio::runtime::Handle>,
         #[case] level: LogLevel,
     ) {
         ENTRIES.write().unwrap().clear();
