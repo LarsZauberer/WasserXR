@@ -1,5 +1,6 @@
 use slotmap::{SlotMap, new_key_type};
 
+pub mod logging;
 pub mod utils;
 
 pub mod definitions;
