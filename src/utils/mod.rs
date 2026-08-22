@@ -8,3 +8,6 @@ pub mod ring;
 
 /// Simple module which carries macros for internal use in WasserXR
 pub(crate) mod macros;
+
+/// Rotation-buffer utilities; see [`rotation_buffer`].
+pub mod rotation_buffer;
