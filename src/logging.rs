@@ -5,8 +5,6 @@
 
 use std::fmt::Display;
 
-use crate::async_runtime::AsyncRuntimeHandle;
-
 /// The log level enum describes the differnet log message logging level: Debug, Info, Warning,
 /// Error, Critical.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -43,21 +41,14 @@ type LogHandler = extern "C" fn(&WasserXRLogEntry) -> ();
 /// This is an abstraction of a logging system interface for WasserXR.
 ///
 /// It basically describes an observer pattern, where [LogHandler] are subscribed to the logger.
-/// Whenever a new [WasserXRLogEntry] is sent by the logger, all [LogHandler] by the
-/// [Logger:send_log] function, they will be called with an [wasserxr::async_runtime::AsyncRuntimeHandle].
+/// Whenever a new [WasserXRLogEntry] is sent by the logger, all [LogHandler] are called by
+/// [Logger::send_log].
 ///
 /// There are convenience functions that can be easily used by the C-bindings to log something with
-/// a corresponding level. These functions internally use the [Logger:send_log] by spawning a fire
-/// and forget async task via the [wasserxr::async_runtime::AsyncRuntimeHandle]
+/// a corresponding level. These functions call [Logger::send_log] synchronously.
 pub(crate) trait Logger {
-    /// This method should run all handler with the log by spawning blocking async tasks.
-    ///
-    /// We use blocking async tasks, because the [LogHandler] may cross the C-boundary, which cannot use
-    /// the rust internal async systems and libraries.
-    ///
-    /// This method should be called asynchronously using the fire and forget pattern since it also
-    /// doesn't provide any output.
-    async fn send_log(&self, entry: &WasserXRLogEntry);
+    /// Calls all registered handlers immediately with the log entry.
+    fn send_log(&self, entry: &WasserXRLogEntry);
 
     fn add_handler(&mut self, handler: LogHandler);
     fn remove_handler(&mut self, handler: LogHandler);
@@ -82,28 +73,22 @@ impl Display for WasserXRLogEntry {
     }
 }
 
-pub struct WasserXRLogger<R: AsyncRuntimeHandle> {
-    runtime_handle: R,
+pub struct WasserXRLogger {
     handlers: Vec<LogHandler>,
 }
 
-impl<R: AsyncRuntimeHandle> WasserXRLogger<R> {
-    pub fn new(handle: R) -> Self {
+impl WasserXRLogger {
+    pub fn new() -> Self {
         Self {
-            runtime_handle: handle,
             handlers: Vec::new(),
         }
     }
 }
 
-impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
-    async fn send_log(&self, entry: &WasserXRLogEntry) {
+impl Logger for WasserXRLogger {
+    fn send_log(&self, entry: &WasserXRLogEntry) {
         for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self
-                .runtime_handle
-                .spawn_blocking(move || handler(&entry))
-                .await;
+            handler(entry);
         }
     }
 
@@ -121,10 +106,7 @@ impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
             level: LogLevel::Debug,
             message: msg.to_owned(),
         };
-        for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
-        }
+        self.send_log(&entry);
     }
 
     fn info(&self, msg: &str) {
@@ -132,10 +114,7 @@ impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
             level: LogLevel::Info,
             message: msg.to_owned(),
         };
-        for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
-        }
+        self.send_log(&entry);
     }
 
     fn warn(&self, msg: &str) {
@@ -143,10 +122,7 @@ impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
             level: LogLevel::Warning,
             message: msg.to_owned(),
         };
-        for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
-        }
+        self.send_log(&entry);
     }
 
     fn error(&self, msg: &str) {
@@ -154,10 +130,7 @@ impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
             level: LogLevel::Error,
             message: msg.to_owned(),
         };
-        for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
-        }
+        self.send_log(&entry);
     }
 
     fn critical(&self, msg: &str) {
@@ -165,10 +138,7 @@ impl<R: AsyncRuntimeHandle> Logger for WasserXRLogger<R> {
             level: LogLevel::Critical,
             message: msg.to_owned(),
         };
-        for handler in self.handlers.iter().copied() {
-            let entry = entry.clone();
-            let _ = self.runtime_handle.spawn_blocking(move || handler(&entry));
-        }
+        self.send_log(&entry);
 
         panic!("{msg}");
     }
@@ -192,9 +162,8 @@ mod simple_logging {
     }
 
     #[fixture]
-    fn simple_logger() -> WasserXRLogger<tokio::runtime::Handle> {
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        WasserXRLogger::new(runtime.handle().clone())
+    fn simple_logger() -> WasserXRLogger {
+        WasserXRLogger::new()
     }
 
     #[rstest]
@@ -202,10 +171,7 @@ mod simple_logging {
     #[case(LogLevel::Info)]
     #[case(LogLevel::Warning)]
     #[case(LogLevel::Error)]
-    fn test_log_handling(
-        mut simple_logger: WasserXRLogger<tokio::runtime::Handle>,
-        #[case] level: LogLevel,
-    ) {
+    fn test_log_handling(mut simple_logger: WasserXRLogger, #[case] level: LogLevel) {
         ENTRIES.write().unwrap().clear();
         simple_logger.add_handler(log_handle);
 
@@ -218,13 +184,13 @@ mod simple_logging {
         }
 
         let entry = ENTRIES.read().unwrap()[0].clone();
-        assert_eq!(entry.level, LogLevel::Debug);
+        assert_eq!(entry.level, level);
         assert_eq!(entry.message, "Hello World!");
     }
 
     #[rstest]
     #[should_panic]
-    fn test_critical_panic(simple_logger: WasserXRLogger<tokio::runtime::Handle>) {
+    fn test_critical_panic(simple_logger: WasserXRLogger) {
         simple_logger.critical("Hello World!");
     }
 }
