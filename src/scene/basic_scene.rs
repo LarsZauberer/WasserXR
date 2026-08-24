@@ -1,5 +1,9 @@
+//! This module implements and tests a basic [`crate::scene::Scene`] implementation.
+
 use crate::{entity::Entity, scene::Scene, utils::storage_backend::StorageBackend};
 
+/// This is a basic implementation of a [`crate::scene::Scene`]. It will store Entities using a
+/// storage backend where all the values implement the [`crate::entity::Entity`] trait.
 pub struct BasicScene<ES>
 where
     ES: StorageBackend<Value: Entity>,
@@ -11,8 +15,6 @@ impl<ES> Scene for BasicScene<ES>
 where
     ES: StorageBackend<Value: Entity>,
 {
-    type Entity = ES::Value;
-
     type EntityID = ES::Key;
 
     fn add_entity(&mut self) -> Self::EntityID {
@@ -23,7 +25,11 @@ where
         todo!()
     }
 
-    fn reset(&mut self) -> Result<(), super::scene_error::SceneError> {
+    fn reset(&mut self) {
+        todo!()
+    }
+
+    fn get_entities(&self) -> Vec<Self::EntityID> {
         todo!()
     }
 }
@@ -65,7 +71,7 @@ mod slot_map_test {
     #[rstest]
     fn test_reset(mut scene: MockScene) {
         let entity = scene.add_entity();
-        scene.reset().expect("Failed to reset the scene");
+        scene.reset();
         scene
             .remove_entity(entity)
             .expect_err("The removed entity can still be removed");
