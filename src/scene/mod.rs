@@ -1,12 +1,14 @@
-use crate::{entity::Entity, utils::storage_backend::StorageBackend};
+use crate::{entity::Entity, scene::scene_error::SceneError};
 
 pub mod basic_scene;
+pub mod scene_error;
 
 pub trait Scene {
-    type EntityStorage: StorageBackend<Value: Entity>;
+    type Entity: Entity;
+    type EntityID: Copy;
 
-    fn new() -> Self;
+    fn add_entity(&mut self) -> Self::EntityID;
+    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), SceneError>;
 
-    fn get_entity_storage(&self) -> &Self::EntityStorage;
-    fn get_mut_entity_storage(&mut self) -> &mut Self::EntityStorage;
+    fn reset(&mut self) -> Result<(), SceneError>;
 }

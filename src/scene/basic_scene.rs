@@ -11,17 +11,19 @@ impl<ES> Scene for BasicScene<ES>
 where
     ES: StorageBackend<Value: Entity>,
 {
-    type EntityStorage = ES;
+    type Entity = ES::Value;
 
-    fn new() -> Self {
+    type EntityID = ES::Key;
+
+    fn add_entity(&mut self) -> Self::EntityID {
         todo!()
     }
 
-    fn get_entity_storage(&self) -> &Self::EntityStorage {
+    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), super::scene_error::SceneError> {
         todo!()
     }
 
-    fn get_mut_entity_storage(&mut self) -> &mut Self::EntityStorage {
+    fn reset(&mut self) -> Result<(), super::scene_error::SceneError> {
         todo!()
     }
 }
