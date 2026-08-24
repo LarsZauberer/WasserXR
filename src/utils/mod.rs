@@ -11,3 +11,6 @@ pub(crate) mod macros;
 
 /// Rotation-buffer utilities; see [`rotation_buffer`].
 pub mod rotation_buffer;
+
+/// Map abstraction utility
+pub mod storage_backend;
