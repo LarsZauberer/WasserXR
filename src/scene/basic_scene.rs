@@ -6,31 +6,37 @@ use crate::{entity::Entity, scene::Scene, utils::storage_backend::StorageBackend
 /// storage backend where all the values implement the [`crate::entity::Entity`] trait.
 pub struct BasicScene<ES>
 where
-    ES: StorageBackend<Value: Entity>,
+    ES: StorageBackend<Value: Entity + Default>,
 {
     entity_storage: ES,
 }
 
 impl<ES> Scene for BasicScene<ES>
 where
-    ES: StorageBackend<Value: Entity>,
+    ES: StorageBackend<Value: Entity + Default>,
 {
     type EntityID = ES::Key;
 
     fn add_entity(&mut self) -> Self::EntityID {
-        todo!()
+        self.entity_storage.insert(ES::Value::default())
     }
 
     fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), super::scene_error::SceneError> {
-        todo!()
+        self.entity_storage
+            .remove(id)
+            .map(|_| ())
+            .ok_or(super::scene_error::SceneError::EntityNotFound)
     }
 
     fn reset(&mut self) {
-        todo!()
+        let ids: Vec<_> = self.entity_storage.iter_key().collect();
+        for id in ids {
+            self.entity_storage.remove(id);
+        }
     }
 
     fn get_entities(&self) -> Vec<Self::EntityID> {
-        todo!()
+        self.entity_storage.iter_key().collect()
     }
 }
 
@@ -42,6 +48,7 @@ mod slot_map_test {
     use rstest::{fixture, rstest};
     use slotmap::{DefaultKey, SlotMap};
 
+    #[derive(Default)]
     struct MockEntity {}
 
     impl Entity for MockEntity {}
