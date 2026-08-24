@@ -1,7 +1,7 @@
 //! Double-buffered storage for values that are produced and consumed in separate phases.
 //!
 //! [`RotationBuffer`] defines the behavior shared by all rotation-buffer implementations.
-//! [`WXRRotationBuffer`] is the built-in `Vec`-backed implementation and also exposes the
+//! [`VecRotationBuffer`] is the built-in `Vec`-backed implementation and also exposes the
 //! currently readable values as a slice and an iterator.
 
 /// Separates pending values from values that are currently readable.
@@ -48,9 +48,9 @@ pub trait RotationBuffer<T> {
 /// # Examples
 ///
 /// ```
-/// use wasserxr::utils::rotation_buffer::{RotationBuffer, WXRRotationBuffer};
+/// use wasserxr::utils::rotation_buffer::{RotationBuffer, VecRotationBuffer};
 ///
-/// let mut buffer = WXRRotationBuffer::new();
+/// let mut buffer = VecRotationBuffer::new();
 /// buffer.push(1);
 /// assert!(buffer.as_slice().is_empty());
 ///
