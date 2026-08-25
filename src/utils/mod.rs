@@ -14,3 +14,6 @@ pub mod rotation_buffer;
 
 /// Map abstraction utility
 pub mod storage_backend;
+
+/// Utility struct to define version numbers
+pub mod version;
