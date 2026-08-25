@@ -2,6 +2,7 @@ use slotmap::{SlotMap, new_key_type};
 
 pub mod utils;
 
+pub mod definitions;
 pub mod entity;
 pub mod scene;
 
