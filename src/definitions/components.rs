@@ -42,6 +42,9 @@ pub struct ComponentDefinition {
 impl Definition for ComponentDefinition {
     type Error = ComponentDefinitionError;
 
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         if self.name.is_null() {
             return Err(ComponentDefinitionError::NameIsNull);

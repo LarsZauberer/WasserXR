@@ -20,6 +20,11 @@ pub trait Definition {
 
     /// Function that validates the definition and sees if it is valid. If not, it will return a
     /// validation error which is of the type defined in the error type of the trait.
+    ///
+    /// # Safety
+    ///
+    /// All raw pointers contained in `self` and its nested definitions must be valid for the
+    /// duration of the call. Any C string pointers must point to valid, NUL-terminated strings.
     unsafe fn validate(&self) -> Result<(), Self::Error>;
 }
 

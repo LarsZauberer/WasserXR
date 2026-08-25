@@ -33,6 +33,9 @@ pub struct PluginDefinition {
 impl Definition for PluginDefinition {
     type Error = PluginDefinitionError;
 
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         // TODO: Check that the name is not null
 

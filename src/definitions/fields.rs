@@ -9,14 +9,29 @@ use crate::definitions::{
 
 /// Function to get from a component or asset a pointer to the actual field data. This is the way
 /// wasserxr provides access a field.
+///
+/// # Safety
+///
+/// The callback must only be called with a pointer to the component or asset that owns this field.
+/// The returned pointer must point to that field and is only valid while its owner is alive.
 pub type Getter = unsafe extern "C" fn(ptr: *const c_void) -> *mut c_void;
 
 /// Provides a function for a component field that serializes the data into binary data.
 // TODO: TBD the final return type here
+///
+/// # Safety
+///
+/// `ptr` must point to a valid component containing this field and remain valid for the duration
+/// of the call.
 pub type Serializer = unsafe extern "C" fn(ptr: *const c_void);
 
 /// Provides a function for a component field to turn binary data into the corresponding field data.
 // TODO: TBD the final argument type here
+///
+/// # Safety
+///
+/// `ptr` must point to a valid component containing this field and remain valid for the duration
+/// of the call. The callback must only access the field using its declared type.
 pub type Deserializer = unsafe extern "C" fn(ptr: *const c_void);
 
 /// This is a definition of a field for a component. It contains the name of the field, a typehint
@@ -40,6 +55,9 @@ pub struct ComponentFieldDefinition {
 impl Definition for ComponentFieldDefinition {
     type Error = ComponentFieldDefinitionError;
 
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         // TODO: Check if the name is not null
 
@@ -66,6 +84,10 @@ pub struct AssetFieldDefinition {}
 impl Definition for AssetFieldDefinition {
     type Error = AssetFieldDefinitionError;
 
+    /// # Safety
+    ///
+    /// This implementation has no additional safety requirements beyond those of
+    /// [`Definition::validate`].
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         todo!()
     }
