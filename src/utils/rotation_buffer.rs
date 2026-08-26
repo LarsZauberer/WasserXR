@@ -34,6 +34,9 @@ pub trait RotationBuffer<T> {
     /// Returns the length of the readable elements
     fn len(&self) -> usize;
 
+    /// Returns whether the buffer is empty or not
+    fn is_empty(&self) -> bool;
+
     /// Removes all pending and readable values from the buffer.
     fn clear(&mut self);
 }
@@ -62,6 +65,7 @@ pub trait RotationBuffer<T> {
 /// buffer.rotate();
 /// assert_eq!(buffer.iter().copied().collect::<Vec<_>>(), vec![2]);
 /// ```
+#[derive(Default)]
 pub struct VecRotationBuffer<T> {
     writing: Vec<T>,
     reading: Vec<T>,
@@ -115,6 +119,10 @@ impl<T> RotationBuffer<T> for VecRotationBuffer<T> {
     fn len(&self) -> usize {
         self.reading.len()
     }
+
+    fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
 }
 
 #[cfg(test)]
@@ -150,14 +158,14 @@ mod test {
         assert_eq!(rotator.len(), left.len());
         assert_eq!(rotator.as_slice(), left);
         assert!(rotator.iter().eq(left.iter()));
-        if left.len() > 0 {
+        if !left.is_empty() {
             assert_eq!(*rotator.get(0).unwrap(), left[0]);
         }
         rotator.rotate();
         assert_eq!(rotator.len(), right.len());
         assert_eq!(rotator.as_slice(), right);
         assert!(rotator.iter().eq(right.iter()));
-        if left.len() > 0 {
+        if !left.is_empty() {
             assert_eq!(*rotator.get(0).unwrap(), right[0]);
         }
         rotator.rotate();

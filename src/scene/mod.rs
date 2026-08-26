@@ -2,7 +2,7 @@
 //! WasserXR. It carries the state of the entire ECS. This means that all entities, components,
 //! systems and plugins live under it. If it goes out of scope, everything else should be dropped.
 
-use crate::{entity::Entity, scene::scene_error::SceneError};
+use crate::scene::scene_error::SceneError;
 
 pub mod basic_scene;
 pub mod scene_error;

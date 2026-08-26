@@ -140,6 +140,10 @@ impl<T> Ring<T> {
         self.data.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     /// Invariant checker to see if all the ring object is consistent with the invariants. The
     /// invariants are described in [`Self`]
     fn check(&self) {
