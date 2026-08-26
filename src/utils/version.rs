@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 /// A simple utility struct that represents a version number by defining the major, minor and patch
 /// number as usize. It is FFI compatible.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct Version {
     pub major: usize,

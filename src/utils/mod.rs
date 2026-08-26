@@ -1,5 +1,8 @@
 //! Utility helpers shared by WasserXR runtime modules.
 
+/// Foreign-function interface helpers.
+pub mod ffi;
+
 /// Filesystem path resolution helpers for enhanced asset loading
 pub mod paths;
 
