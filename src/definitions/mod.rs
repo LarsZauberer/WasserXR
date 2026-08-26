@@ -23,8 +23,10 @@ pub trait Definition {
     ///
     /// # Safety
     ///
-    /// All raw pointers contained in `self` and its nested definitions must be valid for the
-    /// duration of the call. Any C string pointers must point to valid, NUL-terminated strings.
+    /// All non-null C string pointers in the definition and its nested definitions must point to
+    /// readable, nul-terminated strings that remain valid for the duration of this call. Any
+    /// pointer/count array pair must describe a valid initialized array, and every function
+    /// pointer must point to a valid function with the declared C ABI.
     unsafe fn validate(&self) -> Result<(), Self::Error>;
 }
 
