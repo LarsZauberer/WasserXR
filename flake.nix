@@ -43,6 +43,7 @@
 
           buildInputs = [
             nightlyRust
+            pkgs.clippy
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
             pkgs.cargo-fuzz
