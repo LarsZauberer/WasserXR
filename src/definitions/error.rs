@@ -121,7 +121,7 @@ impl Display for PluginDefinitionError {
                 write!(f, "plugin '{name}' component list is null")
             }
             Self::ComponentInvalid(name, error) => {
-                write!(f, "component '{name}' is invalid: {error}")
+                write!(f, "plugin '{name}' has an invalid component: {error}")
             }
         }
     }
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn formats_nested_definition_errors() {
         let error = PluginDefinitionError::ComponentInvalid(
-            "Transform".to_owned(),
+            "example".to_owned(),
             ComponentDefinitionError::FieldInvalid(
                 "Transform".to_owned(),
                 ComponentFieldDefinitionError::MutableButNoGetter("position".to_owned()),
@@ -214,7 +214,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "component 'Transform' is invalid: component 'Transform' has an invalid field: mutable component field 'position' has no getter"
+            "plugin 'example' has an invalid component: component 'Transform' has an invalid field: mutable component field 'position' has no getter"
         );
         assert!(error.source().is_some());
     }
@@ -227,7 +227,23 @@ mod tests {
 
         assert_eq!(
             plugin_error.to_string(),
-            "component 'example' is invalid: component 'Transform' has an invalid field: component field name is null"
+            "plugin 'example' has an invalid component: component 'Transform' has an invalid field: component field name is null"
+        );
+    }
+
+    #[test]
+    fn converts_component_errors_with_explicit_plugin_context() {
+        let plugin_error: PluginDefinitionError = (
+            "example",
+            ComponentDefinitionError::FieldsIsNull("Transform".to_owned()),
+        )
+            .into();
+        assert_eq!(
+            plugin_error,
+            PluginDefinitionError::ComponentInvalid(
+                "example".to_owned(),
+                ComponentDefinitionError::FieldsIsNull("Transform".to_owned()),
+            )
         );
     }
 }
