@@ -1,9 +1,8 @@
 //! This module implements and tests a basic [`crate::private::scene::Scene`] implementation.
 
-use crate::private::{
-    entities::Entity,
-    scene::{Scene, scene_error::SceneError},
-    utils::storage_backend::StorageBackend,
+use crate::{
+    private::{entities::Entity, scene::Scene, utils::storage_backend::StorageBackend},
+    scene::error::SceneError,
 };
 
 /// This is a basic implementation of a [`crate::private::scene::Scene`]. It will store Entities
@@ -14,6 +13,15 @@ where
     ES: StorageBackend<Value: Entity + Default>,
 {
     entity_storage: ES,
+}
+
+impl<ES> BasicScene<ES>
+where
+    ES: StorageBackend<Value: Entity + Default>,
+{
+    pub(crate) fn new(entity_storage: ES) -> Self {
+        Self { entity_storage }
+    }
 }
 
 impl<ES> Scene for BasicScene<ES>
@@ -48,25 +56,23 @@ where
 #[cfg(test)]
 mod slot_map_test {
     use crate::private::entities::Entity;
+    use crate::scene::EntityID;
 
     use super::*;
     use rstest::{fixture, rstest};
-    use slotmap::{DefaultKey, SlotMap};
+    use slotmap::SlotMap;
 
     #[derive(Default)]
     struct MockEntity {}
 
     impl Entity for MockEntity {}
 
-    type MockEntityID = DefaultKey;
-    type MockEntityStorage = SlotMap<MockEntityID, MockEntity>;
+    type MockEntityStorage = SlotMap<EntityID, MockEntity>;
     type MockScene = BasicScene<MockEntityStorage>;
 
     #[fixture]
     fn scene() -> MockScene {
-        MockScene {
-            entity_storage: SlotMap::<DefaultKey, MockEntity>::new(),
-        }
+        MockScene::new(SlotMap::with_key())
     }
 
     #[rstest]
