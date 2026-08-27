@@ -4,11 +4,11 @@ use crate::{
         components::{ComponentDefinition, Creator, Destroyer},
         error::ComponentDefinitionError,
     },
-    manifests::{Manifest, fields::ComponentFieldManifest},
+    private::manifests::{Manifest, fields::ComponentFieldManifest},
 };
 
 #[derive(Debug, Clone)]
-pub struct ComponentManifest {
+pub(crate) struct ComponentManifest {
     pub name: String,
 
     pub creator: Creator,

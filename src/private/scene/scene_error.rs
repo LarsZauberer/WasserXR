@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug, Clone)]
-pub enum SceneError {
+pub(crate) enum SceneError {
     EntityNotFound,
 }
 

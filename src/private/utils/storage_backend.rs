@@ -10,7 +10,7 @@ use uuid::Uuid;
 /// handle to some object. The handle will always be memory safe and never be unsafe like a pointer
 /// while it can be easily used without much expensive actions as a key to get data from the data
 /// structure.
-pub trait StorageBackend {
+pub(crate) trait StorageBackend {
     type Key: Copy;
     type Value;
 

@@ -4,7 +4,7 @@
 use crate::definitions::Definition;
 
 /// Converts a raw definition into a validated manifest.
-pub trait Manifest<D: Definition>: Sized {
+pub(crate) trait Manifest<D: Definition>: Sized {
     /// Validates and converts `definition`, consuming the raw descriptor.
     ///
     /// # Safety
@@ -25,6 +25,6 @@ pub trait Manifest<D: Definition>: Sized {
     unsafe fn checked_convert(definition: D) -> Result<Self, D::Error>;
 }
 
-pub mod components;
-pub mod fields;
-pub mod plugins;
+pub(crate) mod components;
+pub(crate) mod fields;
+pub(crate) mod plugins;

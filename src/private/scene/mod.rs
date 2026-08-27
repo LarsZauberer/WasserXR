@@ -2,17 +2,17 @@
 //! WasserXR. It carries the state of the entire ECS. This means that all entities, components,
 //! systems and plugins live under it. If it goes out of scope, everything else should be dropped.
 
-use crate::scene::scene_error::SceneError;
+use self::scene_error::SceneError;
 
-pub mod basic_scene;
-pub mod scene_error;
+pub(crate) mod basic_scene;
+pub(crate) mod scene_error;
 
 /// The scene is the most fundamental object in WasserXR. It carries all the objects of the entire
 /// ECS, like entities, components, systems and plugins. If the scene goes out of scope, everything
 /// should be dropped.
 ///
 /// This trait shows what operations a scene implements and what they do
-pub trait Scene {
+pub(crate) trait Scene {
     /// The handle of the entities that is returned to the user to mention entities.
     type EntityID: Copy;
 

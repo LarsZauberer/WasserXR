@@ -6,11 +6,11 @@ use crate::{
             AssetFieldDefinition, ComponentFieldDefinition, Deserializer, Getter, Serializer,
         },
     },
-    manifests::Manifest,
+    private::manifests::Manifest,
 };
 
 #[derive(Debug, Clone)]
-pub struct ComponentFieldManifest {
+pub(crate) struct ComponentFieldManifest {
     pub name: String,
 
     pub mutable: bool,
@@ -35,7 +35,7 @@ impl Manifest<ComponentFieldDefinition> for ComponentFieldManifest {
 }
 
 #[derive(Debug, Clone)]
-pub struct AssetFieldManifest {
+pub(crate) struct AssetFieldManifest {
     pub name: String,
     pub getter: Getter,
 }

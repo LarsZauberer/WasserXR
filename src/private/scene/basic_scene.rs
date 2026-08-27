@@ -1,10 +1,15 @@
-//! This module implements and tests a basic [`crate::scene::Scene`] implementation.
+//! This module implements and tests a basic [`crate::private::scene::Scene`] implementation.
 
-use crate::{entity::Entity, scene::Scene, utils::storage_backend::StorageBackend};
+use crate::private::{
+    entities::Entity,
+    scene::{Scene, scene_error::SceneError},
+    utils::storage_backend::StorageBackend,
+};
 
-/// This is a basic implementation of a [`crate::scene::Scene`]. It will store Entities using a
-/// storage backend where all the values implement the [`crate::entity::Entity`] trait.
-pub struct BasicScene<ES>
+/// This is a basic implementation of a [`crate::private::scene::Scene`]. It will store Entities
+/// using a storage backend where all the values implement the [`crate::private::entities::Entity`]
+/// trait.
+pub(crate) struct BasicScene<ES>
 where
     ES: StorageBackend<Value: Entity + Default>,
 {
@@ -21,11 +26,11 @@ where
         self.entity_storage.insert(ES::Value::default())
     }
 
-    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), super::scene_error::SceneError> {
+    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), SceneError> {
         self.entity_storage
             .remove(id)
             .map(|_| ())
-            .ok_or(super::scene_error::SceneError::EntityNotFound)
+            .ok_or(SceneError::EntityNotFound)
     }
 
     fn reset(&mut self) {
@@ -42,7 +47,7 @@ where
 
 #[cfg(test)]
 mod slot_map_test {
-    use crate::entity::Entity;
+    use crate::private::entities::Entity;
 
     use super::*;
     use rstest::{fixture, rstest};

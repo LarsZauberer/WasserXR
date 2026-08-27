@@ -2,7 +2,8 @@
 //! objects that can be created with a plugin, e.g. systems, components, assets, ...
 //!
 //! Definitions are raw C-ABI compatible input. Convert them with
-//! [`crate::manifests::Manifest::checked_convert`] to obtain validated, Rust-native manifests.
+//! [`crate::private::manifests::Manifest::checked_convert`] to obtain validated, Rust-native
+//! manifests.
 
 use std::error::Error;
 
@@ -26,7 +27,7 @@ pub trait Definition {
     ///
     /// # Design Decisions
     ///
-    /// We keep the validation code here and not in the [`wasserxr::manifests`] because the
+    /// We keep the validation code here and not in the [`crate::private::manifests`] because the
     /// validation only depends on the definition itself and nothing from the manifests. The
     /// manifests might later create their extra validation logic but this shouldn't be necessary
     /// and probably avoided.

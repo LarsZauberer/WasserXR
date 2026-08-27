@@ -1,7 +1,7 @@
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
-    manifests::{Manifest, components::ComponentManifest},
+    private::manifests::{Manifest, components::ComponentManifest},
 };
 
 /// The plugin manifest is the main manifest of each wasserxr plugin. It contains all the
@@ -10,7 +10,7 @@ use crate::{
 /// In contrast to the direct wasserxr plugin, it doesn't deal with the I/O operations of loading
 /// plugins. It just carries the content information.
 #[derive(Debug, Clone)]
-pub struct PluginManifest {
+pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,
 

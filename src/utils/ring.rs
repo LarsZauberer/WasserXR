@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::utils::macros::invariant_msg;
+use crate::private::macros::invariant_msg;
 
 #[derive(Debug, Clone)]
 /// The `Ring` struct defines a simple ring buffer with a fixed size, where you can push stuff onto. Until the
