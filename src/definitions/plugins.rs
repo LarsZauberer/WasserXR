@@ -28,11 +28,11 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {
-    name: *const c_char,
-    engine_version: Version,
+    pub name: *const c_char,
+    pub engine_version: Version,
 
-    components: *const ComponentDefinition,
-    component_count: usize,
+    pub components: *const ComponentDefinition,
+    pub component_count: usize,
 }
 
 impl Definition for PluginDefinition {
@@ -88,7 +88,12 @@ impl Definition for PluginDefinition {
 }
 
 impl PluginDefinition {
-    unsafe fn name(&self) -> Result<String, PluginDefinitionError> {
+    /// Returns the validated plugin name as an owned Rust string.
+    ///
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
+    pub(crate) unsafe fn name(&self) -> Result<String, PluginDefinitionError> {
         unsafe { validate_string(self.name, str::to_owned) }.map_err(Into::into)
     }
 }

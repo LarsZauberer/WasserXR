@@ -45,15 +45,15 @@ pub type Deserializer = unsafe extern "C" fn(ptr: *const c_void);
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct ComponentFieldDefinition {
-    name: *const c_char,
+    pub name: *const c_char,
 
     // Access
-    getter: Option<Getter>,
-    mutable: i32,
+    pub getter: Option<Getter>,
+    pub mutable: i32,
 
     // Serialization
-    serializer: Option<Serializer>,
-    deserializer: Option<Deserializer>,
+    pub serializer: Option<Serializer>,
+    pub deserializer: Option<Deserializer>,
 }
 
 impl Definition for ComponentFieldDefinition {
@@ -74,6 +74,11 @@ impl Definition for ComponentFieldDefinition {
 }
 
 impl ComponentFieldDefinition {
+    /// Returns the validated field name as an owned Rust string.
+    ///
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
     pub(crate) unsafe fn name(&self) -> Result<String, ComponentFieldDefinitionError> {
         unsafe { validate_string(self.name, str::to_owned) }.map_err(Into::into)
     }
@@ -88,8 +93,8 @@ impl ComponentFieldDefinition {
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct AssetFieldDefinition {
-    name: *const c_char,
-    getter: Option<Getter>,
+    pub name: *const c_char,
+    pub getter: Option<Getter>,
 }
 
 impl Definition for AssetFieldDefinition {
@@ -109,7 +114,12 @@ impl Definition for AssetFieldDefinition {
 }
 
 impl AssetFieldDefinition {
-    unsafe fn name(&self) -> Result<String, AssetFieldDefinitionError> {
+    /// Returns the validated field name as an owned Rust string.
+    ///
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
+    pub(crate) unsafe fn name(&self) -> Result<String, AssetFieldDefinitionError> {
         unsafe { validate_string(self.name, str::to_owned) }.map_err(Into::into)
     }
 }

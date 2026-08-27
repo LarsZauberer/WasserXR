@@ -1,12 +1,8 @@
 //! A set of definitions used to define a full WasserXR Plugin. There are definitions for all
 //! objects that can be created with a plugin, e.g. systems, components, assets, ...
 //!
-//! These definitions are validated when you call [`wasserxr::scene::Scene::load_plugin`] and they
-//! are also then turned into their corresponding [`wasserxr::manifests`] variant.
-//!
-//! The difference to the [`wasserxr::manifests`] is that the definitions contain raw C-ABI
-//! compatible input while the [`wasserxr::manifests`] contain already validated and more converted
-//! notions.
+//! Definitions are raw C-ABI compatible input. Convert them with
+//! [`crate::manifests::Manifest::checked_convert`] to obtain validated, Rust-native manifests.
 
 use std::error::Error;
 
@@ -27,6 +23,13 @@ pub trait Definition {
     /// readable, nul-terminated strings that remain valid for the duration of this call. Any
     /// pointer/count array pair must describe a valid initialized array, and every function
     /// pointer must point to a valid function with the declared C ABI.
+    ///
+    /// # Design Decisions
+    ///
+    /// We keep the validation code here and not in the [`wasserxr::manifests`] because the
+    /// validation only depends on the definition itself and nothing from the manifests. The
+    /// manifests might later create their extra validation logic but this shouldn't be necessary
+    /// and probably avoided.
     unsafe fn validate(&self) -> Result<(), Self::Error>;
 }
 

@@ -36,12 +36,12 @@ pub type Destroyer = unsafe extern "C" fn(ptr: *mut c_void);
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct ComponentDefinition {
-    name: *const c_char,
-    creator: Option<Creator>,
-    destroyer: Option<Destroyer>,
+    pub name: *const c_char,
+    pub creator: Option<Creator>,
+    pub destroyer: Option<Destroyer>,
 
-    fields: *const ComponentFieldDefinition,
-    field_count: usize,
+    pub fields: *const ComponentFieldDefinition,
+    pub field_count: usize,
 }
 
 impl Definition for ComponentDefinition {
@@ -81,6 +81,11 @@ impl Definition for ComponentDefinition {
 }
 
 impl ComponentDefinition {
+    /// Returns the validated component name as an owned Rust string.
+    ///
+    /// # Safety
+    ///
+    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
     pub(crate) unsafe fn name(&self) -> Result<String, ComponentDefinitionError> {
         unsafe { validate_string(self.name, str::to_owned) }.map_err(Into::into)
     }
