@@ -53,9 +53,7 @@ pub struct ComponentFieldDefinition {
 
     // Serialization
     serializer: Option<Serializer>,
-    serializable: i32,
     deserializer: Option<Deserializer>,
-    deserializable: i32,
 }
 
 impl Definition for ComponentFieldDefinition {
@@ -69,16 +67,6 @@ impl Definition for ComponentFieldDefinition {
 
         if self.mutable != 0 && self.getter.is_none() {
             return Err(ComponentFieldDefinitionError::MutableButNoGetter(name));
-        }
-
-        if self.serializable != 0 && self.serializer.is_none() {
-            return Err(ComponentFieldDefinitionError::SerializableButNoSerializer(
-                name,
-            ));
-        }
-
-        if self.deserializable != 0 && self.deserializer.is_none() {
-            return Err(ComponentFieldDefinitionError::DeserializableButNoDeserializer(name));
         }
 
         Ok(())
@@ -149,9 +137,7 @@ mod component_field_tests {
             getter: Some(getter),
             mutable: 0,
             serializer: Some(serializer),
-            serializable: 0,
             deserializer: Some(deserializer),
-            deserializable: 0,
         }
     }
 
@@ -174,31 +160,17 @@ mod component_field_tests {
     }
 
     #[rstest]
-    fn rejects_serializable_field_without_serializer(mut field: ComponentFieldDefinition) {
+    fn field_without_serializer_is_not_serializable(mut field: ComponentFieldDefinition) {
         field.serializer = None;
-        field.serializable = 1;
 
-        assert_eq!(
-            unsafe { field.validate() },
-            Err(ComponentFieldDefinitionError::SerializableButNoSerializer(
-                "position".to_owned()
-            ))
-        );
+        assert!(unsafe { field.validate() }.is_ok());
     }
 
     #[rstest]
-    fn rejects_deserializable_field_without_deserializer(mut field: ComponentFieldDefinition) {
+    fn field_without_deserializer_is_not_deserializable(mut field: ComponentFieldDefinition) {
         field.deserializer = None;
-        field.deserializable = 1;
 
-        assert_eq!(
-            unsafe { field.validate() },
-            Err(
-                ComponentFieldDefinitionError::DeserializableButNoDeserializer(
-                    "position".to_owned()
-                )
-            )
-        );
+        assert!(unsafe { field.validate() }.is_ok());
     }
 
     #[rstest]

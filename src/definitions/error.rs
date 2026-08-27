@@ -33,8 +33,6 @@ pub enum ComponentFieldDefinitionError {
     NameIsNotUtf8,
     NameIsEmpty,
     MutableButNoGetter(String),
-    SerializableButNoSerializer(String),
-    DeserializableButNoDeserializer(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -169,15 +167,6 @@ impl Display for ComponentFieldDefinitionError {
             Self::NameIsEmpty => f.write_str("component field name is empty"),
             Self::MutableButNoGetter(name) => {
                 write!(f, "mutable component field '{name}' has no getter")
-            }
-            Self::SerializableButNoSerializer(name) => {
-                write!(f, "serializable component field '{name}' has no serializer")
-            }
-            Self::DeserializableButNoDeserializer(name) => {
-                write!(
-                    f,
-                    "deserializable component field '{name}' has no deserializer"
-                )
             }
         }
     }
