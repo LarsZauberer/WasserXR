@@ -2,7 +2,7 @@
 //! WasserXR. It carries the state of the entire ECS. This means that all entities, components,
 //! systems and plugins live under it. If it goes out of scope, everything else should be dropped.
 
-use crate::scene::error::SceneError;
+use std::error::Error;
 
 pub(crate) mod basic_scene;
 
@@ -12,6 +12,9 @@ pub(crate) mod basic_scene;
 ///
 /// This trait shows what operations a scene implements and what they do
 pub(crate) trait Scene {
+    /// The main scene error type which is returned whenever there is something wrong
+    type Error: Error;
+
     /// The handle of the entities that is returned to the user to mention entities.
     type EntityID: Copy;
 
@@ -20,9 +23,9 @@ pub(crate) trait Scene {
     fn add_entity(&mut self) -> Self::EntityID;
 
     /// Removes an entity and it's entire storage of components with it. If an entity with the
-    /// handle [`Self::EntityID`] cannot be found, it will return a [`SceneError::EntityNotFound`].
+    /// handle [`Self::EntityID`] cannot be found, it will return an error.
     /// Otherwise, it will remove the entity from the scene.
-    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), SceneError>;
+    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), Self::Error>;
 
     /// Returns all the entity handles currently stored in the scene
     fn get_entities(&self) -> Vec<Self::EntityID>;

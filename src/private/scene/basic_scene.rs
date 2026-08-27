@@ -1,9 +1,8 @@
 //! This module implements and tests a basic [`crate::private::scene::Scene`] implementation.
 
-use crate::{
-    private::{entities::Entity, scene::Scene, utils::storage_backend::StorageBackend},
-    scene::error::SceneError,
-};
+use std::{error::Error, fmt::Display};
+
+use crate::private::{entities::Entity, scene::Scene, utils::storage_backend::StorageBackend};
 
 /// This is a basic implementation of a [`crate::private::scene::Scene`]. It will store Entities
 /// using a storage backend where all the values implement the [`crate::private::entities::Entity`]
@@ -28,17 +27,18 @@ impl<ES> Scene for BasicScene<ES>
 where
     ES: StorageBackend<Value: Entity + Default>,
 {
+    type Error = BasicSceneError;
     type EntityID = ES::Key;
 
     fn add_entity(&mut self) -> Self::EntityID {
         self.entity_storage.insert(ES::Value::default())
     }
 
-    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), SceneError> {
+    fn remove_entity(&mut self, id: Self::EntityID) -> Result<(), Self::Error> {
         self.entity_storage
             .remove(id)
             .map(|_| ())
-            .ok_or(SceneError::EntityNotFound)
+            .ok_or(BasicSceneError::EntityNotFound)
     }
 
     fn reset(&mut self) {
@@ -52,6 +52,19 @@ where
         self.entity_storage.iter_key().collect()
     }
 }
+
+#[derive(Debug)]
+pub enum BasicSceneError {
+    EntityNotFound,
+}
+
+impl Display for BasicSceneError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for BasicSceneError {}
 
 #[cfg(test)]
 mod slot_map_test {

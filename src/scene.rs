@@ -11,9 +11,7 @@ use crate::private::{
     scene::{Scene as SceneImplementation, basic_scene::BasicScene},
 };
 
-pub mod error;
-
-use error::SceneError;
+pub use crate::private::scene::basic_scene::BasicSceneError;
 
 new_key_type! {
     /// An opaque handle to an entity in the [`Scene`].
@@ -51,7 +49,7 @@ impl Scene {
     ///
     /// Returns [`SceneError::EntityNotFound`] if the entity was already removed or the scene was
     /// reset after the ID was created.
-    pub fn remove_entity(&mut self, id: EntityID) -> Result<(), SceneError> {
+    pub fn remove_entity(&mut self, id: EntityID) -> Result<(), BasicSceneError> {
         self.implementation.remove_entity(id)
     }
 
