@@ -1,72 +1,65 @@
-//! The public scene API.
-//!
-//! A [`Scene`] owns its entities and returns opaque [`EntityID`] values for them.
-//! Entity storage is an implementation detail: callers cannot select a storage backend or access
-//! its keys.
-
 use slotmap::{SlotMap, new_key_type};
 
-use crate::private::{
-    entities::basic_entity::BasicEntity,
-    scene::{Scene as SceneImplementation, basic_scene::BasicScene},
-};
-
-pub use crate::private::scene::basic_scene::BasicSceneError;
+use crate::errors::SceneError;
 
 new_key_type! {
-    /// An opaque handle to an entity in the [`Scene`].
-    ///
-    /// Entity IDs are created by [`Scene::add_entity`] and become invalid when the entity is
-    /// removed or the scene is reset.
-    pub struct EntityID;
+/// EntityID is the main handle how you will address an entity. It uniquely identifies an entity
+/// within a Scene. It is not a globally unique identifier across multiple scenes (if you are
+/// maintaining multiple scenes)
+///
+/// It is designed to be cheaply copyable
+pub struct EntityID;
 }
 
-type DefaultScene = BasicScene<SlotMap<EntityID, BasicEntity>>;
+type EntityStorage = SlotMap<EntityID, ()>;
 
-/// The public facade for a WasserXR scene.
+/// The scene is the core object in WasserXR. It contains the main public API to access and maintain all ECS
+/// objects.
 ///
-/// `Scene` deliberately has no storage type parameter. Its entity and storage implementations are
-/// private so they can change without changing the public API.
+/// While it is possible to have mutliple scenes per application, the scene is designed to only have
+/// one Scene per application maintaining all the entities, components, systems, assets and plugins
+/// currently active.
+#[derive(Debug, Default)]
 pub struct Scene {
-    implementation: DefaultScene,
+    entities: EntityStorage,
 }
 
 impl Scene {
-    /// Creates an empty scene.
-    #[must_use]
+    /// Creates a new empty scene
     pub fn new() -> Self {
-        Self {
-            implementation: BasicScene::new(SlotMap::with_key()),
-        }
+        Self::default()
     }
 
-    /// Adds an entity and returns its ID.
+    /// Creates a new entity and returns it's handle. The handle will be unique to every other
+    /// entity ever created within this scene.
     pub fn add_entity(&mut self) -> EntityID {
-        self.implementation.add_entity()
+        self.entities.insert(())
     }
 
-    /// Removes an entity.
+    /// Removes a previsouly created entity from the scene. This will also delete all the associated
+    /// components of the entity.
     ///
-    /// Returns [`SceneError::EntityNotFound`] if the entity was already removed or the scene was
-    /// reset after the ID was created.
-    pub fn remove_entity(&mut self, id: EntityID) -> Result<(), BasicSceneError> {
-        self.implementation.remove_entity(id)
+    /// If the entity couldn't be found with the handle, the function will return a
+    /// [`SceneError::EntityNotFound`]
+    pub fn remove_entity(&mut self, id: EntityID) -> Result<(), SceneError> {
+        todo!()
     }
 
-    /// Returns the IDs of all entities currently in the scene.
-    #[must_use]
+    /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently active in the
+    /// scene.
     pub fn get_entities(&self) -> Vec<EntityID> {
-        self.implementation.get_entities()
+        self.entities.keys().collect()
     }
 
-    /// Removes every entity from the scene.
-    pub fn reset(&mut self) {
-        self.implementation.reset();
+    /// This will reset the scene's main objects. Meaning it will remove all the entities,
+    /// components and systems
+    ///
+    /// It will **not** unload any plugins or remove cached assets
+    pub fn reset(&mut self) -> Result<(), SceneError> {
+        self.entities.clear();
+        Ok(())
     }
 }
 
-impl Default for Scene {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[cfg(test)]
+mod tests;
