@@ -1,8 +1,11 @@
 use std::{error::Error, fmt::Display};
 
+pub use crate::private::plugins::error::PluginError;
+
 #[derive(Debug)]
 pub enum SceneError {
     EntityNotFound,
+    PluginError(PluginError),
 }
 
 impl Display for SceneError {
