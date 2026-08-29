@@ -21,6 +21,7 @@ wasserxr-macros = { path = "wasserxr-macros", version = "0.2.4" }
 uuid            = { version = "1.23.2", features = ["serde", "v4"] }
 rstest          = "0.26.1"
 slotmap         = "1.1.1"
+mockall = { version = "0.15.0", features = ["nightly"] }
 
 [dev-dependencies]
 criterion = "0.8"

@@ -12,6 +12,9 @@ use crate::{
 
 pub(crate) mod error;
 
+#[cfg(test)]
+mod tests;
+
 /// This trait defines what operations an active plugin that handles all the I/O needs to satisfy
 pub(crate) struct Plugin {
     manifest: PluginManifest,
