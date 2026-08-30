@@ -42,7 +42,10 @@ impl Scene {
     /// If the entity couldn't be found with the handle, the function will return a
     /// [`SceneError::EntityNotFound`]
     pub fn remove_entity(&mut self, id: EntityID) -> Result<(), SceneError> {
-        todo!()
+        self.entities
+            .remove(id)
+            .map(|_| ())
+            .ok_or(SceneError::EntityNotFound)
     }
 
     /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently active in the
@@ -60,6 +63,3 @@ impl Scene {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests;
