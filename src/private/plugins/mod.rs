@@ -16,6 +16,7 @@ pub(crate) mod error;
 mod tests;
 
 /// This trait defines what operations an active plugin that handles all the I/O needs to satisfy
+#[derive(Debug)]
 pub(crate) struct Plugin {
     manifest: PluginManifest,
 }
@@ -51,6 +52,11 @@ impl Plugin {
     /// Loads a given [`PluginManifest`] directly and turns it into an active plugin.
     pub(crate) fn load_static(manifest: PluginManifest) -> Self {
         Self { manifest }
+    }
+
+    /// Returns the name of the plugin
+    pub(crate) fn get_name(&self) -> &str {
+        &self.manifest.name
     }
 
     /// Searches in the current [`PluginManifest`] for the defined components and tries to find the
