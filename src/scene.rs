@@ -6,7 +6,6 @@ use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
-        io::filesystem::LocalFileSystem,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
         utils::storage_backend::StorageBackend,
@@ -114,8 +113,7 @@ impl Scene {
     /// Furthermore, the [`PluginDefinition`] musn't have any malformed content
     /// within it.
     pub unsafe fn load_plugin(&mut self, path: &Path) -> Result<PluginID, SceneError> {
-        let plugin =
-            unsafe { Plugin::load_shared::<LocalFileSystem>(path) }.map_err(SceneError::from)?;
+        let plugin = unsafe { Plugin::load_shared(path) }.map_err(SceneError::from)?;
 
         // Check if the plugin can be combined with other plugins in the scene
         self.check_plugin_compatibility(&plugin)?;

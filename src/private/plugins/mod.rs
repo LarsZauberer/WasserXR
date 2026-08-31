@@ -1,23 +1,26 @@
 //! This module describes everything about the actual active representation of
 //! plugins
 
-use std::path::Path;
+use std::{
+    ffi::{CStr, CString},
+    path::Path,
+};
+
+use libc::{RTLD_LAZY, dlopen, dlsym};
+use uuid::Uuid;
 
 use crate::{
+    definitions::plugins::PluginDefinition,
     errors::PluginError,
-    private::{
-        io::{FileIO, PluginIO},
-        manifests::{Manifest, components::ComponentManifest, plugins::PluginManifest},
-    },
+    private::manifests::{Manifest, components::ComponentManifest, plugins::PluginManifest},
 };
 
 pub(crate) mod error;
 
+const WXR_PLUGIN_SYMBOL_NAME: &CStr = c"wxr_plugin";
+
 /// This trait defines what operations an active plugin that handles all the I/O
 /// needs to satisfy
-#[cfg(test)]
-mod tests;
-
 #[derive(Debug)]
 pub(crate) struct Plugin {
     manifest: PluginManifest,
@@ -25,28 +28,62 @@ pub(crate) struct Plugin {
 
 impl Plugin {
     /// Loads a dynamic shared object library and tries to tires to aquire the
-    /// [`wasserxr::definitions::plugins::PluginDefinition`] which will then be
+    /// [`PluginDefinition`] which will then be
     /// turned into a [`PluginManifest`] and stored.
     ///
     /// # Safety
     ///
-    /// TODO: Add the safety text
-    pub(crate) unsafe fn load_shared<T>(path: &Path) -> Result<Self, PluginError>
-    where
-        T: FileIO + PluginIO,
-        <T as FileIO>::Error: Into<PluginError>,
-        <T as PluginIO>::Error: Into<PluginError>,
-    {
-        let copied_path = std::env::temp_dir().join(
-            path.file_name()
-                .unwrap_or_else(|| std::ffi::OsStr::new("wasserxr-plugin")),
-        );
-        T::copy(path, &copied_path).map_err(|error| -> PluginError { error.into() })?;
+    /// The caller is required to ensure that the plugin that they are trying to
+    /// load has a public variable that is of type [`PluginDefinition`] and
+    /// therefore, implements the correct data structure format. Furthermore,
+    /// the caller is required, that the PluginDefinition is memory safe and
+    /// valid.
+    pub(crate) unsafe fn load_shared(path: &Path) -> Result<Self, PluginError> {
+        // Generate a unique and new path for the loaded plugin and copy it into the
+        // OS's tmp directory.
+        //
+        // This is a deliberate choice, since the kernel will never freshly open the
+        // with the `dlopen` call a plugin that is already open with the same
+        // name. When we want to open the same file (which might have changed by
+        // the user in the meantime), we need to still be able to open the new
+        // plugin file. Hence, we trick the kernel into thinking this is a new
+        // file by giving it a new name.
+        let copied_path = std::env::temp_dir().join(Path::new(&Uuid::new_v4().to_string()));
+        std::fs::copy(path, &copied_path).map_err(PluginError::from)?;
 
-        let plugin_definition = unsafe { T::get_plugin_definition(&copied_path) }
-            .map_err(|error| -> PluginError { error.into() })?;
-        let manifest = unsafe { PluginManifest::checked_convert(plugin_definition) }
-            .map_err(PluginError::from)?;
+        // Load the plugin.
+        //
+        // You may notice that the plugin is kept open intentionally. There is no close
+        // call. We do this deliberately here, since plugins could perform some
+        // thread operations that would anyway prevent the kernel from closing
+        // the plugin. Furthermore, there might be some data around that has
+        // been allocated at some point but needs to be deallocated at some point
+        // later. To ensure that this information stays, we never unload the plugin, so
+        // that still old code can be called.
+        let filename = CString::new(
+            copied_path
+                .to_str()
+                .expect("Filepath needs to be a valid string")
+                .to_owned(),
+        )
+        .expect("Filepath needs to be a valid CString");
+        let handle = unsafe { dlopen(filename.as_ptr(), RTLD_LAZY) };
+        if handle.is_null() {
+            return Err(PluginError::FailedToOpenPlugin);
+        }
+
+        let symbol = unsafe { dlsym(handle, WXR_PLUGIN_SYMBOL_NAME.as_ptr()) };
+        if symbol.is_null() {
+            return Err(PluginError::FailedToFindPluginDefinition);
+        }
+
+        // Cast the null ptr to the PluginDefinition (highly unsafe, since there
+        // are no type guarantees). The caller is required to ensure that the
+        // plugin definitions are of the correct type and use therefore the correct data
+        // structure.
+        let definition = unsafe { symbol.cast::<PluginDefinition>().read() };
+        let manifest =
+            unsafe { Manifest::checked_convert(definition) }.map_err(PluginError::from)?;
 
         Ok(Self::load_static(manifest))
     }
