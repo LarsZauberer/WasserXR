@@ -11,6 +11,8 @@ pub fn compile_plugin(source: impl AsRef<Path>) -> &'static Path {
     let output = std::env::temp_dir().join(format!("wasserxr-test-plugin-{}.so", Uuid::new_v4()));
     let status = Command::new("gcc")
         .args(["-std=c11", "-fPIC", "-shared"])
+        .arg("-I")
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("include"))
         .arg(source)
         .arg("-o")
         .arg(&output)
