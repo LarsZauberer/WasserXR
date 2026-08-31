@@ -26,6 +26,7 @@
           toolchain:
           toolchain.default.override {
             extensions = [
+              "clippy"
               "rust-src"
               "rustfmt"
               "miri"
@@ -43,7 +44,6 @@
 
           buildInputs = [
             nightlyRust
-            pkgs.clippy
             pkgs.cargo-nextest
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand

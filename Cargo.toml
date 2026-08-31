@@ -12,6 +12,13 @@ exclude      = ["result"]
 members  = [".", "wasserxr-macros"]
 resolver = "3"
 
+[workspace.lints.rustdoc]
+broken_intra_doc_links  = "deny"
+private_intra_doc_links = "deny"
+
+[lints]
+workspace = true
+
 [dependencies]
 bincode         = { version = "2.0.1", features = ["serde"] }
 chrono          = "0.4.45"
