@@ -19,7 +19,7 @@ pub type Creator = unsafe extern "C" fn() -> *mut c_void;
 
 /// Destroyer function for a component. It is basically a destructor call to the component. The
 /// destroyer function should not fail.
-/// It takes the pointer to the object created by the [`wasserxr::definitions::components::creator`]
+/// It takes the pointer to the object created by the [`Creator`]
 /// and destroys the object.
 ///
 /// # Safety

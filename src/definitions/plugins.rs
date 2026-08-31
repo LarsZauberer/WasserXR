@@ -21,7 +21,7 @@ use crate::{
 /// The plugin definition is always constructed in the same way
 ///
 /// - `name` as a globally defined static string pointer
-/// - `engine_version` a [`wasserxr::utils::Version`] of WasserXR with which it was built.
+/// - `engine_version` a [`Version`] of WasserXR with which it was built.
 ///
 /// The component array uses a C-compatible pointer/count pair. The pointer must remain valid for
 /// the lifetime of the plugin definition.

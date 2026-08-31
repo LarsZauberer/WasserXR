@@ -29,12 +29,19 @@ pub struct PluginID;
 type EntityStorage = SlotMap<EntityID, ()>;
 type PluginStorage = SlotMap<PluginID, Plugin>;
 
-/// The scene is the core object in WasserXR. It contains the main public API to access and maintain all ECS
-/// objects.
+/// The scene is the core object in WasserXR. It contains the main public API to
+/// access and maintain all ECS objects.
 ///
-/// While it is possible to have mutliple scenes per application, the scene is designed to only have
-/// one Scene per application maintaining all the entities, components, systems, assets and plugins
-/// currently active.
+/// While it is possible to have mutliple scenes per application, the scene is
+/// designed to only have one Scene per application maintaining all the
+/// entities, components, systems, assets and plugins currently active.
+///
+/// # Invariants
+///
+/// adsf asdf
+///
+/// asdf as dfdsa ffasd f dsafa dsa fsd fasdf sadf dfsad fsa df sad fsa afsfds
+/// fdsa afds a fsdfsa asdf asfd asdf asdf asdf asdf asdf asdf dfa sfa
 #[derive(Debug, Default)]
 pub struct Scene {
     entities: EntityStorage,
@@ -47,17 +54,17 @@ impl Scene {
         Self::default()
     }
 
-    /// Creates a new entity and returns it's handle. The handle will be unique to every other
-    /// entity ever created within this scene.
+    /// Creates a new entity and returns it's handle. The handle will be unique
+    /// to every other entity ever created within this scene.
     pub fn add_entity(&mut self) -> EntityID {
         self.entities.insert(())
     }
 
-    /// Removes a previsouly created entity from the scene. This will also delete all the associated
-    /// components of the entity.
+    /// Removes a previsouly created entity from the scene. This will also
+    /// delete all the associated components of the entity.
     ///
-    /// If the entity couldn't be found with the handle, the function will return a
-    /// [`SceneError::EntityNotFound`]
+    /// If the entity couldn't be found with the handle, the function will
+    /// return a [`SceneError::EntityNotFound`]
     pub fn remove_entity(&mut self, id: EntityID) -> Result<(), SceneError> {
         self.entities
             .remove(id)
@@ -65,14 +72,14 @@ impl Scene {
             .ok_or(SceneError::EntityNotFound)
     }
 
-    /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently active in the
-    /// scene.
+    /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently
+    /// active in the scene.
     pub fn get_entities(&self) -> Vec<EntityID> {
         self.entities.keys().collect()
     }
 
-    /// This will reset the scene's main objects. Meaning it will remove all the entities,
-    /// components and systems
+    /// This will reset the scene's main objects. Meaning it will remove all the
+    /// entities, components and systems
     ///
     /// It will **not** unload any plugins or remove cached assets
     pub fn reset(&mut self) -> Result<(), SceneError> {
@@ -80,8 +87,8 @@ impl Scene {
         Ok(())
     }
 
-    /// Checks if the plugin that should be added to the scene is valid to be added to the scene. It
-    /// checks the following conditions
+    /// Checks if the plugin that should be added to the scene is valid to be
+    /// added to the scene. It checks the following conditions
     ///
     /// - Is a plugin with the same name already loaded?
     fn check_plugin_compatibility(&self, new_plugin: &Plugin) -> Result<(), SceneError> {
@@ -96,12 +103,16 @@ impl Scene {
 
     /// Load a plugin from a shared object library.
     ///
-    /// It is not allowed to have a plugin with the same name already loaded in the scene.
+    /// It is not allowed to have a plugin with the same name already loaded in
+    /// the scene.
     ///
     /// # Safety
     ///
-    /// The path must point to a valid shared object that can be read and has a globally defined
-    /// variable called `wxr_plugin`. The `wxr_plugin` variable has to be of type [`PluginDefinition`] as has to be valid. Furthermore, the [`PluginDefinition`] musn't have any malformed content within it.
+    /// The path must point to a valid shared object that can be read and has a
+    /// globally defined variable called `wxr_plugin`. The `wxr_plugin`
+    /// variable has to be of type [`PluginDefinition`] as has to be valid.
+    /// Furthermore, the [`PluginDefinition`] musn't have any malformed content
+    /// within it.
     pub unsafe fn load_plugin(&mut self, path: &Path) -> Result<PluginID, SceneError> {
         let plugin =
             unsafe { Plugin::load_shared::<LocalFileSystem>(path) }.map_err(SceneError::from)?;
@@ -115,11 +126,13 @@ impl Scene {
 
     /// Load a plugin from a statically linked and already [`PluginDefinition`]
     ///
-    /// It is not allowed to have a plugin with the same name already loaded in the scene.
+    /// It is not allowed to have a plugin with the same name already loaded in
+    /// the scene.
     ///
     /// # Safety
     ///
-    /// The [`PluginDefinition`] must be valid and not have not any malformed content within.
+    /// The [`PluginDefinition`] must be valid and not have not any malformed
+    /// content within.
     pub unsafe fn load_static_plugin(
         &mut self,
         definition: PluginDefinition,
@@ -136,7 +149,8 @@ impl Scene {
         Ok(id)
     }
 
-    /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a plugin
+    /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a
+    /// plugin
     pub fn get_plugin(&self, name: &str) -> Option<PluginID> {
         self.plugins
             .iter()
@@ -144,7 +158,8 @@ impl Scene {
             .map(|(k, _)| k)
     }
 
-    /// Get all the [`PluginID`] of the currently actively loaded plugins in the scene
+    /// Get all the [`PluginID`] of the currently actively loaded plugins in the
+    /// scene
     pub fn get_plugins(&self) -> Vec<PluginID> {
         self.plugins.iter_key().collect()
     }

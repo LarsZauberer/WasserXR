@@ -1,4 +1,5 @@
-//! This module describes everything about the actual active representation of plugins
+//! This module describes everything about the actual active representation of
+//! plugins
 
 use std::path::Path;
 
@@ -12,10 +13,11 @@ use crate::{
 
 pub(crate) mod error;
 
+/// This trait defines what operations an active plugin that handles all the I/O
+/// needs to satisfy
 #[cfg(test)]
 mod tests;
 
-/// This trait defines what operations an active plugin that handles all the I/O needs to satisfy
 #[derive(Debug)]
 pub(crate) struct Plugin {
     manifest: PluginManifest,
@@ -23,8 +25,8 @@ pub(crate) struct Plugin {
 
 impl Plugin {
     /// Loads a dynamic shared object library and tries to tires to aquire the
-    /// [`wasserxr::definitions::plugins::PluginDefinition`] which will then be turned into a
-    /// [`PluginManifest`] and stored.
+    /// [`wasserxr::definitions::plugins::PluginDefinition`] which will then be
+    /// turned into a [`PluginManifest`] and stored.
     ///
     /// # Safety
     ///
@@ -49,7 +51,8 @@ impl Plugin {
         Ok(Self::load_static(manifest))
     }
 
-    /// Loads a given [`PluginManifest`] directly and turns it into an active plugin.
+    /// Loads a given [`PluginManifest`] directly and turns it into an active
+    /// plugin.
     pub(crate) fn load_static(manifest: PluginManifest) -> Self {
         Self { manifest }
     }
@@ -59,8 +62,8 @@ impl Plugin {
         &self.manifest.name
     }
 
-    /// Searches in the current [`PluginManifest`] for the defined components and tries to find the
-    /// requested [`ComponentManifest`]
+    /// Searches in the current [`PluginManifest`] for the defined components
+    /// and tries to find the requested [`ComponentManifest`]
     pub(crate) fn get_component(&self, name: &str) -> Option<ComponentManifest> {
         todo!()
     }

@@ -1,8 +1,9 @@
 //! Double-buffered storage for values that are produced and consumed in separate phases.
 //!
-//! [`RotationBuffer`] defines the behavior shared by all rotation-buffer implementations.
-//! [`VecRotationBuffer`] is the built-in `Vec`-backed implementation and also exposes the
-//! currently readable values as a slice and an iterator.
+//! [`crate::utils::rotation_buffer::RotationBuffer`] defines the behavior shared by all
+//! rotation-buffer implementations.
+//! [`crate::utils::rotation_buffer::VecRotationBuffer`] is the built-in `Vec`-backed implementation
+//! and also exposes the currently readable values as a slice and an iterator.
 
 /// Separates pending values from values that are currently readable.
 ///

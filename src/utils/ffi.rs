@@ -18,7 +18,7 @@ pub enum StringError {
 ///
 /// ```
 /// let my_string = std::ffi::CString::new("WasserXR").unwrap();
-/// let res = unsafe {wasserxr::utils::ffi::validate_string(my_string.as_ptr(), str::to_owned)};
+/// let res = unsafe { wasserxr::utils::ffi::validate_string(my_string.as_ptr(), str::to_owned) };
 /// assert!(res.is_ok());
 /// assert_eq!(res.unwrap(), "WasserXR");
 /// ```

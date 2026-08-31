@@ -85,7 +85,7 @@ impl ComponentFieldDefinition {
 }
 
 /// This is a definition of a field for an asset. It is pretty much similar to the
-/// [`wasserxr::definitions::fields::ComponentFieldDescription`] but instead has less functionality
+/// [`ComponentFieldDefinition`] but instead has less functionality
 /// that provide mutability or serialization for that field.
 ///
 /// The name and getter are represented as C-compatible values so this descriptor can cross the
