@@ -9,6 +9,7 @@ pub enum SceneError {
     PluginError(PluginError),
     PluginCompatibilityError(PluginCompatibilityError),
     EntityError(EntityError),
+    NoComponentType,
 }
 
 impl Display for SceneError {

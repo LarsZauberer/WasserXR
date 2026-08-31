@@ -6,6 +6,7 @@ use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
+        entities::Entity,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
         utils::storage_backend::StorageBackend,
@@ -168,12 +169,17 @@ impl Scene {
 
     /// Remove a component type from an entity
     ///
-    /// The function may fail, if the entity cannot be found in the scene.
+    /// The function may fail, if the [`EntityID`] cannot be found in the scene.
     pub fn remove_component(
         &mut self,
         entity_id: EntityID,
         component_type: &str,
     ) -> Result<(), SceneError> {
+        todo!()
+    }
+
+    /// Returns all the component names of the given [`EntityID`]
+    pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<String>, SceneError> {
         todo!()
     }
 }
