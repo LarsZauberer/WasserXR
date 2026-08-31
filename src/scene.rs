@@ -6,6 +6,7 @@ use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
+        components::Component,
         entities::Entity,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
@@ -164,7 +165,23 @@ impl Scene {
         entity_id: EntityID,
         component_type: &str,
     ) -> Result<(), SceneError> {
-        todo!()
+        let entity = self
+            .entities
+            .get_mut(entity_id)
+            .ok_or(SceneError::EntityNotFound)?;
+        let (plugin_id, manifest) = self
+            .plugins
+            .iter()
+            .find_map(|(plugin_id, plugin)| {
+                plugin
+                    .get_component(component_type)
+                    .map(|manifest| (plugin_id, manifest))
+            })
+            .ok_or(SceneError::NoComponentType)?;
+
+        entity
+            .add_component(Component::new(plugin_id, manifest))
+            .map_err(SceneError::EntityError)
     }
 
     /// Remove a component type from an entity
@@ -175,11 +192,19 @@ impl Scene {
         entity_id: EntityID,
         component_type: &str,
     ) -> Result<(), SceneError> {
-        todo!()
+        self.entities
+            .get_mut(entity_id)
+            .ok_or(SceneError::EntityNotFound)?
+            .remove_component(component_type)
+            .map_err(SceneError::EntityError)
     }
 
     /// Returns all the component names of the given [`EntityID`]
     pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<String>, SceneError> {
-        todo!()
+        Ok(self
+            .entities
+            .get(entity_id)
+            .ok_or(SceneError::EntityNotFound)?
+            .get_components())
     }
 }

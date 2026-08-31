@@ -102,6 +102,10 @@ impl Plugin {
     /// Searches in the current [`PluginManifest`] for the defined components
     /// and tries to find the requested [`ComponentManifest`]
     pub(crate) fn get_component(&self, name: &str) -> Option<ComponentManifest> {
-        todo!()
+        self.manifest
+            .components
+            .iter()
+            .find(|component| component.name == name)
+            .cloned()
     }
 }

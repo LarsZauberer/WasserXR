@@ -32,10 +32,21 @@ impl Component {
         }
     }
 
+    pub(crate) fn name(&self) -> &str {
+        &self.manifest.name
+    }
+
     /// If the component has a field with the name and a getter it will call the
     /// getter method and return the raw pointer to that field.
     pub(crate) fn get_field(&self, name: &str) -> Result<*const c_void, ComponentError> {
-        todo!()
+        let field = self
+            .manifest
+            .fields
+            .iter()
+            .find(|field| field.name == name)
+            .ok_or(ComponentError::FieldNotFound)?;
+        let getter = field.getter.ok_or(ComponentError::FieldHasNoGetter)?;
+        Ok(unsafe { getter(self.data.cast_const()) }.cast_const())
     }
 
     /// If the component has a mutable field with the name and a getter it will
@@ -43,7 +54,17 @@ impl Component {
     ///
     /// This function will fail, if the field is not
     pub(crate) fn get_mut_field(&self, name: &str) -> Result<*mut c_void, ComponentError> {
-        todo!()
+        let field = self
+            .manifest
+            .fields
+            .iter()
+            .find(|field| field.name == name)
+            .ok_or(ComponentError::FieldNotFound)?;
+        if !field.mutable {
+            return Err(ComponentError::FieldIsNotMutable);
+        }
+        let getter = field.getter.ok_or(ComponentError::FieldHasNoGetter)?;
+        Ok(unsafe { getter(self.data.cast_const()) })
     }
 
     // TODO: Later add support for methods
