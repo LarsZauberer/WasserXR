@@ -14,6 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: Formatting
+            command: cargo fmt --all -- --check
+          - name: Clippy
+            command: cargo clippy --workspace --lib --tests
+          - name: Documentation
+            command: cargo doc --workspace --no-deps
           - name: Unit tests
             command: cargo test --release -j 4
           - name: Benchmark compilation
