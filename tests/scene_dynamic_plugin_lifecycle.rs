@@ -2,7 +2,10 @@ use std::path::Path;
 
 use rstest::{fixture, rstest};
 use wasserxr::{
-    errors::{PluginCompatibilityError, SceneError},
+    definitions::error::{
+        ComponentDefinitionError, ComponentFieldDefinitionError, PluginDefinitionError,
+    },
+    errors::{PluginCompatibilityError, PluginError, SceneError},
     scene::Scene,
 };
 
@@ -27,6 +30,7 @@ macro_rules! plugin_fixture {
 }
 
 plugin_fixture!(valid_empty_plugin);
+plugin_fixture!(invalid_field_component_plugin);
 
 ////////////////////////////////////////////////////////////////////
 
@@ -76,5 +80,25 @@ fn no_duplicate_dynamic_plugin_with_same_name(mut scene: Scene) {
     assert!(matches!(
         plugin_err,
         SceneError::PluginCompatibilityError(PluginCompatibilityError::PluginWithSameNameExists)
+    ))
+}
+
+#[rstest]
+fn no_invalid_plugin_dynamic_load(mut scene: Scene, invalid_field_component_plugin: &Path) {
+    let plugin_err = unsafe { scene.load_plugin(invalid_field_component_plugin) }
+        .expect_err("Loaded invalid plugin");
+    assert!(matches!(
+        plugin_err,
+        SceneError::PluginError(PluginError::DefinitionValidationError(
+            PluginDefinitionError::ComponentInvalid(
+                plugin_name,
+                ComponentDefinitionError::FieldInvalid(
+                    component_name,
+                    ComponentFieldDefinitionError::MutableButNoGetter(field_name)
+                )
+            )
+        )) if plugin_name == "MyPlugin"
+            && component_name == "MyComponent"
+            && field_name == "MyField"
     ))
 }

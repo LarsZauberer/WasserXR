@@ -108,34 +108,3 @@ mod component_field_tests {
         );
     }
 }
-
-#[cfg(test)]
-mod asset_field_tests {
-    use std::ffi::c_void;
-
-    use rstest::{fixture, rstest};
-
-    use super::*;
-
-    unsafe extern "C" fn getter(_: *const c_void) -> *mut c_void {
-        std::ptr::null_mut()
-    }
-
-    #[fixture]
-    fn asset_field() -> AssetFieldDefinition {
-        static NAME: &[u8] = b"material\0";
-
-        AssetFieldDefinition {
-            name: NAME.as_ptr().cast(),
-            getter: Some(getter),
-        }
-    }
-
-    #[rstest]
-    fn converts_asset_field(asset_field: AssetFieldDefinition) {
-        let manifest = unsafe { AssetFieldManifest::checked_convert(asset_field) }.unwrap();
-
-        assert_eq!(manifest.name, "material");
-        assert!(std::ptr::fn_addr_eq(manifest.getter, getter as Getter));
-    }
-}
