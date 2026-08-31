@@ -4,7 +4,6 @@ use slotmap::{SlotMap, new_key_type};
 
 use crate::{
     definitions::plugins::PluginDefinition,
-    entities::Entity,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
         manifests::{Manifest, plugins::PluginManifest},
@@ -62,16 +61,6 @@ impl Scene {
             .remove(id)
             .map(|_| ())
             .ok_or(SceneError::EntityNotFound)
-    }
-
-    /// Get the actual entity data from the [`EntityID`]
-    pub fn get_entity(&self, id: EntityID) -> Option<&Entity> {
-        todo!()
-    }
-
-    /// Get the actual entity data as a mutable reference from the [`EntityID`]
-    pub fn get_mut_entity(&mut self, id: EntityID) -> Option<&mut Entity> {
-        todo!()
     }
 
     /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently
@@ -163,5 +152,28 @@ impl Scene {
     /// scene
     pub fn get_plugins(&self) -> Vec<PluginID> {
         self.plugins.iter_key().collect()
+    }
+
+    /// Add a component type to an entity
+    ///
+    /// This function may fail, if the entity cannot be found or if the entity
+    /// has already an existing component of that type
+    pub fn add_component(
+        &mut self,
+        entity_id: EntityID,
+        component_type: &str,
+    ) -> Result<(), SceneError> {
+        todo!()
+    }
+
+    /// Remove a component type from an entity
+    ///
+    /// The function may fail, if the entity cannot be found in the scene.
+    pub fn remove_component(
+        &mut self,
+        entity_id: EntityID,
+        component_type: &str,
+    ) -> Result<(), SceneError> {
+        todo!()
     }
 }

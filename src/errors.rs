@@ -1,5 +1,6 @@
 use std::{error::Error, fmt::Display};
 
+// TODO: Inline the PluginError here
 pub use crate::private::plugins::error::PluginError;
 
 #[derive(Debug)]
@@ -7,6 +8,7 @@ pub enum SceneError {
     EntityNotFound,
     PluginError(PluginError),
     PluginCompatibilityError(PluginCompatibilityError),
+    EntityError(EntityError),
 }
 
 impl Display for SceneError {
@@ -45,6 +47,8 @@ impl From<PluginCompatibilityError> for SceneError {
 #[derive(Debug)]
 pub enum EntityError {
     ComponentNotFound,
+    ComponentAlreadyExists,
+    ComponentError(ComponentError),
 }
 
 impl Display for EntityError {
@@ -54,3 +58,18 @@ impl Display for EntityError {
 }
 
 impl Error for EntityError {}
+
+#[derive(Debug)]
+pub enum ComponentError {
+    FieldNotFound,
+    FieldHasNoGetter,
+    FieldIsNotMutable,
+}
+
+impl Display for ComponentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for ComponentError {}
