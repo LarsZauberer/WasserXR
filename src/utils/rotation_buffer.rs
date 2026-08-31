@@ -1,23 +1,28 @@
-//! Double-buffered storage for values that are produced and consumed in separate phases.
+//! Double-buffered storage for values that are produced and consumed in
+//! separate phases.
 //!
-//! [`crate::utils::rotation_buffer::RotationBuffer`] defines the behavior shared by all
-//! rotation-buffer implementations.
-//! [`crate::utils::rotation_buffer::VecRotationBuffer`] is the built-in `Vec`-backed implementation
-//! and also exposes the currently readable values as a slice and an iterator.
+//! [`crate::utils::rotation_buffer::RotationBuffer`] defines the behavior
+//! shared by all rotation-buffer implementations.
+//! [`crate::utils::rotation_buffer::VecRotationBuffer`] is the built-in
+//! `Vec`-backed implementation and also exposes the currently readable values
+//! as a slice and an iterator.
 
 /// Separates pending values from values that are currently readable.
 ///
 /// # Lifecycle
 ///
-/// A newly created buffer is empty. Values passed to [`Self::push`] are pending and are not
-/// readable until [`Self::rotate`] is called. Rotation replaces the readable values with the
-/// values that were pushed since the previous rotation, preserving insertion order. Values that
-/// were readable before the rotation are discarded.
+/// A newly created buffer is empty. Values passed to [`Self::push`] are pending
+/// and are not readable until [`Self::rotate`] is called. Rotation replaces the
+/// readable values with the values that were pushed since the previous
+/// rotation, preserving insertion order. Values that were readable before the
+/// rotation are discarded.
 ///
-/// [`Self::clear`] removes both pending and readable values. Calling [`Self::rotate`] when no
-/// values are pending therefore leaves the buffer empty.
+/// [`Self::clear`] removes both pending and readable values. Calling
+/// [`Self::rotate`] when no values are pending therefore leaves the buffer
+/// empty.
 pub trait RotationBuffer<T> {
-    /// Makes the pending values readable and discards the previously readable values.
+    /// Makes the pending values readable and discards the previously readable
+    /// values.
     ///
     /// The lifecycle and ordering guarantees are defined by [`RotationBuffer`].
     fn rotate(&mut self);
@@ -27,9 +32,11 @@ pub trait RotationBuffer<T> {
     /// The value becomes readable after the next [`Self::rotate`].
     fn push(&mut self, elem: T);
 
-    /// Returns the readable value at `index`, or [`None`] when `index` is out of bounds.
+    /// Returns the readable value at `index`, or [`None`] when `index` is out
+    /// of bounds.
     ///
-    /// Values are indexed in insertion order within the most recent readable batch.
+    /// Values are indexed in insertion order within the most recent readable
+    /// batch.
     fn get(&self, index: usize) -> Option<&T>;
 
     /// Returns the length of the readable elements
@@ -45,9 +52,9 @@ pub trait RotationBuffer<T> {
 #[derive(Clone, Debug)]
 /// A `Vec`-backed implementation of [`RotationBuffer`].
 ///
-/// The behavior of the buffer is defined by [`RotationBuffer`]. This implementation additionally
-/// provides the readable values as a contiguous slice through [`Self::as_slice`] and as an
-/// iterator through [`Self::iter`].
+/// The behavior of the buffer is defined by [`RotationBuffer`]. This
+/// implementation additionally provides the readable values as a contiguous
+/// slice through [`Self::as_slice`] and as an iterator through [`Self::iter`].
 ///
 /// # Examples
 ///
@@ -83,16 +90,18 @@ impl<T> VecRotationBuffer<T> {
 
     /// Returns the currently readable values as a contiguous slice.
     ///
-    /// This contains the same values, in the same order, that are available through
-    /// [`RotationBuffer::get`] and [`Self::iter`]. Pending values are not included.
+    /// This contains the same values, in the same order, that are available
+    /// through [`RotationBuffer::get`] and [`Self::iter`]. Pending values
+    /// are not included.
     pub fn as_slice(&self) -> &[T] {
         self.reading.as_slice()
     }
 
-    /// Returns an iterator over the currently readable values in insertion order.
+    /// Returns an iterator over the currently readable values in insertion
+    /// order.
     ///
-    /// The iterator yields the same sequence as [`Self::as_slice`]. Pending values are not
-    /// included.
+    /// The iterator yields the same sequence as [`Self::as_slice`]. Pending
+    /// values are not included.
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.reading.iter()
     }

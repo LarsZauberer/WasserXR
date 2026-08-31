@@ -4,11 +4,12 @@ use crate::{
     private::manifests::{Manifest, components::ComponentManifest},
 };
 
-/// The plugin manifest is the main manifest of each wasserxr plugin. It contains all the
-/// **content** of the plugin in a validated and rust native form.
+/// The plugin manifest is the main manifest of each wasserxr plugin. It
+/// contains all the **content** of the plugin in a validated and rust native
+/// form.
 ///
-/// In contrast to the direct wasserxr plugin, it doesn't deal with the I/O operations of loading
-/// plugins. It just carries the content information.
+/// In contrast to the direct wasserxr plugin, it doesn't deal with the I/O
+/// operations of loading plugins. It just carries the content information.
 #[derive(Debug, Clone)]
 pub(crate) struct PluginManifest {
     pub name: String,

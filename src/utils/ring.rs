@@ -1,20 +1,23 @@
-//! This module describes a simple implementation of a Ring Buffer which has a fixed capacity.
+//! This module describes a simple implementation of a Ring Buffer which has a
+//! fixed capacity.
 
 use std::collections::VecDeque;
 
 use crate::private::macros::invariant_msg;
 
 #[derive(Debug, Clone)]
-/// The `Ring` struct defines a simple ring buffer with a fixed size, where you can push stuff onto. Until the
-/// capacity is reached, it acts similar to a normal `Vec`. After the capacity has been reached, new
-/// elements pushed onto the ring, will remove the oldest elements.
+/// The `Ring` struct defines a simple ring buffer with a fixed size, where you
+/// can push stuff onto. Until the capacity is reached, it acts similar to a
+/// normal `Vec`. After the capacity has been reached, new elements pushed onto
+/// the ring, will remove the oldest elements.
 ///
-/// It has a generic type which specifies what kind of type is stored inside of the ring. The
-/// generic type doesn't require any trait implementations.
+/// It has a generic type which specifies what kind of type is stored inside of
+/// the ring. The generic type doesn't require any trait implementations.
 ///
 /// ## Invariants
 ///
-/// - There are at most capacity many elements in the ring: [`Self::len()`] <= [`Self::cap()`]
+/// - There are at most capacity many elements in the ring: [`Self::len()`] <=
+///   [`Self::cap()`]
 ///
 /// ## Usage
 ///
@@ -47,10 +50,11 @@ impl<T> Ring<T> {
 
     /// Changes the ring capacity
     ///
-    /// If the capacity is smaller than the old one, it will drop the n oldest elements till it is
-    /// at the max capacity.
-    /// If the capacity is larger than the old one, nothing special happens. These values will not
-    /// be initialized. Furthermore, using [`Self::get`] or [`Self::get_mut`] will return `None` in case a value in
+    /// If the capacity is smaller than the old one, it will drop the n oldest
+    /// elements till it is at the max capacity.
+    /// If the capacity is larger than the old one, nothing special happens.
+    /// These values will not be initialized. Furthermore, using
+    /// [`Self::get`] or [`Self::get_mut`] will return `None` in case a value in
     /// the capacity but not yet pushed is being accessed.
     ///
     /// ## Examples
@@ -78,8 +82,9 @@ impl<T> Ring<T> {
         self.check();
     }
 
-    /// Appends a value to the ring. If the ring has reached it's capacity and the element would be
-    /// larger than it's capacity, it drops the oldest value if the ring is full.
+    /// Appends a value to the ring. If the ring has reached it's capacity and
+    /// the element would be larger than it's capacity, it drops the oldest
+    /// value if the ring is full.
     pub fn push(&mut self, value: T) {
         self.check();
         if self.data.len() == self.cap {
@@ -104,14 +109,15 @@ impl<T> Ring<T> {
     /// Returns the element at the index as a reference.
     /// In case that the index is out of bounds, it will return None
     ///
-    /// Index 0 will point to the oldest element that is still stored with respect to the ring
-    /// capacity.
+    /// Index 0 will point to the oldest element that is still stored with
+    /// respect to the ring capacity.
     pub fn get(&self, index: usize) -> Option<&T> {
         self.check();
         self.data.get(index)
     }
 
-    /// Operates the same way as [`Self::get`] but instead returns a mutable reference.
+    /// Operates the same way as [`Self::get`] but instead returns a mutable
+    /// reference.
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         self.check();
         self.data.get_mut(index)
@@ -129,7 +135,8 @@ impl<T> Ring<T> {
         self.cap
     }
 
-    // Return the length of the ring. It counts the amount of all the allocated objects.
+    // Return the length of the ring. It counts the amount of all the allocated
+    // objects.
     //
     // Invariant: [`Self::len()`] <= [`Self::cap()`]
     pub fn len(&self) -> usize {
@@ -141,8 +148,8 @@ impl<T> Ring<T> {
         self.len() == 0
     }
 
-    /// Invariant checker to see if all the ring object is consistent with the invariants. The
-    /// invariants are described in [`Self`]
+    /// Invariant checker to see if all the ring object is consistent with the
+    /// invariants. The invariants are described in [`Self`]
     fn check(&self) {
         debug_assert!(
             self.data.len() <= self.cap,

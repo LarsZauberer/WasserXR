@@ -22,7 +22,8 @@ pub(crate) fn construction(c: &mut Criterion) {
     group.finish();
 }
 
-/// Times only `Scene::tick`; Scene construction and system registration are excluded.
+/// Times only `Scene::tick`; Scene construction and system registration are
+/// excluded.
 pub(crate) fn tick(c: &mut Criterion) {
     let mut group = c.benchmark_group("scenario_benchmarks/system_tick");
     for scale in SCALES {
@@ -38,7 +39,8 @@ pub(crate) fn tick(c: &mut Criterion) {
     group.finish();
 }
 
-/// Times bulk creation, attachment, mutation/query, and removal as one lifecycle.
+/// Times bulk creation, attachment, mutation/query, and removal as one
+/// lifecycle.
 pub(crate) fn lifecycle(c: &mut Criterion) {
     let mut group = c.benchmark_group("scenario_benchmarks/entity_component_lifecycle");
     for scale in SCALES {
@@ -63,7 +65,8 @@ pub(crate) fn lifecycle(c: &mut Criterion) {
     group.finish();
 }
 
-/// Times complete serialization or deserialization; input Scene/bytes setup is excluded.
+/// Times complete serialization or deserialization; input Scene/bytes setup is
+/// excluded.
 pub(crate) fn serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("scenario_benchmarks/serialization");
     for scale in SCALES {
@@ -171,7 +174,8 @@ fn dynamic_scene(scale: Scale) -> Scene {
     scene
 }
 
-/// Linux only. Times `Scene::reload`; plugin compilation and Scene setup are excluded.
+/// Linux only. Times `Scene::reload`; plugin compilation and Scene setup are
+/// excluded.
 #[cfg(target_os = "linux")]
 pub(crate) fn hotreload(c: &mut Criterion) {
     let mut group = c.benchmark_group("scenario_benchmarks/hotreload");

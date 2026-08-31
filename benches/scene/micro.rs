@@ -5,7 +5,8 @@ use wasserxr::scene::Scene;
 
 use super::fixtures::{COMPONENT, SCALES, asset_fixture, entity_fixture, resource_fixture};
 
-/// Times one entity operation; Scene population and removal fixtures are excluded.
+/// Times one entity operation; Scene population and removal fixtures are
+/// excluded.
 pub(crate) fn entities(c: &mut Criterion) {
     let mut group = c.benchmark_group("microbenchmarks/entities");
 

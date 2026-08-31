@@ -137,8 +137,8 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro exports `wxr_method_<Component>_<my_method_name>`. The first
-/// parameter must be exactly `&mut Scene`, the second a mutable reference to the
-/// component type named in the attribute, and every remaining parameter a
+/// parameter must be exactly `&mut Scene`, the second a mutable reference to
+/// the component type named in the attribute, and every remaining parameter a
 /// mutable reference with a simple identifier name resolved by that name. The
 /// return type must be exactly `Result<*mut c_void, i32>`.
 #[proc_macro_attribute]
@@ -151,9 +151,11 @@ pub fn method(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Wraps `fn create(scene: &mut Scene) -> Option<Component>` as a component creator.
+/// Wraps `fn create(scene: &mut Scene) -> Option<Component>` as a component
+/// creator.
 ///
-/// The macro exports `wxr_create_<Component>` and maps `None` to a null pointer.
+/// The macro exports `wxr_create_<Component>` and maps `None` to a null
+/// pointer.
 #[proc_macro_attribute]
 pub fn component_creator(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as component::CreatorArgs);
@@ -186,7 +188,8 @@ pub fn asset_type(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Wraps `fn create(scene: &mut Scene, data: &str) -> Option<AssetType>` as an asset creator.
+/// Wraps `fn create(scene: &mut Scene, data: &str) -> Option<AssetType>` as an
+/// asset creator.
 ///
 /// The macro exports `wxr_asset_create_<AssetType>` and maps `None` or invalid
 /// C strings to a null pointer.

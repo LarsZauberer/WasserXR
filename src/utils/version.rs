@@ -1,9 +1,10 @@
-//! This is a helper utility struct that help you define versions numbers in a standardized way
+//! This is a helper utility struct that help you define versions numbers in a
+//! standardized way
 
 use std::fmt::Display;
 
-/// A simple utility struct that represents a version number by defining the major, minor and patch
-/// number as usize. It is FFI compatible.
+/// A simple utility struct that represents a version number by defining the
+/// major, minor and patch number as usize. It is FFI compatible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct Version {

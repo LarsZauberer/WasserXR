@@ -8,13 +8,14 @@ use crate::{
     utils::version::Version,
 };
 
-/// The plugin definition defines a plugin for WasserXR. It contains all the raw function pointers
-/// for the components, systems and other ECS objects that are described in the plugin. It is the
-/// master struct containing all the definitions for the plugin.
+/// The plugin definition defines a plugin for WasserXR. It contains all the raw
+/// function pointers for the components, systems and other ECS objects that are
+/// described in the plugin. It is the master struct containing all the
+/// definitions for the plugin.
 ///
-/// The plugin definition should be statically and globally written out. The global plugin
-/// definition variable **requires** to be named `wxr_plugin`. Per plugin, only one single plugin
-/// definition may exist.
+/// The plugin definition should be statically and globally written out. The
+/// global plugin definition variable **requires** to be named `wxr_plugin`. Per
+/// plugin, only one single plugin definition may exist.
 ///
 /// ## Datagram
 ///
@@ -23,8 +24,8 @@ use crate::{
 /// - `name` as a globally defined static string pointer
 /// - `engine_version` a [`Version`] of WasserXR with which it was built.
 ///
-/// The component array uses a C-compatible pointer/count pair. The pointer must remain valid for
-/// the lifetime of the plugin definition.
+/// The component array uses a C-compatible pointer/count pair. The pointer must
+/// remain valid for the lifetime of the plugin definition.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {
@@ -40,7 +41,8 @@ impl Definition for PluginDefinition {
 
     /// # Safety
     ///
-    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
+    /// `self.name` must point to a valid, NUL-terminated C string for the
+    /// duration of the call.
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         let name = unsafe { self.name()? };
         // Get the current WasserXR version
@@ -51,8 +53,8 @@ impl Definition for PluginDefinition {
         };
 
         // Check WasserXR version compatibility
-        // If the major is 0 (meaning that the API is unstable) then also the minor version has to
-        // match.
+        // If the major is 0 (meaning that the API is unstable) then also the minor
+        // version has to match.
         // Otherwise, only the major version has to match
         let compatible = if current_version.major == 0 {
             self.engine_version.major == 0 && self.engine_version.minor == current_version.minor
@@ -92,7 +94,8 @@ impl PluginDefinition {
     ///
     /// # Safety
     ///
-    /// `self.name` must point to a valid, NUL-terminated C string for the duration of the call.
+    /// `self.name` must point to a valid, NUL-terminated C string for the
+    /// duration of the call.
     pub(crate) unsafe fn name(&self) -> Result<String, PluginDefinitionError> {
         unsafe { validate_string(self.name, str::to_owned) }.map_err(Into::into)
     }

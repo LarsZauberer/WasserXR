@@ -1,30 +1,33 @@
-//! This module describes the trait [`StorageBackend`], which is a store that maps a copyable handle
-//! to some object.
+//! This module describes the trait [`StorageBackend`], which is a store that
+//! maps a copyable handle to some object.
 
 use std::collections::HashMap;
 
 use slotmap::{Key, SlotMap};
 use uuid::Uuid;
 
-/// A storage backend is some data structure that acts similar to a map. It maps some copyable
-/// handle to some object. The handle will always be memory safe and never be unsafe like a pointer
-/// while it can be easily used without much expensive actions as a key to get data from the data
-/// structure.
+/// A storage backend is some data structure that acts similar to a map. It maps
+/// some copyable handle to some object. The handle will always be memory safe
+/// and never be unsafe like a pointer while it can be easily used without much
+/// expensive actions as a key to get data from the data structure.
 pub(crate) trait StorageBackend {
     type Key: Copy;
     type Value;
 
-    /// Inserts an element into the storage backend. This will produce a unique key that will be
-    /// returned, which can later be used to retrieve the object efficiently.
+    /// Inserts an element into the storage backend. This will produce a unique
+    /// key that will be returned, which can later be used to retrieve the
+    /// object efficiently.
     fn insert(&mut self, elem: Self::Value) -> Self::Key;
 
-    /// Removes an element from the storage backend with a given key. It the object couldn't be
-    /// found, the function will return [`None`]. If the funciton found the object associated to the
-    /// handle, it will return the ownership of the object.
+    /// Removes an element from the storage backend with a given key. It the
+    /// object couldn't be found, the function will return [`None`]. If the
+    /// funciton found the object associated to the handle, it will return
+    /// the ownership of the object.
     fn remove(&mut self, key: Self::Key) -> Option<Self::Value>;
 
-    /// Retrieves a reference to an object with some handle. If the handle doesn't correspond to any
-    /// object in the storage backend, then the function will return [`None`]
+    /// Retrieves a reference to an object with some handle. If the handle
+    /// doesn't correspond to any object in the storage backend, then the
+    /// function will return [`None`]
     fn get(&self, key: Self::Key) -> Option<&Self::Value>;
 
     /// Same as [`Self::get`] but returns a mutable reference to the object
@@ -44,8 +47,8 @@ pub(crate) trait StorageBackend {
     /// Iterates over the handle/key and the object simultaneously
     fn iter_parts(&self) -> impl Iterator<Item = (Self::Key, &Self::Value)>;
 
-    /// Same as [`Self::iter_parts`] but the objects are iterated via mutable references as
-    /// [`Self::iter_mut`]
+    /// Same as [`Self::iter_parts`] but the objects are iterated via mutable
+    /// references as [`Self::iter_mut`]
     fn iter_mut_parts(&mut self) -> impl Iterator<Item = (Self::Key, &mut Self::Value)>;
 }
 
