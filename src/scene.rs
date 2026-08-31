@@ -4,6 +4,7 @@ use slotmap::{SlotMap, new_key_type};
 
 use crate::{
     definitions::plugins::PluginDefinition,
+    entities::Entity,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
         manifests::{Manifest, plugins::PluginManifest},
@@ -13,11 +14,9 @@ use crate::{
 };
 
 new_key_type! {
-/// EntityID is the main handle how you will address an entity. It uniquely identifies an entity
+/// EntityID is a cheap copyable handle for entities. It uniquely identifies an entity
 /// within a Scene. It is not a globally unique identifier across multiple scenes (if you are
 /// maintaining multiple scenes)
-///
-/// It is designed to be cheaply copyable
 pub struct EntityID;
 
 /// Handle for a loaded plugin. It describes a plugin uniquely to the scene and cannot like the [`EntityID`] be used
@@ -25,7 +24,7 @@ pub struct EntityID;
 pub struct PluginID;
 }
 
-type EntityStorage = SlotMap<EntityID, ()>;
+type EntityStorage = SlotMap<EntityID, Entity>;
 type PluginStorage = SlotMap<PluginID, Plugin>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
@@ -34,13 +33,6 @@ type PluginStorage = SlotMap<PluginID, Plugin>;
 /// While it is possible to have mutliple scenes per application, the scene is
 /// designed to only have one Scene per application maintaining all the
 /// entities, components, systems, assets and plugins currently active.
-///
-/// # Invariants
-///
-/// adsf asdf
-///
-/// asdf as dfdsa ffasd f dsafa dsa fsd fasdf sadf dfsad fsa df sad fsa afsfds
-/// fdsa afds a fsdfsa asdf asfd asdf asdf asdf asdf asdf asdf dfa sfa
 #[derive(Debug, Default)]
 pub struct Scene {
     entities: EntityStorage,
@@ -56,7 +48,8 @@ impl Scene {
     /// Creates a new entity and returns it's handle. The handle will be unique
     /// to every other entity ever created within this scene.
     pub fn add_entity(&mut self) -> EntityID {
-        self.entities.insert(())
+        let entity = Entity::new();
+        self.entities.insert(entity)
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -69,6 +62,16 @@ impl Scene {
             .remove(id)
             .map(|_| ())
             .ok_or(SceneError::EntityNotFound)
+    }
+
+    /// Get the actual entity data from the [`EntityID`]
+    pub fn get_entity(&self, id: EntityID) -> Option<&Entity> {
+        todo!()
+    }
+
+    /// Get the actual entity data as a mutable reference from the [`EntityID`]
+    pub fn get_mut_entity(&mut self, id: EntityID) -> Option<&mut Entity> {
+        todo!()
     }
 
     /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently

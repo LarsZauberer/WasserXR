@@ -41,3 +41,16 @@ impl From<PluginCompatibilityError> for SceneError {
         Self::PluginCompatibilityError(value)
     }
 }
+
+#[derive(Debug)]
+pub enum EntityError {
+    ComponentNotFound,
+}
+
+impl Display for EntityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for EntityError {}
