@@ -48,6 +48,7 @@
             pkgs.cargo-llvm-cov
             pkgs.cargo-expand
             pkgs.cargo-fuzz
+            pkgs.cargo-tarpaulin
             pkgs.rust-cbindgen
             pkgs.cargo-release
             pkgs.gcc

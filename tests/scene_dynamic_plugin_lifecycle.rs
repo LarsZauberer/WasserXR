@@ -26,14 +26,14 @@ macro_rules! plugin_fixture {
     };
 }
 
-plugin_fixture!(simple_valid_empty_plugin);
+plugin_fixture!(valid_empty_plugin);
 
 ////////////////////////////////////////////////////////////////////
 
 #[rstest]
-fn add_dynamic_plugin(mut scene: Scene, simple_valid_empty_plugin: &Path) {
-    let plugin_id = unsafe { scene.load_plugin(simple_valid_empty_plugin) }
-        .expect("Failed to load valid plugin");
+fn add_dynamic_plugin(mut scene: Scene, valid_empty_plugin: &Path) {
+    let plugin_id =
+        unsafe { scene.load_plugin(valid_empty_plugin) }.expect("Failed to load valid plugin");
 
     let plugins = scene.get_plugins();
     assert!(
@@ -48,10 +48,10 @@ fn add_dynamic_plugin(mut scene: Scene, simple_valid_empty_plugin: &Path) {
 }
 
 #[rstest]
-fn no_duplicate_dynamic_plugin_with_same_path(mut scene: Scene, simple_valid_empty_plugin: &Path) {
-    let plugin_id = unsafe { scene.load_plugin(simple_valid_empty_plugin) }
-        .expect("Failed to load valid plugin");
-    let plugin_err = unsafe { scene.load_plugin(simple_valid_empty_plugin) }
+fn no_duplicate_dynamic_plugin_with_same_path(mut scene: Scene, valid_empty_plugin: &Path) {
+    let plugin_id =
+        unsafe { scene.load_plugin(valid_empty_plugin) }.expect("Failed to load valid plugin");
+    let plugin_err = unsafe { scene.load_plugin(valid_empty_plugin) }
         .expect_err("Plugin shouldn't load since it is a duplicate");
 
     assert!(matches!(
@@ -62,8 +62,8 @@ fn no_duplicate_dynamic_plugin_with_same_path(mut scene: Scene, simple_valid_emp
 
 #[rstest]
 fn no_duplicate_dynamic_plugin_with_same_name(mut scene: Scene) {
-    let comp1 = simple_valid_empty_plugin();
-    let comp2 = simple_valid_empty_plugin();
+    let comp1 = valid_empty_plugin();
+    let comp2 = valid_empty_plugin();
     assert_ne!(
         comp1, comp2,
         "The fixture didn't produce two different compilations"
