@@ -14,12 +14,21 @@ fn scene() -> Scene {
     Scene::new()
 }
 
-#[fixture]
-fn simple_valid_empty_plugin() -> &'static Path {
-    plugin_compile::compile_plugin(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugins/simple_valid_empty_plugin.c"),
-    )
+macro_rules! plugin_fixture {
+    ($name:ident) => {
+        #[fixture]
+        fn $name() -> &'static Path {
+            plugin_compile::compile_plugin(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("tests/plugins/{}.c", stringify!($name))),
+            )
+        }
+    };
 }
+
+plugin_fixture!(simple_valid_empty_plugin);
+
+////////////////////////////////////////////////////////////////////
 
 #[rstest]
 fn add_dynamic_plugin(mut scene: Scene, simple_valid_empty_plugin: &Path) {
