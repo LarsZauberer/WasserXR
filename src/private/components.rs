@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{collections::HashMap, ffi::c_void};
 
 use slotmap::SlotMap;
 
@@ -17,6 +17,7 @@ pub(crate) struct Component {
     plugin_id: PluginID,
     name: String,
     fields: SlotMap<FieldID, Field>,
+    field_ids: HashMap<String, FieldID>,
     destroyer: Destroyer,
     data: *mut c_void,
 }
@@ -36,14 +37,18 @@ impl Component {
     pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
         let data = unsafe { (manifest.creator)() };
         let mut fields = SlotMap::with_key();
+        let mut field_ids = HashMap::new();
         manifest.fields.iter().for_each(|(_, field)| {
             let field = Field::from(field);
-            fields.insert(field);
+            let name = field.get_name().to_owned();
+            let id = fields.insert(field);
+            field_ids.insert(name, id);
         });
         Self {
             plugin_id,
             name: manifest.name.clone(),
             fields,
+            field_ids,
             destroyer: manifest.destroyer,
             data,
         }
@@ -61,10 +66,9 @@ impl Component {
 
     /// Get field id from the field name
     pub(crate) fn resolve_field_id(&self, name: &str) -> Result<FieldID, ComponentError> {
-        self.fields
-            .iter()
-            .find(|(_, f)| f.get_name() == name)
-            .map(|(i, _)| i)
+        self.field_ids
+            .get(name)
+            .copied()
             .ok_or(ComponentError::FieldNotFound)
     }
 
