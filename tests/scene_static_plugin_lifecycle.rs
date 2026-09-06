@@ -32,6 +32,8 @@ const VALID_EMPTY_PLUGIN: PluginDefinition = PluginDefinition {
     engine_version: COMPATIBLE_ENGINE_VERSION,
     components: std::ptr::null(),
     component_count: 0,
+    assets: std::ptr::null(),
+    asset_count: 0,
 };
 
 const VALID_EMPTY_COMPONENT: ComponentDefinition = ComponentDefinition {
@@ -47,6 +49,8 @@ const VALID_EMPTY_COMPONENT_PLUGIN: PluginDefinition = PluginDefinition {
     engine_version: COMPATIBLE_ENGINE_VERSION,
     components: &VALID_EMPTY_COMPONENT,
     component_count: 1,
+    assets: std::ptr::null(),
+    asset_count: 0,
 };
 
 const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
@@ -70,6 +74,8 @@ const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {
     engine_version: COMPATIBLE_ENGINE_VERSION,
     components: &VALID_COMPONENT_WITH_FIELD,
     component_count: 1,
+    assets: std::ptr::null(),
+    asset_count: 0,
 };
 
 #[rstest]

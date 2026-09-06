@@ -4,10 +4,11 @@ use rstest::{fixture, rstest};
 use wasserxr::{
     definitions::{
         Definition,
+        assets::AssetDefinition,
         components::ComponentDefinition,
         error::{
-            AssetFieldDefinitionError, ComponentDefinitionError, ComponentFieldDefinitionError,
-            PluginDefinitionError,
+            AssetDefinitionError, AssetFieldDefinitionError, ComponentDefinitionError,
+            ComponentFieldDefinitionError, PluginDefinitionError,
         },
         fields::{AssetFieldDefinition, ComponentFieldDefinition},
         plugins::PluginDefinition,
@@ -225,6 +226,77 @@ mod components {
     }
 }
 
+mod assets {
+    use super::*;
+
+    #[fixture]
+    fn asset() -> AssetDefinition {
+        static NAME: &[u8] = b"Mesh\0";
+
+        AssetDefinition {
+            name: NAME.as_ptr().cast(),
+            creator: Some(creator),
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        }
+    }
+
+    #[rstest]
+    fn validates_asset(asset: AssetDefinition) {
+        assert!(unsafe { asset.validate() }.is_ok());
+    }
+
+    #[rstest]
+    fn rejects_missing_creator(mut asset: AssetDefinition) {
+        asset.creator = None;
+
+        assert_eq!(
+            unsafe { asset.validate() },
+            Err(AssetDefinitionError::CreatorIsNull("Mesh".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_missing_destroyer(mut asset: AssetDefinition) {
+        asset.destroyer = None;
+
+        assert_eq!(
+            unsafe { asset.validate() },
+            Err(AssetDefinitionError::DestroyerIsNull("Mesh".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_missing_fields(mut asset: AssetDefinition) {
+        asset.field_count = 1;
+
+        assert_eq!(
+            unsafe { asset.validate() },
+            Err(AssetDefinitionError::FieldsIsNull("Mesh".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_invalid_field(mut asset: AssetDefinition) {
+        static FIELD_NAME: &[u8] = b"vertices\0";
+        let field = AssetFieldDefinition {
+            name: FIELD_NAME.as_ptr().cast(),
+            getter: None,
+        };
+        asset.fields = &field;
+        asset.field_count = 1;
+
+        assert_eq!(
+            unsafe { asset.validate() },
+            Err(AssetDefinitionError::FieldInvalid(
+                "Mesh".to_owned(),
+                AssetFieldDefinitionError::GetterIsNull("vertices".to_owned()),
+            ))
+        );
+    }
+}
+
 mod plugins {
     use super::*;
 
@@ -245,6 +317,8 @@ mod plugins {
             engine_version: compatible_version(),
             components: std::ptr::null(),
             component_count: 0,
+            assets: std::ptr::null(),
+            asset_count: 0,
         }
     }
 
@@ -289,6 +363,38 @@ mod plugins {
             ))
         );
     }
+
+    #[rstest]
+    fn rejects_missing_assets(mut plugin: PluginDefinition) {
+        plugin.asset_count = 1;
+
+        assert_eq!(
+            unsafe { plugin.validate() },
+            Err(PluginDefinitionError::AssetsIsNull("example".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_invalid_asset(mut plugin: PluginDefinition) {
+        static ASSET_NAME: &[u8] = b"Mesh\0";
+        let asset = AssetDefinition {
+            name: ASSET_NAME.as_ptr().cast(),
+            creator: None,
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        };
+        plugin.assets = &asset;
+        plugin.asset_count = 1;
+
+        assert_eq!(
+            unsafe { plugin.validate() },
+            Err(PluginDefinitionError::AssetInvalid(
+                "example".to_owned(),
+                AssetDefinitionError::CreatorIsNull("Mesh".to_owned()),
+            ))
+        );
+    }
 }
 
 mod errors {
@@ -307,6 +413,23 @@ mod errors {
         assert_eq!(
             error.to_string(),
             "plugin 'example' has an invalid component: component 'Transform' has an invalid field: mutable component field 'position' has no getter"
+        );
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn formats_nested_asset_definition_errors() {
+        let error = PluginDefinitionError::AssetInvalid(
+            "example".to_owned(),
+            AssetDefinitionError::FieldInvalid(
+                "Mesh".to_owned(),
+                AssetFieldDefinitionError::GetterIsNull("vertices".to_owned()),
+            ),
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "plugin 'example' has an invalid asset: asset 'Mesh' has an invalid field: asset field 'vertices' has no getter"
         );
         assert!(error.source().is_some());
     }

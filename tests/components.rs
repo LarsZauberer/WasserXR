@@ -54,6 +54,8 @@ const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {
     engine_version: COMPATIBLE_ENGINE_VERSION,
     components: &VALID_COMPONENT_WITH_FIELD,
     component_count: 1,
+    assets: std::ptr::null(),
+    asset_count: 0,
 };
 
 fn reset_globals() {
