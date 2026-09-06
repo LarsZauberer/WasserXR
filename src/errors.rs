@@ -69,8 +69,7 @@ impl From<EntityError> for SceneError {
 #[derive(Debug)]
 pub enum ComponentError {
     FieldNotFound,
-    FieldHasNoGetter,
-    FieldIsNotMutable,
+    FieldError(FieldError),
 }
 
 impl Display for ComponentError {
@@ -84,5 +83,25 @@ impl Error for ComponentError {}
 impl From<ComponentError> for EntityError {
     fn from(value: ComponentError) -> Self {
         EntityError::ComponentError(value)
+    }
+}
+
+#[derive(Debug)]
+pub enum FieldError {
+    NoGetter,
+    NotMutable,
+}
+
+impl Display for FieldError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for FieldError {}
+
+impl From<FieldError> for ComponentError {
+    fn from(value: FieldError) -> Self {
+        ComponentError::FieldError(value)
     }
 }

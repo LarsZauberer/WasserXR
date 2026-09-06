@@ -1,7 +1,12 @@
 use std::ffi::c_void;
 
+use slotmap::SlotMap;
+
 use crate::{
-    errors::ComponentError, private::manifests::components::ComponentManifest, scene::PluginID,
+    definitions::components::Destroyer,
+    errors::ComponentError,
+    private::{fields::Field, manifests::components::ComponentManifest},
+    scene::{FieldID, PluginID},
 };
 
 /// The component is the concrete data record of a component. It carries the
@@ -10,7 +15,9 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Component {
     plugin_id: PluginID,
-    manifest: ComponentManifest,
+    name: String,
+    fields: SlotMap<FieldID, Field>,
+    destroyer: Destroyer,
     data: *mut c_void,
 }
 
@@ -18,60 +25,69 @@ impl Component {
     /// Creates a new component. This function will run the creator of the
     /// component to generate allocate the data.
     ///
-    /// It will also store the entirety of the manifest so that it can on drop
-    /// call the destroyer with the data.
+    /// The destroyer and all other required function pointers will be saved in
+    /// this concrete implementation.
+    ///
+    /// The destroyer is especially important since it is used during drop of
+    /// the component to deallocate the user's allocated data.
     ///
     /// This **requires** that the destroyer code is still loaded by the plugin
     /// at the time the component is dropped.
-    pub(crate) fn new(plugin_id: PluginID, manifest: ComponentManifest) -> Self {
+    pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
         let data = unsafe { (manifest.creator)() };
+        let mut fields = SlotMap::with_key();
+        manifest.fields.iter().for_each(|field| {
+            let field = Field::from(field);
+            fields.insert(field);
+        });
         Self {
             plugin_id,
-            manifest,
+            name: manifest.name.clone(),
+            fields,
+            destroyer: manifest.destroyer,
             data,
         }
     }
 
+    /// Get the name of the component
     pub(crate) fn get_name(&self) -> &str {
-        &self.manifest.name
+        &self.name
     }
 
-    /// If the component has a field with the name and a getter it will call the
-    /// getter method and return the raw pointer to that field.
-    pub(crate) fn get_field(&self, name: &str) -> Result<*const c_void, ComponentError> {
-        let field = self
-            .manifest
-            .fields
+    /// Get the name of a field
+    pub(crate) fn get_field_name(&self, id: FieldID) -> Result<&str, ComponentError> {
+        todo!()
+    }
+
+    /// Get field id from the field name
+    pub(crate) fn resolve_field_id(&self, name: &str) -> Result<FieldID, ComponentError> {
+        self.fields
             .iter()
-            .find(|field| field.name == name)
-            .ok_or(ComponentError::FieldNotFound)?;
-        let getter = field.getter.ok_or(ComponentError::FieldHasNoGetter)?;
-        Ok(unsafe { getter(self.data.cast_const()) }.cast_const())
+            .find(|(_, f)| f.get_name() == name)
+            .map(|(i, _)| i)
+            .ok_or(ComponentError::FieldNotFound)
     }
 
-    /// If the component has a mutable field with the name and a getter it will
-    /// call the getter method and return the raw pointer to that field.
-    ///
-    /// This function will fail, if the field is not
-    pub(crate) fn get_mut_field(&self, name: &str) -> Result<*mut c_void, ComponentError> {
-        let field = self
-            .manifest
-            .fields
-            .iter()
-            .find(|field| field.name == name)
-            .ok_or(ComponentError::FieldNotFound)?;
-        if !field.mutable {
-            return Err(ComponentError::FieldIsNotMutable);
-        }
-        let getter = field.getter.ok_or(ComponentError::FieldHasNoGetter)?;
-        Ok(unsafe { getter(self.data.cast_const()) })
+    /// Get the data pointer of a specific field
+    pub(crate) fn get_field_ptr(&self, id: FieldID) -> Result<*const c_void, ComponentError> {
+        self.fields
+            .get(id)
+            .ok_or(ComponentError::FieldNotFound)?
+            .get(self.data)
+            .map_err(ComponentError::from)
     }
 
-    // TODO: Later add support for methods
+    pub(crate) fn get_field_mut_ptr(&self, id: FieldID) -> Result<*mut c_void, ComponentError> {
+        self.fields
+            .get(id)
+            .ok_or(ComponentError::FieldNotFound)?
+            .get_mut(self.data)
+            .map_err(ComponentError::from)
+    }
 }
 
 impl Drop for Component {
     fn drop(&mut self) {
-        unsafe { (self.manifest.destroyer)(self.data) }
+        unsafe { (self.destroyer)(self.data) }
     }
 }

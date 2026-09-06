@@ -2,7 +2,11 @@ use std::os::raw::c_void;
 
 use slotmap::SlotMap;
 
-use crate::{errors::EntityError, private::components::Component, scene::ComponentID};
+use crate::{
+    errors::EntityError,
+    private::{components::Component, manifests::components::ComponentManifest},
+    scene::{ComponentID, FieldID, PluginID},
+};
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -21,8 +25,10 @@ impl Entity {
     /// a component of that type already exists.
     pub(crate) fn add_component(
         &mut self,
-        component: Component,
+        plugin_id: PluginID,
+        manifest: &ComponentManifest,
     ) -> Result<ComponentID, EntityError> {
+        let component = Component::new(manifest, plugin_id);
         if self
             .components
             .values()
@@ -35,10 +41,11 @@ impl Entity {
     }
 
     /// Remove a component from the entity
-    pub(crate) fn remove_component(&mut self, id: ComponentID) -> Result<Component, EntityError> {
+    pub(crate) fn remove_component(&mut self, id: ComponentID) -> Result<(), EntityError> {
         self.components
             .remove(id)
             .ok_or(EntityError::ComponentNotFound)
+            .map(|_| ())
     }
 
     /// Get all currently attached component id's from this entity
@@ -56,12 +63,21 @@ impl Entity {
             .ok_or(EntityError::ComponentNotFound)
     }
 
+    /// Resolve the [`FieldID`] from the field name
+    pub(crate) fn resolve_field_id(
+        &self,
+        component_id: ComponentID,
+        name: &str,
+    ) -> Result<FieldID, EntityError> {
+        todo!()
+    }
+
     /// Returns the field pointer of a component field from a specific
     /// component.
     pub(crate) fn get_component_field(
         &self,
-        id: ComponentID,
-        name: &str,
+        component_id: ComponentID,
+        field_id: FieldID,
     ) -> Result<*const c_void, EntityError> {
         todo!()
     }
@@ -70,32 +86,10 @@ impl Entity {
     /// pointer
     pub(crate) fn get_mut_component_field(
         &self,
-        id: ComponentID,
-        name: &str,
+        component_id: ComponentID,
+        field_id: FieldID,
     ) -> Result<*mut c_void, EntityError> {
         todo!()
-    }
-
-    /// A wrapper around quickly getting a field pointer from a [`Component`]
-    /// while not having a [`ComponentID`]
-    pub(crate) fn resolve_and_get_component_field(
-        &self,
-        id: &str,
-        name: &str,
-    ) -> Result<*const c_void, EntityError> {
-        let id = self.resolve_component_id(id)?;
-        self.get_component_field(id, name)
-    }
-
-    /// Same as [`Self::resolve_and_get_component_field`] but it returns a
-    /// mutable pointer
-    pub(crate) fn resolve_and_get_mut_component_field(
-        &self,
-        id: &str,
-        name: &str,
-    ) -> Result<*mut c_void, EntityError> {
-        let id = self.resolve_component_id(id)?;
-        self.get_mut_component_field(id, name)
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]
@@ -104,5 +98,14 @@ impl Entity {
             .get(id)
             .ok_or(EntityError::ComponentNotFound)
             .map(|c| c.get_name())
+    }
+
+    /// Get the [`Field`] name of a [`Component`]
+    pub(crate) fn get_field_name(
+        &self,
+        component_id: ComponentID,
+        field_id: FieldID,
+    ) -> Result<&str, EntityError> {
+        todo!()
     }
 }

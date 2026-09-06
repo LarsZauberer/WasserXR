@@ -6,7 +6,6 @@ use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
-        components::Component,
         entities::Entity,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
@@ -24,9 +23,13 @@ pub struct EntityID;
 /// in different scenes. This behavior is not supported.
 pub struct PluginID;
 
-/// The main handle that is cheap to copy and address a [`Component`]. It is only unique within a
+/// Handle that is cheap to copy and address a [`Component`]. It is only unique within a
 /// single [`Entity`] and cannot be used across multiple [`Entity`].
 pub struct ComponentID;
+
+/// Handle that is cheap to copy and address a field in a component. It is only unique within a
+/// single entity and component. It is not unique across multiple components.
+pub struct FieldID;
 }
 
 type EntityStorage = SlotMap<EntityID, Entity>;
@@ -73,6 +76,11 @@ impl Scene {
     /// active in the scene.
     pub fn get_entities(&self) -> Vec<EntityID> {
         self.entities.keys().collect()
+    }
+
+    /// Private utility function that gets an [`Entity`] from [`EntityID`]
+    pub(crate) fn get_entity(&self, id: EntityID) -> Result<&Entity, SceneError> {
+        self.entities.get(id).ok_or(SceneError::EntityNotFound)
     }
 
     /// This will reset the scene's main objects. Meaning it will remove all the
@@ -184,7 +192,7 @@ impl Scene {
             .ok_or(SceneError::NoComponentType)?;
 
         entity
-            .add_component(Component::new(plugin_id, manifest))
+            .add_component(plugin_id, manifest)
             .map_err(SceneError::EntityError)
     }
 
@@ -206,11 +214,7 @@ impl Scene {
 
     /// Returns all the component names of the given [`EntityID`]
     pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<ComponentID>, SceneError> {
-        Ok(self
-            .entities
-            .get(entity_id)
-            .ok_or(SceneError::EntityNotFound)?
-            .get_components())
+        Ok(self.get_entity(entity_id)?.get_components())
     }
 
     /// Return the name of some component handle
@@ -219,24 +223,33 @@ impl Scene {
         entity_id: EntityID,
         component_id: ComponentID,
     ) -> Result<&str, SceneError> {
-        self.entities
-            .get(entity_id)
-            .ok_or(SceneError::EntityNotFound)?
+        self.get_entity(entity_id)?
             .get_component_name(component_id)
             .map_err(SceneError::from)
     }
 
-    /// Resolves the `[ComponentID]` of a component given it's name and an
+    /// Resolves the [`ComponentID`] of a component given it's name and an
     /// [`EntityID`] which should have the component attached to it
     pub fn resolve_component_id(
         &self,
         entity_id: EntityID,
         component_name: &str,
     ) -> Result<ComponentID, SceneError> {
-        self.entities
-            .get(entity_id)
-            .ok_or(SceneError::EntityNotFound)?
+        self.get_entity(entity_id)?
             .resolve_component_id(component_name)
+            .map_err(SceneError::from)
+    }
+
+    /// Resolve the [`FieldID`] from the name of a field providing the
+    /// [`EntityID`] and the [`ComponentID`].
+    pub fn resolve_field_id(
+        &self,
+        entity_id: EntityID,
+        component_id: ComponentID,
+        name: &str,
+    ) -> Result<FieldID, SceneError> {
+        self.get_entity(entity_id)?
+            .resolve_field_id(component_id, name)
             .map_err(SceneError::from)
     }
 }
