@@ -88,7 +88,9 @@ impl Entity {
         component_id: ComponentID,
         field_id: FieldID,
     ) -> Result<*const c_void, EntityError> {
-        todo!()
+        self.get_component(component_id)?
+            .get_field_ptr(field_id)
+            .map_err(EntityError::from)
     }
 
     /// Same as [`Self::get_component_field`] but instead provides a mutable
@@ -98,7 +100,9 @@ impl Entity {
         component_id: ComponentID,
         field_id: FieldID,
     ) -> Result<*mut c_void, EntityError> {
-        todo!()
+        self.get_component(component_id)?
+            .get_field_mut_ptr(field_id)
+            .map_err(EntityError::from)
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]
@@ -112,6 +116,8 @@ impl Entity {
         component_id: ComponentID,
         field_id: FieldID,
     ) -> Result<&str, EntityError> {
-        todo!()
+        self.get_component(component_id)?
+            .get_field_name(field_id)
+            .map_err(EntityError::from)
     }
 }
