@@ -54,6 +54,13 @@ impl Entity {
         self.components.keys().collect()
     }
 
+    /// Get a component from its id.
+    pub(crate) fn get_component(&self, id: ComponentID) -> Result<&Component, EntityError> {
+        self.components
+            .get(id)
+            .ok_or(EntityError::ComponentNotFound)
+    }
+
     /// Resolve from component name to component id. If there is no component
     /// with this type, it will return None.
     pub(crate) fn resolve_component_id(&self, name: &str) -> Result<ComponentID, EntityError> {
@@ -69,9 +76,7 @@ impl Entity {
         component_id: ComponentID,
         name: &str,
     ) -> Result<FieldID, EntityError> {
-        self.components
-            .get(component_id)
-            .ok_or(EntityError::ComponentNotFound)?
+        self.get_component(component_id)?
             .resolve_field_id(name)
             .map_err(EntityError::from)
     }
@@ -98,10 +103,7 @@ impl Entity {
 
     /// Get the name of a [`Component`] from a [`ComponentID`]
     pub(crate) fn get_component_name(&self, id: ComponentID) -> Result<&str, EntityError> {
-        self.components
-            .get(id)
-            .ok_or(EntityError::ComponentNotFound)
-            .map(|c| c.get_name())
+        Ok(self.get_component(id)?.get_name())
     }
 
     /// Get the [`Field`] name of a [`Component`]
