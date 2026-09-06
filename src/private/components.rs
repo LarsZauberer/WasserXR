@@ -36,7 +36,7 @@ impl Component {
     pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
         let data = unsafe { (manifest.creator)() };
         let mut fields = SlotMap::with_key();
-        manifest.fields.iter().for_each(|field| {
+        manifest.fields.iter().for_each(|(_, field)| {
             let field = Field::from(field);
             fields.insert(field);
         });

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     definitions::{
         Definition,
@@ -14,7 +16,7 @@ pub(crate) struct ComponentManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: Vec<ComponentFieldManifest>,
+    pub fields: HashMap<String, ComponentFieldManifest>,
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {
@@ -32,16 +34,17 @@ impl Manifest<ComponentDefinition> for ComponentManifest {
                 .destroyer
                 .expect("validated component definitions have a destroyer"),
             fields: if value.field_count == 0 {
-                Vec::new()
+                HashMap::new()
             } else {
                 unsafe { std::slice::from_raw_parts(value.fields, value.field_count) }
                     .iter()
                     .copied()
                     .map(|field| {
                         unsafe { ComponentFieldManifest::checked_convert(field) }
+                            .map(|manifest| (manifest.name.clone(), manifest))
                             .map_err(|error| (name.clone(), error).into())
                     })
-                    .collect::<Result<_, ComponentDefinitionError>>()?
+                    .collect::<Result<HashMap<_, _>, ComponentDefinitionError>>()?
             },
         })
     }

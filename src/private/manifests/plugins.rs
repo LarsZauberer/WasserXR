@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
@@ -15,7 +17,7 @@ pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,
 
-    pub components: Vec<ComponentManifest>,
+    pub components: HashMap<String, ComponentManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {
@@ -26,16 +28,17 @@ impl Manifest<PluginDefinition> for PluginManifest {
             name: name.clone(),
             engine_version: value.engine_version,
             components: if value.component_count == 0 {
-                Vec::new()
+                HashMap::new()
             } else {
                 unsafe { std::slice::from_raw_parts(value.components, value.component_count) }
                     .iter()
                     .copied()
                     .map(|component| {
                         unsafe { ComponentManifest::checked_convert(component) }
+                            .map(|manifest| (manifest.name.clone(), manifest))
                             .map_err(|error| (name.clone(), error).into())
                     })
-                    .collect::<Result<_, PluginDefinitionError>>()?
+                    .collect::<Result<HashMap<_, _>, PluginDefinitionError>>()?
             },
         })
     }
