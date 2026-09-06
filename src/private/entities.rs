@@ -1,4 +1,4 @@
-use std::os::raw::c_void;
+use std::{collections::HashMap, os::raw::c_void};
 
 use slotmap::SlotMap;
 
@@ -13,6 +13,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub(crate) struct Entity {
     components: SlotMap<ComponentID, Component>,
+    component_ids: HashMap<String, ComponentID>,
 }
 
 impl Entity {
@@ -29,23 +30,23 @@ impl Entity {
         manifest: &ComponentManifest,
     ) -> Result<ComponentID, EntityError> {
         let component = Component::new(manifest, plugin_id);
-        if self
-            .components
-            .values()
-            .find(|c| c.get_name() == component.get_name())
-            .is_some()
-        {
+        if self.component_ids.contains_key(component.get_name()) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        Ok(self.components.insert(component))
+        let name = component.get_name().to_owned();
+        let id = self.components.insert(component);
+        self.component_ids.insert(name, id);
+        Ok(id)
     }
 
     /// Remove a component from the entity
     pub(crate) fn remove_component(&mut self, id: ComponentID) -> Result<(), EntityError> {
-        self.components
+        let component = self
+            .components
             .remove(id)
-            .ok_or(EntityError::ComponentNotFound)
-            .map(|_| ())
+            .ok_or(EntityError::ComponentNotFound)?;
+        self.component_ids.remove(component.get_name());
+        Ok(())
     }
 
     /// Get all currently attached component id's from this entity
@@ -56,10 +57,9 @@ impl Entity {
     /// Resolve from component name to component id. If there is no component
     /// with this type, it will return None.
     pub(crate) fn resolve_component_id(&self, name: &str) -> Result<ComponentID, EntityError> {
-        self.components
-            .iter()
-            .find(|(_, c)| c.get_name() == name)
-            .map(|(i, _)| i)
+        self.component_ids
+            .get(name)
+            .copied()
             .ok_or(EntityError::ComponentNotFound)
     }
 
@@ -69,7 +69,11 @@ impl Entity {
         component_id: ComponentID,
         name: &str,
     ) -> Result<FieldID, EntityError> {
-        todo!()
+        self.components
+            .get(component_id)
+            .ok_or(EntityError::ComponentNotFound)?
+            .resolve_field_id(name)
+            .map_err(EntityError::from)
     }
 
     /// Returns the field pointer of a component field from a specific
