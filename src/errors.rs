@@ -14,7 +14,15 @@ pub enum SceneError {
 
 impl Display for SceneError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::EntityNotFound => f.write_str("entity not found"),
+            Self::PluginError(error) => write!(f, "plugin error: {error}"),
+            Self::PluginCompatibilityError(error) => {
+                write!(f, "plugin compatibility error: {error}")
+            }
+            Self::EntityError(error) => write!(f, "entity error: {error}"),
+            Self::NoComponentType => f.write_str("component type not found"),
+        }
     }
 }
 
@@ -33,7 +41,11 @@ pub enum PluginCompatibilityError {
 
 impl Display for PluginCompatibilityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::PluginWithSameNameExists => {
+                f.write_str("a plugin with the same name already exists")
+            }
+        }
     }
 }
 
@@ -54,7 +66,11 @@ pub enum EntityError {
 
 impl Display for EntityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::ComponentNotFound => f.write_str("component not found"),
+            Self::ComponentAlreadyExists => f.write_str("component already exists"),
+            Self::ComponentError(error) => write!(f, "component error: {error}"),
+        }
     }
 }
 
@@ -74,7 +90,10 @@ pub enum ComponentError {
 
 impl Display for ComponentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::FieldNotFound => f.write_str("field not found"),
+            Self::FieldError(error) => write!(f, "field error: {error}"),
+        }
     }
 }
 
@@ -94,7 +113,10 @@ pub enum FieldError {
 
 impl Display for FieldError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::NoGetter => f.write_str("field has no getter"),
+            Self::NotMutable => f.write_str("field is not mutable"),
+        }
     }
 }
 
