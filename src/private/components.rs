@@ -66,7 +66,7 @@ impl Component {
 
     /// Get the name of a field
     pub(crate) fn get_field_name(&self, id: FieldID) -> Result<&str, ComponentError> {
-        todo!()
+        Ok(self.get_field(id)?.get_name())
     }
 
     /// Get field id from the field name
