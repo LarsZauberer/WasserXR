@@ -6,7 +6,7 @@ use wasserxr::{
         components::ComponentDefinition, fields::ComponentFieldDefinition,
         plugins::PluginDefinition,
     },
-    errors::SceneError,
+    errors::{EntityError, SceneError},
     scene::{EntityID, Scene},
     utils::version::Version,
 };
@@ -144,9 +144,13 @@ fn component_lifecycle(mut scene: Scene) {
     scene
         .remove_component(entity1, my_component_id)
         .expect("Failed to remove the component form entity1");
-    scene
-        .remove_component(entity2, my_component_id)
-        .expect_err("Removed a none existent component from entity2");
+    let err = scene
+        .resolve_component_id(entity2, "MyComponent")
+        .expect_err("Got a component that shouldn't exist");
+    assert!(matches!(
+        err,
+        SceneError::EntityError(EntityError::ComponentNotFound)
+    ));
 
     // Check double remove
     scene
