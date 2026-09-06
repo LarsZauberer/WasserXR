@@ -11,6 +11,7 @@ use wasserxr::{
     utils::version::Version,
 };
 
+static TEST_LOCK: Mutex<()> = Mutex::new(());
 static CREATOR_COUNTER: Mutex<usize> = Mutex::new(0);
 static DESTROYER_COUNTER: Mutex<usize> = Mutex::new(0);
 
@@ -65,7 +66,6 @@ fn reset_globals() {
 
 #[fixture]
 fn scene() -> Scene {
-    reset_globals();
     let mut scene = Scene::new();
     unsafe { scene.load_static_plugin(VALID_COMPONENT_FIELD_PLUGIN) }
         .expect("Failed to load valid plugin");
@@ -86,6 +86,8 @@ fn empty_scene_cannot_add_component() {
 
 #[rstest]
 fn entity_cannot_have_duplicate_component(mut scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
     let entity_id = scene.add_entity();
     scene
         .add_component(entity_id, "MyComponent")
@@ -93,6 +95,9 @@ fn entity_cannot_have_duplicate_component(mut scene: Scene) {
     scene
         .add_component(entity_id, "MyComponent")
         .expect_err("Added duplicate of the same component");
+    // Drop the component before releasing TEST_LOCK so its destroyer cannot race
+    // another test's counters.
+    drop(scene);
 }
 
 fn get_vec_of_component_names(scene: &Scene, entity_id: EntityID) -> Vec<String> {
@@ -112,6 +117,8 @@ fn get_vec_of_component_names(scene: &Scene, entity_id: EntityID) -> Vec<String>
 
 #[rstest]
 fn component_lifecycle(mut scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
     // Add entities
     let entity1 = scene.add_entity();
     let entity2 = scene.add_entity();

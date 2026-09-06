@@ -1,12 +1,7 @@
-use std::ffi::c_char;
+use std::ffi::{c_char, c_void};
 
 use crate::{
-    definitions::{
-        Definition,
-        components::{Creator, Destroyer},
-        error::AssetDefinitionError,
-        fields::AssetFieldDefinition,
-    },
+    definitions::{Definition, error::AssetDefinitionError, fields::AssetFieldDefinition},
     utils::ffi::validate_string,
 };
 
@@ -17,8 +12,8 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub struct AssetDefinition {
     pub name: *const c_char,
-    pub creator: Option<Creator>,
-    pub destroyer: Option<Destroyer>,
+    pub creator: Option<unsafe extern "C" fn() -> *mut c_void>,
+    pub destroyer: Option<unsafe extern "C" fn(ptr: *mut c_void)>,
 
     pub fields: *const AssetFieldDefinition,
     pub field_count: usize,
