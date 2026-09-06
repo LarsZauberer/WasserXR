@@ -12,7 +12,9 @@ use uuid::Uuid;
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::PluginError,
-    private::manifests::{Manifest, components::ComponentManifest, plugins::PluginManifest},
+    private::manifests::{
+        Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
+    },
 };
 
 pub(crate) mod error;
@@ -103,5 +105,11 @@ impl Plugin {
     /// and tries to find the requested [`ComponentManifest`]
     pub(crate) fn get_component(&self, name: &str) -> Option<&ComponentManifest> {
         self.manifest.components.get(name)
+    }
+
+    /// Searches in the current [`PluginManifest`] for the defined assets and
+    /// tries to find the requested [`AssetManifest`].
+    pub(crate) fn get_asset(&self, name: &str) -> Option<&AssetManifest> {
+        self.manifest.assets.get(name)
     }
 }
