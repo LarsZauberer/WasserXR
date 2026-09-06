@@ -59,6 +59,11 @@ impl Component {
         &self.name
     }
 
+    /// Get a field from its id.
+    pub(crate) fn get_field(&self, id: FieldID) -> Result<&Field, ComponentError> {
+        self.fields.get(id).ok_or(ComponentError::FieldNotFound)
+    }
+
     /// Get the name of a field
     pub(crate) fn get_field_name(&self, id: FieldID) -> Result<&str, ComponentError> {
         todo!()
@@ -74,17 +79,13 @@ impl Component {
 
     /// Get the data pointer of a specific field
     pub(crate) fn get_field_ptr(&self, id: FieldID) -> Result<*const c_void, ComponentError> {
-        self.fields
-            .get(id)
-            .ok_or(ComponentError::FieldNotFound)?
+        self.get_field(id)?
             .get(self.data)
             .map_err(ComponentError::from)
     }
 
     pub(crate) fn get_field_mut_ptr(&self, id: FieldID) -> Result<*mut c_void, ComponentError> {
-        self.fields
-            .get(id)
-            .ok_or(ComponentError::FieldNotFound)?
+        self.get_field(id)?
             .get_mut(self.data)
             .map_err(ComponentError::from)
     }
