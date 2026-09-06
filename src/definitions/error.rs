@@ -162,8 +162,9 @@ impl Display for PluginDefinitionError {
             Self::ComponentInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid component: {error}")
             }
-            _ => {
-                todo!()
+            Self::AssetsIsNull(name) => write!(f, "plugin '{name}' asset list is null"),
+            Self::AssetInvalid(name, error) => {
+                write!(f, "plugin '{name}' has an invalid asset: {error}")
             }
         }
     }
@@ -173,6 +174,7 @@ impl Error for PluginDefinitionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::ComponentInvalid(_, error) => Some(error),
+            Self::AssetInvalid(_, error) => Some(error),
             _ => None,
         }
     }
@@ -233,8 +235,25 @@ impl Error for AssetFieldDefinitionError {}
 
 impl Display for AssetDefinitionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::NameIsNull => f.write_str("asset name is null"),
+            Self::NameIsNotUtf8 => f.write_str("asset name is not valid UTF-8"),
+            Self::NameIsEmpty => f.write_str("asset name is empty"),
+            Self::CreatorIsNull(name) => write!(f, "asset '{name}' creator is null"),
+            Self::DestroyerIsNull(name) => write!(f, "asset '{name}' destroyer is null"),
+            Self::FieldsIsNull(name) => write!(f, "asset '{name}' field list is null"),
+            Self::FieldInvalid(name, error) => {
+                write!(f, "asset '{name}' has an invalid field: {error}")
+            }
+        }
     }
 }
 
-impl Error for AssetDefinitionError {}
+impl Error for AssetDefinitionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FieldInvalid(_, error) => Some(error),
+            _ => None,
+        }
+    }
+}
