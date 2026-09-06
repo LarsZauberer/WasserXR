@@ -92,9 +92,13 @@ fn entity_cannot_have_duplicate_component(mut scene: Scene) {
     scene
         .add_component(entity_id, "MyComponent")
         .expect("Failed to add the component");
-    scene
+    let err = scene
         .add_component(entity_id, "MyComponent")
         .expect_err("Added duplicate of the same component");
+    assert!(matches!(
+        err,
+        SceneError::EntityError(EntityError::ComponentAlreadyExists)
+    ));
     // Drop the component before releasing TEST_LOCK so its destroyer cannot race
     // another test's counters.
     drop(scene);
@@ -133,17 +137,35 @@ fn component_lifecycle(mut scene: Scene) {
         get_vec_of_component_names(&scene, entity1),
         &["MyComponent"]
     );
-
-    let empty_string_list: [String; 0] = [];
-    assert_eq!(
-        get_vec_of_component_names(&scene, entity2),
-        &empty_string_list
-    );
+    assert!(get_vec_of_component_names(&scene, entity2).is_empty());
 
     // Remove components
     scene
         .remove_component(entity1, my_component_id)
-        .expect("Failed to remove the component form entity1");
+        .expect("Failed to remove the component from entity1");
+
+    // Check component status
+    assert!(get_vec_of_component_names(&scene, entity1).is_empty());
+    assert!(get_vec_of_component_names(&scene, entity2).is_empty());
+
+    // Check the call count of creator and destroyer
+    assert_eq!(*CREATOR_COUNTER.lock().unwrap(), 1);
+    assert_eq!(*DESTROYER_COUNTER.lock().unwrap(), 1);
+}
+
+#[rstest]
+fn component_is_scoped_to_entity(mut scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    // Add entities
+    let entity1 = scene.add_entity();
+    let entity2 = scene.add_entity();
+
+    // Add component
+    let my_component_id = scene
+        .add_component(entity1, "MyComponent")
+        .expect("Failed to add component to entity1");
+
     let err = scene
         .resolve_component_id(entity2, "MyComponent")
         .expect_err("Got a component that shouldn't exist");
@@ -152,22 +174,29 @@ fn component_lifecycle(mut scene: Scene) {
         SceneError::EntityError(EntityError::ComponentNotFound)
     ));
 
-    // Check double remove
     scene
         .remove_component(entity1, my_component_id)
-        .expect_err("Removed the same component twice from entity1");
+        .expect("Failed to remove the component from entity1");
+}
 
-    // Check component status
-    assert_eq!(
-        get_vec_of_component_names(&scene, entity1),
-        &empty_string_list
-    );
-    assert_eq!(
-        get_vec_of_component_names(&scene, entity2),
-        &empty_string_list
-    );
+#[rstest]
+fn component_cannot_be_removed_twice(mut scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let entity = scene.add_entity();
+    let component = scene
+        .add_component(entity, "MyComponent")
+        .expect("Failed to add component");
+    scene
+        .remove_component(entity, component)
+        .expect("Failed to remove component");
 
-    // Check the call count of creator and destroyer
-    assert_eq!(*CREATOR_COUNTER.lock().unwrap(), 1);
-    assert_eq!(*DESTROYER_COUNTER.lock().unwrap(), 1);
+    // Check double remove
+    let err = scene
+        .remove_component(entity, component)
+        .expect_err("Removed the same component twice");
+    assert!(matches!(
+        err,
+        SceneError::EntityError(EntityError::ComponentNotFound)
+    ));
 }
