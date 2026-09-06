@@ -14,6 +14,8 @@ pub enum PluginDefinitionError {
     },
     ComponentsIsNull(String),
     ComponentInvalid(String, ComponentDefinitionError),
+    AssetsIsNull(String),
+    AssetInvalid(String, AssetDefinitionError),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -41,6 +43,17 @@ pub enum AssetFieldDefinitionError {
     NameIsNotUtf8,
     NameIsEmpty,
     GetterIsNull(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssetDefinitionError {
+    NameIsNull,
+    NameIsNotUtf8,
+    NameIsEmpty,
+    CreatorIsNull(String),
+    DestroyerIsNull(String),
+    FieldsIsNull(String),
+    FieldInvalid(String, AssetFieldDefinitionError),
 }
 
 impl From<StringError> for PluginDefinitionError {
@@ -83,6 +96,16 @@ impl From<StringError> for AssetFieldDefinitionError {
     }
 }
 
+impl From<StringError> for AssetDefinitionError {
+    fn from(error: StringError) -> Self {
+        match error {
+            StringError::Null => Self::NameIsNull,
+            StringError::NotUtf8 => Self::NameIsNotUtf8,
+            StringError::Empty => Self::NameIsEmpty,
+        }
+    }
+}
+
 impl<N> From<(N, ComponentFieldDefinitionError)> for ComponentDefinitionError
 where
     N: Into<String>,
@@ -98,6 +121,24 @@ where
 {
     fn from((name, error): (N, ComponentDefinitionError)) -> Self {
         Self::ComponentInvalid(name.into(), error)
+    }
+}
+
+impl<N> From<(N, AssetDefinitionError)> for PluginDefinitionError
+where
+    N: Into<String>,
+{
+    fn from((name, error): (N, AssetDefinitionError)) -> Self {
+        Self::AssetInvalid(name.into(), error)
+    }
+}
+
+impl<N> From<(N, AssetFieldDefinitionError)> for AssetDefinitionError
+where
+    N: Into<String>,
+{
+    fn from((name, error): (N, AssetFieldDefinitionError)) -> Self {
+        Self::FieldInvalid(name.into(), error)
     }
 }
 
@@ -120,6 +161,9 @@ impl Display for PluginDefinitionError {
             }
             Self::ComponentInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid component: {error}")
+            }
+            _ => {
+                todo!()
             }
         }
     }
@@ -186,3 +230,11 @@ impl Display for AssetFieldDefinitionError {
 }
 
 impl Error for AssetFieldDefinitionError {}
+
+impl Display for AssetDefinitionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for AssetDefinitionError {}

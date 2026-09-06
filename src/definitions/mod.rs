@@ -45,3 +45,5 @@ pub mod components;
 
 /// Define the raw fields in components and assets
 pub mod fields;
+
+pub mod assets;

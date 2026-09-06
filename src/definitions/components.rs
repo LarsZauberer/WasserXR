@@ -40,8 +40,8 @@ pub type Destroyer = unsafe extern "C" fn(ptr: *mut c_void);
 #[repr(C)]
 pub struct ComponentDefinition {
     pub name: *const c_char,
-    pub creator: Option<unsafe extern "C" fn() -> *mut c_void>,
-    pub destroyer: Option<unsafe extern "C" fn(ptr: *mut c_void)>,
+    pub creator: Option<Creator>,
+    pub destroyer: Option<Destroyer>,
 
     pub fields: *const ComponentFieldDefinition,
     pub field_count: usize,
