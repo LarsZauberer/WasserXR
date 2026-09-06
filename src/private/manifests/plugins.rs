@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
-    private::manifests::{Manifest, components::ComponentManifest},
+    private::manifests::{Manifest, assets::AssetManifest, components::ComponentManifest},
 };
 
 /// The plugin manifest is the main manifest of each wasserxr plugin. It
@@ -18,6 +18,7 @@ pub(crate) struct PluginManifest {
     pub engine_version: Version,
 
     pub components: HashMap<String, ComponentManifest>,
+    pub assets: HashMap<String, AssetManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {
@@ -35,6 +36,19 @@ impl Manifest<PluginDefinition> for PluginManifest {
                     .copied()
                     .map(|component| {
                         unsafe { ComponentManifest::checked_convert(component) }
+                            .map(|manifest| (manifest.name.clone(), manifest))
+                            .map_err(|error| (name.clone(), error).into())
+                    })
+                    .collect::<Result<HashMap<_, _>, PluginDefinitionError>>()?
+            },
+            assets: if value.asset_count == 0 {
+                HashMap::new()
+            } else {
+                unsafe { std::slice::from_raw_parts(value.assets, value.asset_count) }
+                    .iter()
+                    .copied()
+                    .map(|asset| {
+                        unsafe { AssetManifest::checked_convert(asset) }
                             .map(|manifest| (manifest.name.clone(), manifest))
                             .map_err(|error| (name.clone(), error).into())
                     })

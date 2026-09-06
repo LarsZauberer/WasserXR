@@ -27,6 +27,7 @@ pub(crate) trait Manifest<D: Definition>: Sized {
     unsafe fn checked_convert(definition: D) -> Result<Self, D::Error>;
 }
 
+pub(crate) mod assets;
 pub(crate) mod components;
 pub(crate) mod fields;
 pub(crate) mod plugins;
