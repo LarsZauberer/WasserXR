@@ -14,7 +14,7 @@ use crate::{
 /// It's responsibility is to create it from a [`ComponentFieldManifest`] and be
 /// concrete.
 #[derive(Debug, Clone)]
-pub(crate) struct Field {
+pub(crate) struct ComponentField {
     name: String,
     getter: Option<Getter>,
     mutable: bool,
@@ -22,7 +22,7 @@ pub(crate) struct Field {
     deserializer: Option<Deserializer>,
 }
 
-impl Field {
+impl ComponentField {
     /// Get the field data from a component object
     pub(crate) fn get(&self, ptr: *const c_void) -> Result<*const c_void, FieldError> {
         match self.getter {
@@ -52,9 +52,9 @@ impl Field {
     }
 }
 
-impl From<&ComponentFieldManifest> for Field {
+impl From<&ComponentFieldManifest> for ComponentField {
     fn from(value: &ComponentFieldManifest) -> Self {
-        Field {
+        ComponentField {
             name: value.name.clone(),
             getter: value.getter,
             mutable: value.mutable,

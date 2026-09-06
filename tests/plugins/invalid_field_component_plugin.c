@@ -29,4 +29,6 @@ const PluginDefinition wxr_plugin = {
     .engine_version = {0, 2, 0},
     .components = components,
     .component_count = 1,
+    .assets = NULL,
+    .asset_count = 0,
 };

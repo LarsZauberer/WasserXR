@@ -5,7 +5,7 @@ use slotmap::SlotMap;
 use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
-    private::{fields::Field, manifests::components::ComponentManifest},
+    private::{fields::ComponentField, manifests::components::ComponentManifest},
     scene::{FieldID, PluginID},
 };
 
@@ -16,7 +16,7 @@ use crate::{
 pub(crate) struct Component {
     plugin_id: PluginID,
     name: String,
-    fields: SlotMap<FieldID, Field>,
+    fields: SlotMap<FieldID, ComponentField>,
     field_ids: HashMap<String, FieldID>,
     destroyer: Destroyer,
     data: *mut c_void,
@@ -39,7 +39,7 @@ impl Component {
         let mut fields = SlotMap::with_key();
         let mut field_ids = HashMap::new();
         manifest.fields.iter().for_each(|(_, field)| {
-            let field = Field::from(field);
+            let field = ComponentField::from(field);
             let name = field.get_name().to_owned();
             let id = fields.insert(field);
             field_ids.insert(name, id);
@@ -60,7 +60,7 @@ impl Component {
     }
 
     /// Get a field from its id.
-    pub(crate) fn get_field(&self, id: FieldID) -> Result<&Field, ComponentError> {
+    pub(crate) fn get_field(&self, id: FieldID) -> Result<&ComponentField, ComponentError> {
         self.fields.get(id).ok_or(ComponentError::FieldNotFound)
     }
 
