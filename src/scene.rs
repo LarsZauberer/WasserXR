@@ -23,6 +23,10 @@ pub struct EntityID;
 /// Handle for a loaded plugin. It describes a plugin uniquely to the scene and cannot like the [`EntityID`] be used
 /// in different scenes. This behavior is not supported.
 pub struct PluginID;
+
+/// The main handle that is cheap to copy and address a [`Component`]. It is only unique within a
+/// single [`Entity`] and cannot be used across multiple [`Entity`].
+pub struct ComponentID;
 }
 
 type EntityStorage = SlotMap<EntityID, Entity>;
@@ -164,7 +168,7 @@ impl Scene {
         &mut self,
         entity_id: EntityID,
         component_type: &str,
-    ) -> Result<(), SceneError> {
+    ) -> Result<ComponentID, SceneError> {
         let entity = self
             .entities
             .get_mut(entity_id)
@@ -190,21 +194,49 @@ impl Scene {
     pub fn remove_component(
         &mut self,
         entity_id: EntityID,
-        component_type: &str,
+        component: ComponentID,
     ) -> Result<(), SceneError> {
         self.entities
             .get_mut(entity_id)
             .ok_or(SceneError::EntityNotFound)?
-            .remove_component(component_type)
-            .map_err(SceneError::EntityError)
+            .remove_component(component)
+            .map_err(SceneError::from)
+            .map(|_| ())
     }
 
     /// Returns all the component names of the given [`EntityID`]
-    pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<String>, SceneError> {
+    pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<ComponentID>, SceneError> {
         Ok(self
             .entities
             .get(entity_id)
             .ok_or(SceneError::EntityNotFound)?
             .get_components())
+    }
+
+    /// Return the name of some component handle
+    pub fn get_component_name(
+        &self,
+        entity_id: EntityID,
+        component_id: ComponentID,
+    ) -> Result<&str, SceneError> {
+        self.entities
+            .get(entity_id)
+            .ok_or(SceneError::EntityNotFound)?
+            .get_component_name(component_id)
+            .map_err(SceneError::from)
+    }
+
+    /// Resolves the `[ComponentID]` of a component given it's name and an
+    /// [`EntityID`] which should have the component attached to it
+    pub fn resolve_component_id(
+        &self,
+        entity_id: EntityID,
+        component_name: &str,
+    ) -> Result<ComponentID, SceneError> {
+        self.entities
+            .get(entity_id)
+            .ok_or(SceneError::EntityNotFound)?
+            .resolve_component_id(component_name)
+            .map_err(SceneError::from)
     }
 }

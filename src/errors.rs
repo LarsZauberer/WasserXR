@@ -60,6 +60,12 @@ impl Display for EntityError {
 
 impl Error for EntityError {}
 
+impl From<EntityError> for SceneError {
+    fn from(value: EntityError) -> Self {
+        SceneError::EntityError(value)
+    }
+}
+
 #[derive(Debug)]
 pub enum ComponentError {
     FieldNotFound,
@@ -74,3 +80,9 @@ impl Display for ComponentError {
 }
 
 impl Error for ComponentError {}
+
+impl From<ComponentError> for EntityError {
+    fn from(value: ComponentError) -> Self {
+        EntityError::ComponentError(value)
+    }
+}

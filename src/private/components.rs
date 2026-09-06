@@ -32,7 +32,7 @@ impl Component {
         }
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub(crate) fn get_name(&self) -> &str {
         &self.manifest.name
     }
 

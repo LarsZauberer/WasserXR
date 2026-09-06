@@ -7,7 +7,7 @@ use wasserxr::{
         plugins::PluginDefinition,
     },
     errors::SceneError,
-    scene::Scene,
+    scene::{EntityID, Scene},
     utils::version::Version,
 };
 
@@ -93,6 +93,21 @@ fn entity_cannot_have_duplicate_component(mut scene: Scene) {
         .expect_err("Added duplicate of the same component");
 }
 
+fn get_vec_of_component_names(scene: &Scene, entity_id: EntityID) -> Vec<String> {
+    let components = scene
+        .get_components(entity_id)
+        .expect("Entity has to exist");
+    components
+        .iter()
+        .map(|c| {
+            scene
+                .get_component_name(entity_id, *c)
+                .expect("Component exists")
+                .to_owned()
+        })
+        .collect()
+}
+
 #[rstest]
 fn component_lifecycle(mut scene: Scene) {
     // Add entities
@@ -100,50 +115,42 @@ fn component_lifecycle(mut scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    scene
+    let my_component_id = scene
         .add_component(entity1, "MyComponent")
         .expect("Failed to add component to entity1");
 
     // Check component add status
     assert_eq!(
-        scene
-            .get_components(entity1)
-            .expect("Failed to get the components from entity1"),
+        get_vec_of_component_names(&scene, entity1),
         &["MyComponent"]
     );
 
     let empty_string_list: [String; 0] = [];
     assert_eq!(
-        scene
-            .get_components(entity2)
-            .expect("Failed to get the components from entity2"),
+        get_vec_of_component_names(&scene, entity2),
         &empty_string_list
     );
 
     // Remove components
     scene
-        .remove_component(entity1, "MyComponent")
+        .remove_component(entity1, my_component_id)
         .expect("Failed to remove the component form entity1");
     scene
-        .remove_component(entity2, "MyComponent")
+        .remove_component(entity2, my_component_id)
         .expect_err("Removed a none existent component from entity2");
 
     // Check double remove
     scene
-        .remove_component(entity1, "MyComponent")
+        .remove_component(entity1, my_component_id)
         .expect_err("Removed the same component twice from entity1");
 
     // Check component status
     assert_eq!(
-        scene
-            .get_components(entity1)
-            .expect("Failed to get the components from entity1"),
+        get_vec_of_component_names(&scene, entity1),
         &empty_string_list
     );
     assert_eq!(
-        scene
-            .get_components(entity2)
-            .expect("Failed to get the components from entity2"),
+        get_vec_of_component_names(&scene, entity2),
         &empty_string_list
     );
 
