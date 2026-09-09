@@ -38,6 +38,8 @@ pub enum SceneError {
     PluginCompatibilityError(PluginCompatibilityError),
     EntityError(EntityError),
     NoComponentType,
+    AssetNotFound,
+    AssetError(AssetError),
 }
 
 impl Display for SceneError {
@@ -153,5 +155,25 @@ impl Error for FieldError {}
 impl From<FieldError> for ComponentError {
     fn from(value: FieldError) -> Self {
         ComponentError::FieldError(value)
+    }
+}
+
+#[derive(Debug)]
+pub enum AssetError {
+    CreationFailure,
+    FieldNotFound,
+}
+
+impl Error for AssetError {}
+
+impl Display for AssetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl From<AssetError> for SceneError {
+    fn from(value: AssetError) -> Self {
+        SceneError::AssetError(value)
     }
 }

@@ -1,4 +1,4 @@
-use std::{path::Path, sync::RwLock};
+use std::{ffi::c_void, path::Path, sync::RwLock};
 
 use slotmap::{SlotMap, new_key_type};
 
@@ -6,6 +6,7 @@ use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     private::{
+        asset_storage::AssetStorage,
         entities::Entity,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
@@ -22,13 +23,22 @@ pub struct EntityID;
 /// in different scenes. This behavior is not supported.
 pub struct PluginID;
 
-/// Handle that is cheap to copy and address a [`Component`]. It is only unique within a
-/// single [`Entity`] and cannot be used across multiple [`Entity`].
+/// Handle that is cheap to copy and address a component. It is only unique within a
+/// single entity and cannot be used across multiple entity.
 pub struct ComponentID;
 
 /// Handle that is cheap to copy and address a field in a component. It is only unique within a
 /// single entity and component. It is not unique across multiple components.
 pub struct FieldID;
+
+/// Handle that is cheap to copy to address assets. An AssetID is unique to an asset type and it's
+/// data string. Meaning two assets of the same type but have different data strings will have
+/// different ID's
+pub struct AssetID;
+
+/// HAndle that is cheap to copy and uniquely identifies a field inside of an asset. It is only
+/// unique inside of a single Asset and it's data string.
+pub struct AssetFieldID;
 }
 
 type EntityStorage = SlotMap<EntityID, Entity>;
@@ -46,6 +56,7 @@ type PluginStorage = SlotMap<PluginID, Plugin>;
 pub struct Scene {
     entities: RwLock<EntityStorage>,
     plugins: RwLock<PluginStorage>,
+    assets: RwLock<AssetStorage>,
 }
 
 impl Scene {
@@ -277,5 +288,45 @@ impl Scene {
                 .resolve_field_id(component_id, name)
                 .map_err(SceneError::from)
         })
+    }
+
+    /// Resolve the [`AssetID`] from a given asset name and data string
+    ///
+    /// This function will **not** load a new asset if the asset doesn't exist.
+    pub fn resolve_asset_id(
+        &self,
+        asset_name: &str,
+        data_string: &str,
+    ) -> Result<AssetID, SceneError> {
+        todo!()
+    }
+
+    /// Resolve the [`AssetFieldID`] from ta given [`AssetID`] and the field
+    /// name
+    ///
+    /// This function will **not** load a new asset if the asset doesn't exist.
+    pub fn resolve_asset_field_id(
+        &self,
+        asset_id: AssetID,
+        field_name: &str,
+    ) -> Result<AssetFieldID, SceneError> {
+        todo!()
+    }
+
+    /// Resolves the asset id and if it doesn't exist, it will try to load the
+    /// asset
+    pub fn get_asset_id(&self, asset_name: &str, data_string: &str) -> Result<AssetID, SceneError> {
+        todo!()
+    }
+
+    /// Get the assets field pointer to access an asset's field.
+    ///
+    /// This can be thread safely done, since all the assets are read-only
+    pub fn query_asset_field(
+        &self,
+        asset_id: AssetID,
+        field_id: AssetFieldID,
+    ) -> Result<*const c_void, SceneError> {
+        todo!()
     }
 }

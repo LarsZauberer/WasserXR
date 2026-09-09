@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use crate::{
     definitions::fields::{Deserializer, Getter, Serializer},
     errors::FieldError,
-    private::manifests::fields::ComponentFieldManifest,
+    private::manifests::fields::{AssetFieldManifest, ComponentFieldManifest},
 };
 
 /// A field is the concrete implementation of a field in a concrete
@@ -60,6 +60,34 @@ impl From<&ComponentFieldManifest> for ComponentField {
             mutable: value.mutable,
             serializer: value.serializer,
             deserializer: value.deserializer,
+        }
+    }
+}
+
+/// A concrete field implementation of an asset field. It is created from a
+/// [`AssetFieldManifest`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AssetField {
+    name: String,
+    getter: Getter,
+}
+
+impl AssetField {
+    pub(crate) fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn get(&self, data: *const c_void) -> *const c_void {
+        let ptr = unsafe { (self.getter)(data) };
+        ptr.cast_const()
+    }
+}
+
+impl From<&AssetFieldManifest> for AssetField {
+    fn from(value: &AssetFieldManifest) -> Self {
+        AssetField {
+            name: value.name.clone(),
+            getter: value.getter,
         }
     }
 }

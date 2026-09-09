@@ -1,3 +1,5 @@
+pub(crate) mod asset_storage;
+pub(crate) mod assets;
 pub(crate) mod components;
 pub(crate) mod entities;
 pub(crate) mod fields;
