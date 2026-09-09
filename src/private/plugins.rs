@@ -17,8 +17,6 @@ use crate::{
     },
 };
 
-pub(crate) mod error;
-
 const WXR_PLUGIN_SYMBOL_NAME: &CStr = c"wxr_plugin";
 
 /// This trait defines what operations an active plugin that handles all the I/O
