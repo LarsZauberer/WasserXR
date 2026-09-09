@@ -298,7 +298,10 @@ impl Scene {
         asset_name: &str,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
-        todo!()
+        self.assets
+            .read()
+            .expect("scene asset lock poisoned")
+            .resolve_asset_id(asset_name, data_string)
     }
 
     /// Resolve the [`AssetFieldID`] from ta given [`AssetID`] and the field
@@ -310,13 +313,32 @@ impl Scene {
         asset_id: AssetID,
         field_name: &str,
     ) -> Result<AssetFieldID, SceneError> {
-        todo!()
+        self.assets
+            .read()
+            .expect("scene asset lock poisoned")
+            .resolve_asset_field_id(asset_id, field_name)
     }
 
     /// Resolves the asset id and if it doesn't exist, it will try to load the
     /// asset
     pub fn get_asset_id(&self, asset_name: &str, data_string: &str) -> Result<AssetID, SceneError> {
-        todo!()
+        if let Ok(id) = self.resolve_asset_id(asset_name, data_string) {
+            return Ok(id);
+        }
+
+        let manifest = self
+            .plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .values()
+            .find_map(|plugin| plugin.get_asset(asset_name).cloned())
+            .ok_or(SceneError::AssetNotFound)?;
+
+        let mut assets = self.assets.write().expect("scene asset lock poisoned");
+        if let Ok(id) = assets.resolve_asset_id(asset_name, data_string) {
+            return Ok(id);
+        }
+        assets.add_asset(data_string.to_owned(), &manifest)
     }
 
     /// Get the assets field pointer to access an asset's field.
@@ -327,6 +349,9 @@ impl Scene {
         asset_id: AssetID,
         field_id: AssetFieldID,
     ) -> Result<*const c_void, SceneError> {
-        todo!()
+        self.assets
+            .read()
+            .expect("scene asset lock poisoned")
+            .get_asset_field_ptr(asset_id, field_id)
     }
 }

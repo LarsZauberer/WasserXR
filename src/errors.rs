@@ -52,6 +52,8 @@ impl Display for SceneError {
             }
             Self::EntityError(error) => write!(f, "entity error: {error}"),
             Self::NoComponentType => f.write_str("component type not found"),
+            Self::AssetNotFound => f.write_str("asset not found"),
+            Self::AssetError(error) => write!(f, "asset error: {error}"),
         }
     }
 }
@@ -168,7 +170,10 @@ impl Error for AssetError {}
 
 impl Display for AssetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::CreationFailure => f.write_str("asset creation failed"),
+            Self::FieldNotFound => f.write_str("asset field not found"),
+        }
     }
 }
 

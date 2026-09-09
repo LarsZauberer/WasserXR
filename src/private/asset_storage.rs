@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::c_void, sync::RwLock};
+use std::{collections::HashMap, ffi::c_void};
 
 use slotmap::SlotMap;
 
@@ -22,29 +22,31 @@ pub(crate) struct AssetStorage {
 }
 
 impl AssetStorage {
-    /// Create a new empty asset storage
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     /// Resolves from the asset name and the data string the [`AssetID`]
-    pub(crate) fn resolve_asset_id(&self, name: &str, data_string: &str) -> AssetID {
-        todo!()
-    }
-
-    /// Runs an action with an [`Asset`] given an [`AssetID`]
-    fn with_asset<T>(
+    pub(crate) fn resolve_asset_id(
         &self,
-        id: AssetID,
-        action: impl FnOnce(&Asset) -> Result<T, SceneError>,
-    ) -> Result<T, SceneError> {
-        todo!()
+        name: &str,
+        data_string: &str,
+    ) -> Result<AssetID, SceneError> {
+        self.asset_ids
+            .get(name)
+            .and_then(|assets| assets.get(data_string))
+            .copied()
+            .ok_or(SceneError::AssetNotFound)
     }
 
     /// Resolve the [`AssetFieldID`] from the [`AssetID`] and the name of the
     /// field
-    pub(crate) fn resolve_asset_field_id(&self, id: AssetID, field_name: &str) -> AssetFieldID {
-        todo!()
+    pub(crate) fn resolve_asset_field_id(
+        &self,
+        id: AssetID,
+        field_name: &str,
+    ) -> Result<AssetFieldID, SceneError> {
+        self.assets
+            .get(id)
+            .ok_or(SceneError::AssetNotFound)?
+            .resolve_field_id(field_name)
+            .map_err(SceneError::from)
     }
 
     /// Query the field of an asset and get the field pointer
@@ -52,8 +54,12 @@ impl AssetStorage {
         &self,
         asset_id: AssetID,
         field_id: AssetFieldID,
-    ) -> *const c_void {
-        todo!()
+    ) -> Result<*const c_void, SceneError> {
+        self.assets
+            .get(asset_id)
+            .ok_or(SceneError::AssetNotFound)?
+            .get_field(field_id)
+            .map_err(SceneError::from)
     }
 
     /// Add a new asset
@@ -62,17 +68,12 @@ impl AssetStorage {
         data_string: String,
         manifest: &AssetManifest,
     ) -> Result<AssetID, SceneError> {
-        todo!()
-    }
-
-    /// Remove a specific asset
-    pub(crate) fn remove_asset(&mut self, id: AssetID) -> Result<AssetID, SceneError> {
-        todo!()
-    }
-
-    /// Clear asset cache. It will remove all the current assets and invalidate
-    /// all the current assets
-    pub(crate) fn clear(&mut self) {
-        todo!()
+        let asset = Asset::new(manifest).map_err(SceneError::from)?;
+        let id = self.assets.insert(asset);
+        self.asset_ids
+            .entry(manifest.name.clone())
+            .or_default()
+            .insert(data_string, id);
+        Ok(id)
     }
 }
