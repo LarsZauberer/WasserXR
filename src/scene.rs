@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::RwLock};
 
 use slotmap::{SlotMap, new_key_type};
 
@@ -9,7 +9,6 @@ use crate::{
         entities::Entity,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
-        utils::storage_backend::StorageBackend,
     },
 };
 
@@ -41,10 +40,12 @@ type PluginStorage = SlotMap<PluginID, Plugin>;
 /// While it is possible to have mutliple scenes per application, the scene is
 /// designed to only have one Scene per application maintaining all the
 /// entities, components, systems, assets and plugins currently active.
+/// Its contents are internally synchronized so a scene can be shared across
+/// threads.
 #[derive(Debug, Default)]
 pub struct Scene {
-    entities: EntityStorage,
-    plugins: PluginStorage,
+    entities: RwLock<EntityStorage>,
+    plugins: RwLock<PluginStorage>,
 }
 
 impl Scene {
@@ -55,9 +56,12 @@ impl Scene {
 
     /// Creates a new entity and returns it's handle. The handle will be unique
     /// to every other entity ever created within this scene.
-    pub fn add_entity(&mut self) -> EntityID {
+    pub fn add_entity(&self) -> EntityID {
         let entity = Entity::new();
-        self.entities.insert(entity)
+        self.entities
+            .write()
+            .expect("scene entity lock poisoned")
+            .insert(entity)
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -65,30 +69,34 @@ impl Scene {
     ///
     /// If the entity couldn't be found with the handle, the function will
     /// return a [`SceneError::EntityNotFound`]
-    pub fn remove_entity(&mut self, id: EntityID) -> Result<(), SceneError> {
-        self.entities
+    pub fn remove_entity(&self, id: EntityID) -> Result<(), SceneError> {
+        let _ = self
+            .entities
+            .write()
+            .expect("scene entity lock poisoned")
             .remove(id)
-            .map(|_| ())
-            .ok_or(SceneError::EntityNotFound)
+            .ok_or(SceneError::EntityNotFound)?;
+        Ok(())
     }
 
     /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently
     /// active in the scene.
     pub fn get_entities(&self) -> Vec<EntityID> {
-        self.entities.keys().collect()
-    }
-
-    /// Private utility function that gets an [`Entity`] from [`EntityID`]
-    pub(crate) fn get_entity(&self, id: EntityID) -> Result<&Entity, SceneError> {
-        self.entities.get(id).ok_or(SceneError::EntityNotFound)
+        self.entities
+            .read()
+            .expect("scene entity lock poisoned")
+            .keys()
+            .collect()
     }
 
     /// This will reset the scene's main objects. Meaning it will remove all the
     /// entities, components and systems
     ///
     /// It will **not** unload any plugins or remove cached assets
-    pub fn reset(&mut self) -> Result<(), SceneError> {
-        self.entities.clear();
+    pub fn reset(&self) -> Result<(), SceneError> {
+        let entities =
+            std::mem::take(&mut *self.entities.write().expect("scene entity lock poisoned"));
+        drop(entities);
         Ok(())
     }
 
@@ -96,14 +104,30 @@ impl Scene {
     /// added to the scene. It checks the following conditions
     ///
     /// - Is a plugin with the same name already loaded?
-    fn check_plugin_compatibility(&self, new_plugin: &Plugin) -> Result<(), SceneError> {
-        if self.get_plugin(new_plugin.get_name()).is_some() {
+    fn add_plugin(&self, new_plugin: Plugin) -> Result<PluginID, SceneError> {
+        let mut plugins = self.plugins.write().expect("scene plugin lock poisoned");
+        if plugins
+            .values()
+            .any(|plugin| plugin.get_name() == new_plugin.get_name())
+        {
             return Err(SceneError::from(
                 PluginCompatibilityError::PluginWithSameNameExists,
             ));
         }
 
-        Ok(())
+        Ok(plugins.insert(new_plugin))
+    }
+
+    /// Runs an action with an entity while holding the entity collection's
+    /// read lock, preventing the entity from being removed during the action.
+    fn with_entity<T>(
+        &self,
+        id: EntityID,
+        action: impl FnOnce(&Entity) -> Result<T, SceneError>,
+    ) -> Result<T, SceneError> {
+        let entities = self.entities.read().expect("scene entity lock poisoned");
+        let entity = entities.get(id).ok_or(SceneError::EntityNotFound)?;
+        action(entity)
     }
 
     /// Load a plugin from a shared object library.
@@ -117,15 +141,11 @@ impl Scene {
     /// globally defined variable called `wxr_plugin`. The `wxr_plugin`
     /// variable has to be of type [`PluginDefinition`] as has to be valid.
     /// Furthermore, the [`PluginDefinition`] musn't have any malformed content
-    /// within it.
-    pub unsafe fn load_plugin(&mut self, path: &Path) -> Result<PluginID, SceneError> {
+    /// within it. Component data and callbacks supplied by the plugin must be
+    /// safe to access from multiple threads.
+    pub unsafe fn load_plugin(&self, path: &Path) -> Result<PluginID, SceneError> {
         let plugin = unsafe { Plugin::load_shared(path) }.map_err(SceneError::from)?;
-
-        // Check if the plugin can be combined with other plugins in the scene
-        self.check_plugin_compatibility(&plugin)?;
-
-        let id = self.plugins.insert(plugin);
-        Ok(id)
+        self.add_plugin(plugin)
     }
 
     /// Load a plugin from a statically linked and already [`PluginDefinition`]
@@ -136,36 +156,38 @@ impl Scene {
     /// # Safety
     ///
     /// The [`PluginDefinition`] must be valid and not have not any malformed
-    /// content within.
+    /// content within. Its component data and callbacks must be safe to access
+    /// from multiple threads.
     pub unsafe fn load_static_plugin(
-        &mut self,
+        &self,
         definition: PluginDefinition,
     ) -> Result<PluginID, SceneError> {
         let manifest: PluginManifest = unsafe { Manifest::checked_convert(definition) }
             .map_err(|err| SceneError::from(PluginError::from(err)))?;
         let plugin = Plugin::load_static(manifest);
 
-        // Check if the plugin can be combined with other plugins in the scene
-        self.check_plugin_compatibility(&plugin)?;
-
-        // Add plugin to scene
-        let id = self.plugins.insert(plugin);
-        Ok(id)
+        self.add_plugin(plugin)
     }
 
     /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a
     /// plugin
     pub fn get_plugin(&self, name: &str) -> Option<PluginID> {
         self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
             .iter()
-            .find(|(_, v)| v.get_name() == name)
+            .find(|(_, plugin)| plugin.get_name() == name)
             .map(|(k, _)| k)
     }
 
     /// Get all the [`PluginID`] of the currently actively loaded plugins in the
     /// scene
     pub fn get_plugins(&self) -> Vec<PluginID> {
-        self.plugins.iter_key().collect()
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .keys()
+            .collect()
     }
 
     /// Add a component type to an entity
@@ -173,48 +195,46 @@ impl Scene {
     /// This function may fail, if the entity cannot be found or if the entity
     /// has already an existing component of that type
     pub fn add_component(
-        &mut self,
+        &self,
         entity_id: EntityID,
         component_type: &str,
     ) -> Result<ComponentID, SceneError> {
-        let entity = self
-            .entities
-            .get_mut(entity_id)
-            .ok_or(SceneError::EntityNotFound)?;
         let (plugin_id, manifest) = self
             .plugins
+            .read()
+            .expect("scene plugin lock poisoned")
             .iter()
             .find_map(|(plugin_id, plugin)| {
                 plugin
                     .get_component(component_type)
+                    .cloned()
                     .map(|manifest| (plugin_id, manifest))
             })
             .ok_or(SceneError::NoComponentType)?;
 
-        entity
-            .add_component(plugin_id, manifest)
-            .map_err(SceneError::EntityError)
+        self.with_entity(entity_id, |entity| {
+            entity
+                .add_component(plugin_id, &manifest)
+                .map_err(SceneError::EntityError)
+        })
     }
 
     /// Remove a component type from an entity
     ///
     /// The function may fail, if the [`EntityID`] cannot be found in the scene.
     pub fn remove_component(
-        &mut self,
+        &self,
         entity_id: EntityID,
         component: ComponentID,
     ) -> Result<(), SceneError> {
-        self.entities
-            .get_mut(entity_id)
-            .ok_or(SceneError::EntityNotFound)?
-            .remove_component(component)
-            .map_err(SceneError::from)
-            .map(|_| ())
+        self.with_entity(entity_id, |entity| {
+            entity.remove_component(component).map_err(SceneError::from)
+        })
     }
 
     /// Returns all the component names of the given [`EntityID`]
     pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<ComponentID>, SceneError> {
-        Ok(self.get_entity(entity_id)?.get_components())
+        self.with_entity(entity_id, |entity| Ok(entity.get_components()))
     }
 
     /// Return the name of some component handle
@@ -222,10 +242,12 @@ impl Scene {
         &self,
         entity_id: EntityID,
         component_id: ComponentID,
-    ) -> Result<&str, SceneError> {
-        self.get_entity(entity_id)?
-            .get_component_name(component_id)
-            .map_err(SceneError::from)
+    ) -> Result<String, SceneError> {
+        self.with_entity(entity_id, |entity| {
+            entity
+                .get_component_name(component_id)
+                .map_err(SceneError::from)
+        })
     }
 
     /// Resolves the [`ComponentID`] of a component given it's name and an
@@ -235,9 +257,11 @@ impl Scene {
         entity_id: EntityID,
         component_name: &str,
     ) -> Result<ComponentID, SceneError> {
-        self.get_entity(entity_id)?
-            .resolve_component_id(component_name)
-            .map_err(SceneError::from)
+        self.with_entity(entity_id, |entity| {
+            entity
+                .resolve_component_id(component_name)
+                .map_err(SceneError::from)
+        })
     }
 
     /// Resolve the [`FieldID`] from the name of a field providing the
@@ -248,8 +272,10 @@ impl Scene {
         component_id: ComponentID,
         name: &str,
     ) -> Result<FieldID, SceneError> {
-        self.get_entity(entity_id)?
-            .resolve_field_id(component_id, name)
-            .map_err(SceneError::from)
+        self.with_entity(entity_id, |entity| {
+            entity
+                .resolve_field_id(component_id, name)
+                .map_err(SceneError::from)
+        })
     }
 }

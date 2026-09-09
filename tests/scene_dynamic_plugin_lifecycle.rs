@@ -35,7 +35,7 @@ plugin_fixture!(invalid_field_component_plugin);
 ////////////////////////////////////////////////////////////////////
 
 #[rstest]
-fn add_dynamic_plugin(mut scene: Scene, valid_empty_plugin: &Path) {
+fn add_dynamic_plugin(scene: Scene, valid_empty_plugin: &Path) {
     let plugin_id =
         unsafe { scene.load_plugin(valid_empty_plugin) }.expect("Failed to load valid plugin");
 
@@ -52,7 +52,7 @@ fn add_dynamic_plugin(mut scene: Scene, valid_empty_plugin: &Path) {
 }
 
 #[rstest]
-fn no_duplicate_dynamic_plugin_with_same_path(mut scene: Scene, valid_empty_plugin: &Path) {
+fn no_duplicate_dynamic_plugin_with_same_path(scene: Scene, valid_empty_plugin: &Path) {
     let plugin_id =
         unsafe { scene.load_plugin(valid_empty_plugin) }.expect("Failed to load valid plugin");
     let plugin_err = unsafe { scene.load_plugin(valid_empty_plugin) }
@@ -65,7 +65,7 @@ fn no_duplicate_dynamic_plugin_with_same_path(mut scene: Scene, valid_empty_plug
 }
 
 #[rstest]
-fn no_duplicate_dynamic_plugin_with_same_name(mut scene: Scene) {
+fn no_duplicate_dynamic_plugin_with_same_name(scene: Scene) {
     let comp1 = valid_empty_plugin();
     let comp2 = valid_empty_plugin();
     assert_ne!(
@@ -84,7 +84,7 @@ fn no_duplicate_dynamic_plugin_with_same_name(mut scene: Scene) {
 }
 
 #[rstest]
-fn no_invalid_plugin_dynamic_load(mut scene: Scene, invalid_field_component_plugin: &Path) {
+fn no_invalid_plugin_dynamic_load(scene: Scene, invalid_field_component_plugin: &Path) {
     let plugin_err = unsafe { scene.load_plugin(invalid_field_component_plugin) }
         .expect_err("Loaded invalid plugin");
     assert!(matches!(

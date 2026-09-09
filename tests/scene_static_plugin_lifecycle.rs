@@ -83,7 +83,7 @@ const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {
 #[case::empty_component_plugin(VALID_EMPTY_COMPONENT_PLUGIN)]
 #[case::component_with_field_plugin(VALID_COMPONENT_FIELD_PLUGIN)]
 fn add_simple_plugin(#[case] definition: PluginDefinition) {
-    let mut scene = Scene::new();
+    let scene = Scene::new();
     let plugin =
         unsafe { scene.load_static_plugin(definition) }.expect("Valid plugins should be loadable");
     let plugins = scene.get_plugins();
@@ -98,7 +98,7 @@ fn add_simple_plugin(#[case] definition: PluginDefinition) {
 #[case::empty_component_plugin(VALID_EMPTY_COMPONENT_PLUGIN)]
 #[case::component_with_field_plugin(VALID_COMPONENT_FIELD_PLUGIN)]
 fn cannot_add_duplicate_plugin(#[case] definition: PluginDefinition) {
-    let mut scene = Scene::new();
+    let scene = Scene::new();
     let _ =
         unsafe { scene.load_static_plugin(definition) }.expect("Valid plugins should be loadable");
 
@@ -115,7 +115,7 @@ fn cannot_add_duplicate_plugin(#[case] definition: PluginDefinition) {
 #[case::empty_component_plugin(VALID_EMPTY_COMPONENT_PLUGIN)]
 #[case::component_with_field_plugin(VALID_COMPONENT_FIELD_PLUGIN)]
 fn get_plugin_name(#[case] definition: PluginDefinition) {
-    let mut scene = Scene::new();
+    let scene = Scene::new();
     let plugin =
         unsafe { scene.load_static_plugin(definition) }.expect("Valid plugins should be loadable");
 

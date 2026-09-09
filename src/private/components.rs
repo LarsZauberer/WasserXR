@@ -22,6 +22,12 @@ pub(crate) struct Component {
     data: *mut c_void,
 }
 
+// SAFETY: Component access is synchronized by its owning collection lock.
+// Plugin creators, getters, and destroyers must uphold the thread-safety
+// contract of their opaque data pointer.
+unsafe impl Send for Component {}
+unsafe impl Sync for Component {}
+
 impl Component {
     /// Creates a new component. This function will run the creator of the
     /// component to generate allocate the data.

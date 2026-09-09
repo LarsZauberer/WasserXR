@@ -1,4 +1,4 @@
-use std::{collections::HashMap, os::raw::c_void};
+use std::{collections::HashMap, os::raw::c_void, sync::RwLock};
 
 use slotmap::SlotMap;
 
@@ -12,6 +12,11 @@ use crate::{
 /// components it is carrying.
 #[derive(Debug, Default)]
 pub(crate) struct Entity {
+    components: RwLock<ComponentStorage>,
+}
+
+#[derive(Debug, Default)]
+struct ComponentStorage {
     components: SlotMap<ComponentID, Component>,
     component_ids: HashMap<String, ComponentID>,
 }
@@ -22,49 +27,80 @@ impl Entity {
         Self::default()
     }
 
+    /// Runs an action with a component while holding the component collection's
+    /// read lock, preventing the component from being removed during the
+    /// action.
+    fn with_component<T>(
+        &self,
+        id: ComponentID,
+        action: impl FnOnce(&Component) -> Result<T, EntityError>,
+    ) -> Result<T, EntityError> {
+        let components = self
+            .components
+            .read()
+            .expect("entity component lock poisoned");
+        let component = components
+            .components
+            .get(id)
+            .ok_or(EntityError::ComponentNotFound)?;
+        action(component)
+    }
+
     /// Add a new component to the entity. The function will reject the add, if
     /// a component of that type already exists.
     pub(crate) fn add_component(
-        &mut self,
+        &self,
         plugin_id: PluginID,
         manifest: &ComponentManifest,
     ) -> Result<ComponentID, EntityError> {
         let component = Component::new(manifest, plugin_id);
-        if self.component_ids.contains_key(component.get_name()) {
+        let name = component.get_name().to_owned();
+        let mut components = self
+            .components
+            .write()
+            .expect("entity component lock poisoned");
+        if components.component_ids.contains_key(&name) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        let name = component.get_name().to_owned();
-        let id = self.components.insert(component);
-        self.component_ids.insert(name, id);
+        let id = components.components.insert(component);
+        components.component_ids.insert(name, id);
         Ok(id)
     }
 
     /// Remove a component from the entity
-    pub(crate) fn remove_component(&mut self, id: ComponentID) -> Result<(), EntityError> {
-        let component = self
+    pub(crate) fn remove_component(&self, id: ComponentID) -> Result<(), EntityError> {
+        let mut components = self
+            .components
+            .write()
+            .expect("entity component lock poisoned");
+        let component = components
             .components
             .remove(id)
             .ok_or(EntityError::ComponentNotFound)?;
-        self.component_ids.remove(component.get_name());
+        let name = component.get_name().to_owned();
+        components.component_ids.remove(&name);
+        drop(components);
+        drop(component);
         Ok(())
     }
 
     /// Get all currently attached component id's from this entity
     pub(crate) fn get_components(&self) -> Vec<ComponentID> {
-        self.components.keys().collect()
-    }
-
-    /// Get a component from its id.
-    pub(crate) fn get_component(&self, id: ComponentID) -> Result<&Component, EntityError> {
         self.components
-            .get(id)
-            .ok_or(EntityError::ComponentNotFound)
+            .read()
+            .expect("entity component lock poisoned")
+            .components
+            .keys()
+            .collect()
     }
 
     /// Resolve from component name to component id. If there is no component
     /// with this type, it will return None.
     pub(crate) fn resolve_component_id(&self, name: &str) -> Result<ComponentID, EntityError> {
-        self.component_ids
+        self.components
+            .read()
+            .expect("entity component lock poisoned")
+            .component_ids
             .get(name)
             .copied()
             .ok_or(EntityError::ComponentNotFound)
@@ -76,9 +112,9 @@ impl Entity {
         component_id: ComponentID,
         name: &str,
     ) -> Result<FieldID, EntityError> {
-        self.get_component(component_id)?
-            .resolve_field_id(name)
-            .map_err(EntityError::from)
+        self.with_component(component_id, |component| {
+            component.resolve_field_id(name).map_err(EntityError::from)
+        })
     }
 
     /// Returns the field pointer of a component field from a specific
@@ -88,9 +124,9 @@ impl Entity {
         component_id: ComponentID,
         field_id: FieldID,
     ) -> Result<*const c_void, EntityError> {
-        self.get_component(component_id)?
-            .get_field_ptr(field_id)
-            .map_err(EntityError::from)
+        self.with_component(component_id, |component| {
+            component.get_field_ptr(field_id).map_err(EntityError::from)
+        })
     }
 
     /// Same as [`Self::get_component_field`] but instead provides a mutable
@@ -100,14 +136,22 @@ impl Entity {
         component_id: ComponentID,
         field_id: FieldID,
     ) -> Result<*mut c_void, EntityError> {
-        self.get_component(component_id)?
+        let components = self
+            .components
+            .read()
+            .expect("entity component lock poisoned");
+        let component = components
+            .components
+            .get(component_id)
+            .ok_or(EntityError::ComponentNotFound)?;
+        component
             .get_field_mut_ptr(field_id)
             .map_err(EntityError::from)
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]
-    pub(crate) fn get_component_name(&self, id: ComponentID) -> Result<&str, EntityError> {
-        Ok(self.get_component(id)?.get_name())
+    pub(crate) fn get_component_name(&self, id: ComponentID) -> Result<String, EntityError> {
+        self.with_component(id, |component| Ok(component.get_name().to_owned()))
     }
 
     /// Get the [`Field`] name of a [`Component`]
@@ -115,9 +159,12 @@ impl Entity {
         &self,
         component_id: ComponentID,
         field_id: FieldID,
-    ) -> Result<&str, EntityError> {
-        self.get_component(component_id)?
-            .get_field_name(field_id)
-            .map_err(EntityError::from)
+    ) -> Result<String, EntityError> {
+        self.with_component(component_id, |component| {
+            component
+                .get_field_name(field_id)
+                .map(str::to_owned)
+                .map_err(EntityError::from)
+        })
     }
 }

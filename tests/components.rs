@@ -66,7 +66,7 @@ fn reset_globals() {
 
 #[fixture]
 fn scene() -> Scene {
-    let mut scene = Scene::new();
+    let scene = Scene::new();
     unsafe { scene.load_static_plugin(VALID_COMPONENT_FIELD_PLUGIN) }
         .expect("Failed to load valid plugin");
     scene
@@ -74,7 +74,7 @@ fn scene() -> Scene {
 
 #[rstest]
 fn empty_scene_cannot_add_component() {
-    let mut scene = Scene::new();
+    let scene = Scene::new();
 
     let entity_id = scene.add_entity();
     let err = scene
@@ -85,7 +85,7 @@ fn empty_scene_cannot_add_component() {
 }
 
 #[rstest]
-fn entity_cannot_have_duplicate_component(mut scene: Scene) {
+fn entity_cannot_have_duplicate_component(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity_id = scene.add_entity();
@@ -120,7 +120,7 @@ fn get_vec_of_component_names(scene: &Scene, entity_id: EntityID) -> Vec<String>
 }
 
 #[rstest]
-fn component_lifecycle(mut scene: Scene) {
+fn component_lifecycle(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     // Add entities
@@ -154,7 +154,7 @@ fn component_lifecycle(mut scene: Scene) {
 }
 
 #[rstest]
-fn component_is_scoped_to_entity(mut scene: Scene) {
+fn component_is_scoped_to_entity(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     // Add entities
@@ -180,7 +180,7 @@ fn component_is_scoped_to_entity(mut scene: Scene) {
 }
 
 #[rstest]
-fn component_cannot_be_removed_twice(mut scene: Scene) {
+fn component_cannot_be_removed_twice(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
