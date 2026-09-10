@@ -42,7 +42,7 @@ pub struct AssetID;
 pub struct AssetFieldID;
 }
 
-type EntityStorage = SlotMap<EntityID, Entity>;
+type EntityStorage = SlotMap<EntityID, RwLock<Entity>>;
 type PluginStorage = SlotMap<PluginID, Plugin>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
@@ -73,7 +73,7 @@ impl Scene {
         self.entities
             .write()
             .expect("scene entity lock poisoned")
-            .insert(entity)
+            .insert(RwLock::new(entity))
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -139,7 +139,7 @@ impl Scene {
     ) -> Result<T, SceneError> {
         let entities = self.entities.read().expect("scene entity lock poisoned");
         let entity = entities.get(id).ok_or(SceneError::EntityNotFound)?;
-        action(entity)
+        action(&entity.read().expect("entity lock poisoned"))
     }
 
     /// Load a plugin from a shared object library.

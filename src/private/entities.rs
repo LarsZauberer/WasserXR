@@ -18,7 +18,7 @@ pub(crate) struct Entity {
 
 #[derive(Debug, Default)]
 struct ComponentStorage {
-    components: SlotMap<ComponentID, Component>,
+    components: SlotMap<ComponentID, RwLock<Component>>,
     component_ids: HashMap<String, ComponentID>,
 }
 
@@ -44,7 +44,7 @@ impl Entity {
             .components
             .get(id)
             .ok_or(EntityError::ComponentNotFound)?;
-        action(component)
+        action(&component.read().expect("component lock poisoned"))
     }
 
     /// Add a new component to the entity. The function will reject the add, if
@@ -63,7 +63,7 @@ impl Entity {
         if components.component_ids.contains_key(&name) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        let id = components.components.insert(component);
+        let id = components.components.insert(RwLock::new(component));
         components.component_ids.insert(name, id);
         Ok(id)
     }
@@ -77,7 +77,9 @@ impl Entity {
         let component = components
             .components
             .remove(id)
-            .ok_or(EntityError::ComponentNotFound)?;
+            .ok_or(EntityError::ComponentNotFound)?
+            .into_inner()
+            .expect("component lock poisoned");
         let name = component.get_name().to_owned();
         components.component_ids.remove(&name);
         drop(components);
