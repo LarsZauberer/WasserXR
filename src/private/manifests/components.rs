@@ -9,7 +9,7 @@ use crate::{
     private::manifests::{Manifest, fields::ComponentFieldManifest},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct ComponentManifest {
     pub name: String,
 

@@ -10,7 +10,7 @@ use crate::{
     private::manifests::{Manifest, fields::AssetFieldManifest},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct AssetManifest {
     pub name: String,
 

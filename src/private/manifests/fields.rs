@@ -9,7 +9,7 @@ use crate::{
     private::manifests::Manifest,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct ComponentFieldManifest {
     pub name: String,
 
@@ -34,7 +34,7 @@ impl Manifest<ComponentFieldDefinition> for ComponentFieldManifest {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct AssetFieldManifest {
     pub name: String,
     pub getter: Getter,

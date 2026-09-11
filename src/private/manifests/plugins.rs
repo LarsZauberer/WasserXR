@@ -12,7 +12,7 @@ use crate::{
 ///
 /// In contrast to the direct wasserxr plugin, it doesn't deal with the I/O
 /// operations of loading plugins. It just carries the content information.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,

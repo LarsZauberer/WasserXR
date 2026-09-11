@@ -223,22 +223,19 @@ impl Scene {
         entity_id: EntityID,
         component_type: &str,
     ) -> Result<ComponentID, SceneError> {
-        let (plugin_id, manifest) = self
-            .plugins
-            .read()
-            .expect("scene plugin lock poisoned")
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let (plugin_id, manifest) = plugins
             .iter()
             .find_map(|(plugin_id, plugin)| {
                 plugin
                     .get_component(component_type)
-                    .cloned()
                     .map(|manifest| (plugin_id, manifest))
             })
             .ok_or(SceneError::NoComponentType)?;
 
         self.with_entity(entity_id, |entity| {
             entity
-                .add_component(plugin_id, &manifest)
+                .add_component(plugin_id, manifest)
                 .map_err(SceneError::EntityError)
         })
     }
@@ -369,19 +366,17 @@ impl Scene {
             return Ok(id);
         }
 
-        let manifest = self
-            .plugins
-            .read()
-            .expect("scene plugin lock poisoned")
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let manifest = plugins
             .values()
-            .find_map(|plugin| plugin.get_asset(asset_name).cloned())
+            .find_map(|plugin| plugin.get_asset(asset_name))
             .ok_or(SceneError::AssetNotFound)?;
 
         let mut assets = self.assets.write().expect("scene asset lock poisoned");
         if let Some(id) = assets.resolve_id(&key) {
             return Ok(id);
         }
-        let asset = Asset::new(&manifest).map_err(SceneError::from)?;
+        let asset = Asset::new(manifest).map_err(SceneError::from)?;
         Ok(assets.insert_named(key, asset))
     }
 
