@@ -3,6 +3,7 @@ pub(crate) mod assets;
 pub(crate) mod components;
 pub(crate) mod entities;
 pub(crate) mod fields;
+pub(crate) mod id_store;
 pub(crate) mod macros;
 pub(crate) mod manifests;
 pub(crate) mod plugins;
