@@ -5,6 +5,7 @@ use slotmap::{SlotMap, new_key_type};
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
+    field::{Field, FieldAccess},
     private::{
         asset_storage::AssetStorage,
         entities::Entity,
@@ -286,6 +287,26 @@ impl Scene {
         self.with_entity(entity_id, |entity| {
             entity
                 .resolve_field_id(component_id, name)
+                .map_err(SceneError::from)
+        })
+    }
+
+    /// Locks component fields in field-ID order.
+    ///
+    /// The fields are locked in field-ID order to avoid ordering deadlocks, but
+    /// are passed to `action` in the order requested. They remain locked until
+    /// `action` returns. Write access to an immutable field returns
+    /// [`crate::errors::FieldError::NotMutable`].
+    pub fn query_component_fields<T>(
+        &self,
+        entity_id: EntityID,
+        component_id: ComponentID,
+        requests: &[(FieldID, FieldAccess)],
+        action: impl FnOnce(&[Field]) -> T,
+    ) -> Result<T, SceneError> {
+        self.with_entity(entity_id, |entity| {
+            entity
+                .query_component_fields(component_id, requests, action)
                 .map_err(SceneError::from)
         })
     }

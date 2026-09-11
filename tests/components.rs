@@ -6,7 +6,8 @@ use wasserxr::{
         components::ComponentDefinition, fields::ComponentFieldDefinition,
         plugins::PluginDefinition,
     },
-    errors::{EntityError, SceneError},
+    errors::{ComponentError, EntityError, FieldError, SceneError},
+    field::{Field, FieldAccess},
     scene::{EntityID, Scene},
     utils::version::Version,
 };
@@ -42,12 +43,23 @@ const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition
     deserializer: None,
 };
 
+const IMMUTABLE_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
+    name: c"ImmutableField".as_ptr(),
+    getter: Some(simple_getter),
+    mutable: 0,
+    serializer: None,
+    deserializer: None,
+};
+
+const VALID_COMPONENT_FIELDS: [ComponentFieldDefinition; 2] =
+    [VALID_COMPONENT_FIELD, IMMUTABLE_COMPONENT_FIELD];
+
 const VALID_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
     name: c"MyComponent".as_ptr(),
     creator: Some(simple_creator),
     destroyer: Some(simple_destroyer),
-    fields: &VALID_COMPONENT_FIELD,
-    field_count: 1,
+    fields: VALID_COMPONENT_FIELDS.as_ptr(),
+    field_count: VALID_COMPONENT_FIELDS.len(),
 };
 
 const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {
@@ -82,6 +94,88 @@ fn empty_scene_cannot_add_component() {
         .expect_err("Added a component to a scene with no plugins");
 
     assert!(matches!(err, SceneError::NoComponentType));
+}
+
+#[rstest]
+fn component_fields_enforce_mutability(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let entity = scene.add_entity();
+    let component = scene.add_component(entity, "MyComponent").unwrap();
+    let mutable_field = scene
+        .resolve_field_id(entity, component, "MyField")
+        .unwrap();
+
+    let immutable_field = scene
+        .resolve_field_id(entity, component, "ImmutableField")
+        .unwrap();
+
+    let requests = [
+        (mutable_field, FieldAccess::Write),
+        (immutable_field, FieldAccess::Read),
+    ];
+    scene
+        .query_component_fields(entity, component, &requests, |fields| {
+            for ((id, access), field) in requests.into_iter().zip(fields) {
+                assert!(matches!(
+                    (access, field),
+                    (FieldAccess::Read, Field::Read(field_id, _))
+                        | (FieldAccess::Write, Field::Write(field_id, _))
+                        if id == *field_id
+                ));
+            }
+            assert!(
+                fields
+                    .iter()
+                    .any(|field| matches!(field, Field::Write(_, pointer) if pointer.is_null()))
+            );
+        })
+        .unwrap();
+
+    assert!(matches!(
+        scene.query_component_fields(
+            entity,
+            component,
+            &[(immutable_field, FieldAccess::Write)],
+            |_| ()
+        ),
+        Err(SceneError::EntityError(EntityError::ComponentError(
+            ComponentError::FieldError(FieldError::NotMutable)
+        )))
+    ));
+    drop(scene);
+}
+
+#[rstest]
+fn component_fields_keep_requested_order(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let entity = scene.add_entity();
+    let component = scene.add_component(entity, "MyComponent").unwrap();
+    let first = scene
+        .resolve_field_id(entity, component, "MyField")
+        .unwrap();
+    let second = scene
+        .resolve_field_id(entity, component, "ImmutableField")
+        .unwrap();
+    let requests = if first < second {
+        [(second, FieldAccess::Read), (first, FieldAccess::Read)]
+    } else {
+        [(first, FieldAccess::Read), (second, FieldAccess::Read)]
+    };
+
+    scene
+        .query_component_fields(entity, component, &requests, |fields| {
+            let returned = fields
+                .iter()
+                .map(|field| match field {
+                    Field::Read(id, _) | Field::Write(id, _) => *id,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(returned, requests.map(|(id, _)| id));
+        })
+        .unwrap();
+    drop(scene);
 }
 
 #[rstest]

@@ -1,9 +1,10 @@
-use std::{collections::HashMap, os::raw::c_void, sync::RwLock};
+use std::{collections::HashMap, sync::RwLock};
 
 use slotmap::SlotMap;
 
 use crate::{
     errors::EntityError,
+    field::{Field, FieldAccess},
     private::{components::Component, manifests::components::ComponentManifest},
     scene::{ComponentID, FieldID, PluginID},
 };
@@ -117,36 +118,18 @@ impl Entity {
         })
     }
 
-    /// Returns the field pointer of a component field from a specific
-    /// component.
-    pub(crate) fn get_component_field(
+    /// Locks component fields in a consistent order.
+    pub(crate) fn query_component_fields<T>(
         &self,
         component_id: ComponentID,
-        field_id: FieldID,
-    ) -> Result<*const c_void, EntityError> {
+        requests: &[(FieldID, FieldAccess)],
+        action: impl FnOnce(&[Field]) -> T,
+    ) -> Result<T, EntityError> {
         self.with_component(component_id, |component| {
-            component.get_field_ptr(field_id).map_err(EntityError::from)
+            component
+                .query_fields(requests, action)
+                .map_err(EntityError::from)
         })
-    }
-
-    /// Same as [`Self::get_component_field`] but instead provides a mutable
-    /// pointer
-    pub(crate) fn get_mut_component_field(
-        &self,
-        component_id: ComponentID,
-        field_id: FieldID,
-    ) -> Result<*mut c_void, EntityError> {
-        let components = self
-            .components
-            .read()
-            .expect("entity component lock poisoned");
-        let component = components
-            .components
-            .get(component_id)
-            .ok_or(EntityError::ComponentNotFound)?;
-        component
-            .get_field_mut_ptr(field_id)
-            .map_err(EntityError::from)
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]
@@ -163,7 +146,6 @@ impl Entity {
         self.with_component(component_id, |component| {
             component
                 .get_field_name(field_id)
-                .map(str::to_owned)
                 .map_err(EntityError::from)
         })
     }

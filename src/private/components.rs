@@ -1,13 +1,58 @@
-use std::{collections::HashMap, ffi::c_void};
+use std::{
+    collections::HashMap,
+    ffi::c_void,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use slotmap::SlotMap;
 
 use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
+    field::{Field, FieldAccess},
     private::{fields::ComponentField, manifests::components::ComponentManifest},
     scene::{FieldID, PluginID},
 };
+
+/// Keeps a queried field pointer and its lock guard alive together.
+///
+/// # Purpose
+///
+/// A query may contain both shared and exclusive field access. Each variant
+/// stores the matching pointer and guard until the query callback finishes.
+///
+/// # Usage
+///
+/// [`Component::query_fields`] creates these after sorting requests by field
+/// ID, then converts them to the public [`Field`] values passed to the
+/// callback.
+///
+/// # Design decision
+///
+/// Read and write guards have different types, so an enum is required to keep
+/// both in one collection. Retaining the guards here keeps every field locked
+/// without exposing synchronization details in the public API.
+enum LockedField<'a> {
+    Read {
+        id: FieldID,
+        pointer: *const c_void,
+        _guard: RwLockReadGuard<'a, ComponentField>,
+    },
+    Write {
+        id: FieldID,
+        pointer: *mut c_void,
+        _guard: RwLockWriteGuard<'a, ComponentField>,
+    },
+}
+
+impl LockedField<'_> {
+    fn field(&self) -> Field {
+        match self {
+            Self::Read { id, pointer, .. } => Field::Read(*id, *pointer),
+            Self::Write { id, pointer, .. } => Field::Write(*id, *pointer),
+        }
+    }
+}
 
 /// The component is the concrete data record of a component. It carries the
 /// information about which plugin it belongs to, stores it's component manifest
@@ -16,7 +61,7 @@ use crate::{
 pub(crate) struct Component {
     plugin_id: PluginID,
     name: String,
-    fields: SlotMap<FieldID, ComponentField>,
+    fields: SlotMap<FieldID, RwLock<ComponentField>>,
     field_ids: HashMap<String, FieldID>,
     destroyer: Destroyer,
     data: *mut c_void,
@@ -47,7 +92,7 @@ impl Component {
         manifest.fields.iter().for_each(|(_, field)| {
             let field = ComponentField::from(field);
             let name = field.get_name().to_owned();
-            let id = fields.insert(field);
+            let id = fields.insert(RwLock::new(field));
             field_ids.insert(name, id);
         });
         Self {
@@ -65,14 +110,24 @@ impl Component {
         &self.name
     }
 
-    /// Get a field from its id.
-    pub(crate) fn get_field(&self, id: FieldID) -> Result<&ComponentField, ComponentError> {
-        self.fields.get(id).ok_or(ComponentError::FieldNotFound)
+    /// Runs an action with a field lock resolved from its ID.
+    fn with_field<'a, T>(
+        &'a self,
+        id: FieldID,
+        action: impl FnOnce(&'a RwLock<ComponentField>) -> Result<T, ComponentError>,
+    ) -> Result<T, ComponentError> {
+        action(self.fields.get(id).ok_or(ComponentError::FieldNotFound)?)
     }
 
     /// Get the name of a field
-    pub(crate) fn get_field_name(&self, id: FieldID) -> Result<&str, ComponentError> {
-        Ok(self.get_field(id)?.get_name())
+    pub(crate) fn get_field_name(&self, id: FieldID) -> Result<String, ComponentError> {
+        self.with_field(id, |field| {
+            Ok(field
+                .read()
+                .expect("component field lock poisoned")
+                .get_name()
+                .to_owned())
+        })
     }
 
     /// Get field id from the field name
@@ -83,17 +138,50 @@ impl Component {
             .ok_or(ComponentError::FieldNotFound)
     }
 
-    /// Get the data pointer of a specific field
-    pub(crate) fn get_field_ptr(&self, id: FieldID) -> Result<*const c_void, ComponentError> {
-        self.get_field(id)?
-            .get(self.data)
-            .map_err(ComponentError::from)
-    }
-
-    pub(crate) fn get_field_mut_ptr(&self, id: FieldID) -> Result<*mut c_void, ComponentError> {
-        self.get_field(id)?
-            .get_mut(self.data)
-            .map_err(ComponentError::from)
+    /// Lock fields in ID order to prevent ordering deadlocks.
+    pub(crate) fn query_fields<T>(
+        &self,
+        requests: &[(FieldID, FieldAccess)],
+        action: impl FnOnce(&[Field]) -> T,
+    ) -> Result<T, ComponentError> {
+        let mut requests = requests.iter().copied().enumerate().collect::<Vec<_>>();
+        requests.sort_by_key(|(_, (field, _))| *field);
+        let mut locked = Vec::with_capacity(requests.len());
+        for (position, (id, access)) in requests {
+            let field = self.with_field(id, |field| {
+                Ok(match access {
+                    FieldAccess::Read => {
+                        let guard = field.read().expect("component field lock poisoned");
+                        let pointer = guard.get(self.data)?;
+                        LockedField::Read {
+                            id,
+                            pointer,
+                            _guard: guard,
+                        }
+                    }
+                    FieldAccess::Write => {
+                        let guard = field.write().expect("component field lock poisoned");
+                        let pointer = guard.get_mut(self.data)?;
+                        LockedField::Write {
+                            id,
+                            pointer,
+                            _guard: guard,
+                        }
+                    }
+                })
+            })?;
+            locked.push((position, field));
+        }
+        let mut fields = locked
+            .iter()
+            .map(|(position, field)| (*position, field.field()))
+            .collect::<Vec<_>>();
+        fields.sort_by_key(|(position, _)| *position);
+        let fields = fields
+            .into_iter()
+            .map(|(_, field)| field)
+            .collect::<Vec<_>>();
+        Ok(action(&fields))
     }
 }
 

@@ -1,5 +1,6 @@
 pub mod definitions;
 pub mod errors;
+pub mod field;
 pub mod scene;
 pub mod utils;
 

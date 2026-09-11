@@ -13,7 +13,7 @@ use crate::{
 ///
 /// It's responsibility is to create it from a [`ComponentFieldManifest`] and be
 /// concrete.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct ComponentField {
     name: String,
     getter: Option<Getter>,
@@ -34,7 +34,7 @@ impl ComponentField {
     /// Get the field data from a component object but also checking if the data
     /// is allowed to be mutated
     pub(crate) fn get_mut(&self, ptr: *mut c_void) -> Result<*mut c_void, FieldError> {
-        if self.mutable {
+        if !self.mutable {
             return Err(FieldError::NotMutable);
         }
 
