@@ -1,6 +1,6 @@
 use std::{ffi::c_void, path::Path, sync::RwLock};
 
-use slotmap::new_key_type;
+use slotmap::{Key, new_key_type};
 
 use crate::{
     definitions::plugins::PluginDefinition,
@@ -89,8 +89,13 @@ pub struct Scene {
 }
 
 impl Scene {
-    fn asset_key(name: &str, data_string: &str) -> String {
-        format!("{}:{name}{data_string}", name.len())
+    fn asset_key(plugin: PluginID, asset_type: AssetTypeID, data_string: &str) -> String {
+        // TODO: This function needs to be deprecated and removed
+        format!(
+            "{}:{}:{data_string}",
+            plugin.data().as_ffi(),
+            asset_type.data().as_ffi()
+        )
     }
 
     /// Creates a new empty scene
@@ -230,6 +235,64 @@ impl Scene {
             .collect()
     }
 
+    /// Resolves a component type name within a plugin manifest.
+    pub fn resolve_component_type_id(
+        &self,
+        plugin_id: PluginID,
+        name: &str,
+    ) -> Result<ComponentTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id)
+            .and_then(|plugin| plugin.resolve_component_type_id(name))
+            .ok_or(SceneError::NoComponentType)
+    }
+
+    /// Resolves a component field type name within a component type manifest.
+    pub fn resolve_field_type_id(
+        &self,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
+        name: &str,
+    ) -> Result<FieldTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id)
+            .and_then(|plugin| plugin.resolve_field_type_id(component_type_id, name))
+            .ok_or(SceneError::NoComponentType)
+    }
+
+    /// Resolves an asset type name within a plugin manifest.
+    pub fn resolve_asset_type_id(
+        &self,
+        plugin_id: PluginID,
+        name: &str,
+    ) -> Result<AssetTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id)
+            .and_then(|plugin| plugin.resolve_asset_type_id(name))
+            .ok_or(SceneError::AssetNotFound)
+    }
+
+    /// Resolves an asset field type name within an asset type manifest.
+    pub fn resolve_asset_field_type_id(
+        &self,
+        plugin_id: PluginID,
+        asset_type_id: AssetTypeID,
+        name: &str,
+    ) -> Result<AssetFieldTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id)
+            .and_then(|plugin| plugin.resolve_asset_field_type_id(asset_type_id, name))
+            .ok_or(SceneError::AssetNotFound)
+    }
+
     /// Add a component type to an entity
     ///
     /// This function may fail, if the entity cannot be found or if the entity
@@ -237,17 +300,13 @@ impl Scene {
     pub fn add_component(
         &self,
         entity_id: EntityID,
-        component_type: &str,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
     ) -> Result<ComponentID, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let (plugin_id, manifest) = plugins
-            .iter()
-            .find_map(|(plugin_id, plugin)| {
-                let component_type_id = plugin.resolve_component_type_id(component_type)?;
-                plugin
-                    .get_component(component_type_id)
-                    .map(|manifest| (plugin_id, manifest))
-            })
+        let manifest = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_component(component_type_id))
             .ok_or(SceneError::NoComponentType)?;
 
         self.with_entity(entity_id, |entity| {
@@ -337,18 +396,19 @@ impl Scene {
         })
     }
 
-    /// Resolve the [`AssetID`] from a given asset name and data string
+    /// Resolve the [`AssetID`] from a given asset type and data string.
     ///
     /// This function will **not** load a new asset if the asset doesn't exist.
     pub fn resolve_asset_id(
         &self,
-        asset_name: &str,
+        plugin_id: PluginID,
+        asset_type_id: AssetTypeID,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .resolve_id(&Self::asset_key(asset_name, data_string))
+            .resolve_id(&Self::asset_key(plugin_id, asset_type_id, data_string))
             .ok_or(SceneError::AssetNotFound)
     }
 
@@ -372,8 +432,13 @@ impl Scene {
 
     /// Resolves the asset id and if it doesn't exist, it will try to load the
     /// asset
-    pub fn get_asset_id(&self, asset_name: &str, data_string: &str) -> Result<AssetID, SceneError> {
-        let key = Self::asset_key(asset_name, data_string);
+    pub fn get_asset_id(
+        &self,
+        plugin_id: PluginID,
+        asset_type_id: AssetTypeID,
+        data_string: &str,
+    ) -> Result<AssetID, SceneError> {
+        let key = Self::asset_key(plugin_id, asset_type_id, data_string);
         if let Some(id) = self
             .assets
             .read()
@@ -385,11 +450,8 @@ impl Scene {
 
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let manifest = plugins
-            .values()
-            .find_map(|plugin| {
-                let asset_type_id = plugin.resolve_asset_type_id(asset_name)?;
-                plugin.get_asset(asset_type_id)
-            })
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_asset(asset_type_id))
             .ok_or(SceneError::AssetNotFound)?;
 
         let mut assets = self.assets.write().expect("scene asset lock poisoned");

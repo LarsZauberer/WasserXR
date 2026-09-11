@@ -76,6 +76,17 @@ fn reset_globals() {
     *DESTROYER_COUNTER.lock().unwrap() = 0;
 }
 
+fn add_test_component(
+    scene: &Scene,
+    entity: EntityID,
+) -> Result<wasserxr::scene::ComponentID, SceneError> {
+    let plugin = scene
+        .get_plugin("MyPlugin")
+        .ok_or(SceneError::NoComponentType)?;
+    let component_type = scene.resolve_component_type_id(plugin, "MyComponent")?;
+    scene.add_component(entity, plugin, component_type)
+}
+
 #[fixture]
 fn scene() -> Scene {
     let scene = Scene::new();
@@ -89,8 +100,7 @@ fn empty_scene_cannot_add_component() {
     let scene = Scene::new();
 
     let entity_id = scene.add_entity();
-    let err = scene
-        .add_component(entity_id, "MyComponent")
+    let err = add_test_component(&scene, entity_id)
         .expect_err("Added a component to a scene with no plugins");
 
     assert!(matches!(err, SceneError::NoComponentType));
@@ -101,7 +111,7 @@ fn component_fields_enforce_mutability(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = scene.add_component(entity, "MyComponent").unwrap();
+    let component = add_test_component(&scene, entity).unwrap();
     let mutable_field = scene
         .resolve_field_id(entity, component, "MyField")
         .unwrap();
@@ -151,7 +161,7 @@ fn component_fields_keep_requested_order(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = scene.add_component(entity, "MyComponent").unwrap();
+    let component = add_test_component(&scene, entity).unwrap();
     let first = scene
         .resolve_field_id(entity, component, "MyField")
         .unwrap();
@@ -183,12 +193,9 @@ fn entity_cannot_have_duplicate_component(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity_id = scene.add_entity();
-    scene
-        .add_component(entity_id, "MyComponent")
-        .expect("Failed to add the component");
-    let err = scene
-        .add_component(entity_id, "MyComponent")
-        .expect_err("Added duplicate of the same component");
+    add_test_component(&scene, entity_id).expect("Failed to add the component");
+    let err =
+        add_test_component(&scene, entity_id).expect_err("Added duplicate of the same component");
     assert!(matches!(
         err,
         SceneError::EntityError(EntityError::ComponentAlreadyExists)
@@ -222,9 +229,8 @@ fn component_lifecycle(scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    let my_component_id = scene
-        .add_component(entity1, "MyComponent")
-        .expect("Failed to add component to entity1");
+    let my_component_id =
+        add_test_component(&scene, entity1).expect("Failed to add component to entity1");
 
     // Check component add status
     assert_eq!(
@@ -256,9 +262,8 @@ fn component_is_scoped_to_entity(scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    let my_component_id = scene
-        .add_component(entity1, "MyComponent")
-        .expect("Failed to add component to entity1");
+    let my_component_id =
+        add_test_component(&scene, entity1).expect("Failed to add component to entity1");
 
     let err = scene
         .resolve_component_id(entity2, "MyComponent")
@@ -278,9 +283,7 @@ fn component_cannot_be_removed_twice(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = scene
-        .add_component(entity, "MyComponent")
-        .expect("Failed to add component");
+    let component = add_test_component(&scene, entity).expect("Failed to add component");
     scene
         .remove_component(entity, component)
         .expect("Failed to remove component");
