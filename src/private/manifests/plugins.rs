@@ -14,6 +14,14 @@ use crate::{
 ///
 /// In contrast to the direct wasserxr plugin, it doesn't deal with the I/O
 /// operations of loading plugins. It just carries the content information.
+///
+/// # Design Decision
+///
+/// Inside of the plugin everything has object type has it's own ID (see
+/// [`ComponentTypeID`], [`AssetTypeID`], ...). They are used to make allow
+/// cached resolution of the these types. For example, if a system want to
+/// always add a component, it can cache these TypeIDs and pass it to the system
+/// function.
 #[derive(Debug)]
 pub(crate) struct PluginManifest {
     pub name: String,
