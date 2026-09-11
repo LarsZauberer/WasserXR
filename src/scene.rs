@@ -243,8 +243,9 @@ impl Scene {
         let (plugin_id, manifest) = plugins
             .iter()
             .find_map(|(plugin_id, plugin)| {
+                let component_type_id = plugin.resolve_component_type_id(component_type)?;
                 plugin
-                    .get_component(component_type)
+                    .get_component(component_type_id)
                     .map(|manifest| (plugin_id, manifest))
             })
             .ok_or(SceneError::NoComponentType)?;
@@ -385,7 +386,10 @@ impl Scene {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let manifest = plugins
             .values()
-            .find_map(|plugin| plugin.get_asset(asset_name))
+            .find_map(|plugin| {
+                let asset_type_id = plugin.resolve_asset_type_id(asset_name)?;
+                plugin.get_asset(asset_type_id)
+            })
             .ok_or(SceneError::AssetNotFound)?;
 
         let mut assets = self.assets.write().expect("scene asset lock poisoned");

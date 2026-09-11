@@ -15,6 +15,7 @@ use crate::{
     private::manifests::{
         Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
     },
+    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID},
 };
 
 const WXR_PLUGIN_SYMBOL_NAME: &CStr = c"wxr_plugin";
@@ -99,21 +100,41 @@ impl Plugin {
         &self.manifest.name
     }
 
-    /// Searches in the current [`PluginManifest`] for the defined components
-    /// and tries to find the requested [`ComponentManifest`]
-    pub(crate) fn get_component(&self, name: &str) -> Option<&ComponentManifest> {
-        self.manifest
-            .components
-            .resolve_id(name)
-            .and_then(|id| self.manifest.components.get(id))
+    /// Resolves a component type name to its ID.
+    pub(crate) fn resolve_component_type_id(&self, name: &str) -> Option<ComponentTypeID> {
+        self.manifest.components.resolve_id(name)
     }
 
-    /// Searches in the current [`PluginManifest`] for the defined assets and
-    /// tries to find the requested [`AssetManifest`].
-    pub(crate) fn get_asset(&self, name: &str) -> Option<&AssetManifest> {
-        self.manifest
-            .assets
-            .resolve_id(name)
-            .and_then(|id| self.manifest.assets.get(id))
+    /// Resolves a component field type name to its ID.
+    pub(crate) fn resolve_field_type_id(
+        &self,
+        component: ComponentTypeID,
+        name: &str,
+    ) -> Option<FieldTypeID> {
+        self.get_component(component)?.fields.resolve_id(name)
+    }
+
+    /// Returns the component manifest identified by `id`.
+    pub(crate) fn get_component(&self, id: ComponentTypeID) -> Option<&ComponentManifest> {
+        self.manifest.components.get(id)
+    }
+
+    /// Resolves an asset type name to its ID.
+    pub(crate) fn resolve_asset_type_id(&self, name: &str) -> Option<AssetTypeID> {
+        self.manifest.assets.resolve_id(name)
+    }
+
+    /// Resolves an asset field type name to its ID.
+    pub(crate) fn resolve_asset_field_type_id(
+        &self,
+        asset: AssetTypeID,
+        name: &str,
+    ) -> Option<AssetFieldTypeID> {
+        self.manifest.assets.get(asset)?.fields.resolve_id(name)
+    }
+
+    /// Returns the asset manifest identified by `id`.
+    pub(crate) fn get_asset(&self, id: AssetTypeID) -> Option<&AssetManifest> {
+        self.manifest.assets.get(id)
     }
 }
