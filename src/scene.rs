@@ -89,8 +89,30 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// Builds the internal lookup key for an asset.
+    ///
+    /// An asset is identified by the plugin that defines it, its asset type,
+    /// and the data string supplied by the caller. Combining all three values
+    /// ensures that repeated requests for the same asset resolve to the same
+    /// [`AssetID`], while requests that differ in any value remain distinct.
+    /// This key is local to a scene and must not be persisted or exposed as a
+    /// stable asset identifier.
+    ///
+    /// # Design Decision
+    ///
+    /// [`AssetStorage`] currently uses [`IDStore`], whose named lookup accepts
+    /// only a [`String`]. The natural asset key is instead the tuple
+    /// (`PluginID`, `AssetTypeID`, data string), so this function encodes that
+    /// tuple in the form expected by `IDStore`. The plugin ID is required
+    /// because an [`AssetTypeID`] is only unique within its plugin manifest,
+    /// and the data string distinguishes separate instances of the same asset
+    /// type. Keeping the encoding here also ensures that insertion and lookup
+    /// use exactly the same representation.
+    ///
+    /// This string encoding is an implementation workaround rather than part
+    /// of the asset model. It can be removed once asset storage supports a
+    /// typed composite key directly.
     fn asset_key(plugin: PluginID, asset_type: AssetTypeID, data_string: &str) -> String {
-        // TODO: This function needs to be deprecated and removed
         format!(
             "{}:{}:{data_string}",
             plugin.data().as_ffi(),
