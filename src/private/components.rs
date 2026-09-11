@@ -1,16 +1,15 @@
 use std::{
-    collections::HashMap,
     ffi::c_void,
     sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-
-use slotmap::SlotMap;
 
 use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
     field::{Field, FieldAccess},
-    private::{fields::ComponentField, manifests::components::ComponentManifest},
+    private::{
+        fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
+    },
     scene::{FieldID, PluginID},
 };
 
@@ -61,8 +60,7 @@ impl LockedField<'_> {
 pub(crate) struct Component {
     plugin_id: PluginID,
     name: String,
-    fields: SlotMap<FieldID, RwLock<ComponentField>>,
-    field_ids: HashMap<String, FieldID>,
+    fields: IDStore<FieldID, RwLock<ComponentField>>,
     destroyer: Destroyer,
     data: *mut c_void,
 }
@@ -87,19 +85,16 @@ impl Component {
     /// at the time the component is dropped.
     pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
         let data = unsafe { (manifest.creator)() };
-        let mut fields = SlotMap::with_key();
-        let mut field_ids = HashMap::new();
-        manifest.fields.iter().for_each(|(_, field)| {
+        let mut fields = IDStore::default();
+        for field in manifest.fields.values() {
             let field = ComponentField::from(field);
             let name = field.get_name().to_owned();
-            let id = fields.insert(RwLock::new(field));
-            field_ids.insert(name, id);
-        });
+            fields.insert_named(name, RwLock::new(field));
+        }
         Self {
             plugin_id,
             name: manifest.name.clone(),
             fields,
-            field_ids,
             destroyer: manifest.destroyer,
             data,
         }
@@ -132,9 +127,8 @@ impl Component {
 
     /// Get field id from the field name
     pub(crate) fn resolve_field_id(&self, name: &str) -> Result<FieldID, ComponentError> {
-        self.field_ids
-            .get(name)
-            .copied()
+        self.fields
+            .resolve_id(name)
             .ok_or(ComponentError::FieldNotFound)
     }
 

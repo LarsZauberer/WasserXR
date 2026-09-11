@@ -1,14 +1,15 @@
 use std::{ffi::c_void, path::Path, sync::RwLock};
 
-use slotmap::{SlotMap, new_key_type};
+use slotmap::new_key_type;
 
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError},
     field::{Field, FieldAccess},
     private::{
-        asset_storage::AssetStorage,
+        assets::Asset,
         entities::Entity,
+        id_store::IDStore,
         manifests::{Manifest, plugins::PluginManifest},
         plugins::Plugin,
     },
@@ -42,8 +43,9 @@ pub struct AssetID;
 pub struct AssetFieldID;
 }
 
-type EntityStorage = SlotMap<EntityID, RwLock<Entity>>;
-type PluginStorage = SlotMap<PluginID, Plugin>;
+type EntityStorage = IDStore<EntityID, RwLock<Entity>>;
+type PluginStorage = IDStore<PluginID, Plugin>;
+type AssetStorage = IDStore<AssetID, Asset>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
 /// access and maintain all ECS objects.
@@ -61,6 +63,10 @@ pub struct Scene {
 }
 
 impl Scene {
+    fn asset_key(name: &str, data_string: &str) -> String {
+        format!("{}:{name}{data_string}", name.len())
+    }
+
     /// Creates a new empty scene
     pub fn new() -> Self {
         Self::default()
@@ -118,16 +124,14 @@ impl Scene {
     /// - Is a plugin with the same name already loaded?
     fn add_plugin(&self, new_plugin: Plugin) -> Result<PluginID, SceneError> {
         let mut plugins = self.plugins.write().expect("scene plugin lock poisoned");
-        if plugins
-            .values()
-            .any(|plugin| plugin.get_name() == new_plugin.get_name())
-        {
+        if plugins.contains_name(new_plugin.get_name()) {
             return Err(SceneError::from(
                 PluginCompatibilityError::PluginWithSameNameExists,
             ));
         }
 
-        Ok(plugins.insert(new_plugin))
+        let name = new_plugin.get_name().to_owned();
+        Ok(plugins.insert_named(name, new_plugin))
     }
 
     /// Runs an action with an entity while holding the entity collection's
@@ -187,9 +191,7 @@ impl Scene {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .iter()
-            .find(|(_, plugin)| plugin.get_name() == name)
-            .map(|(k, _)| k)
+            .resolve_id(name)
     }
 
     /// Get all the [`PluginID`] of the currently actively loaded plugins in the
@@ -322,7 +324,8 @@ impl Scene {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .resolve_asset_id(asset_name, data_string)
+            .resolve_id(&Self::asset_key(asset_name, data_string))
+            .ok_or(SceneError::AssetNotFound)
     }
 
     /// Resolve the [`AssetFieldID`] from ta given [`AssetID`] and the field
@@ -337,13 +340,22 @@ impl Scene {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .resolve_asset_field_id(asset_id, field_name)
+            .get(asset_id)
+            .ok_or(SceneError::AssetNotFound)?
+            .resolve_field_id(field_name)
+            .map_err(SceneError::from)
     }
 
     /// Resolves the asset id and if it doesn't exist, it will try to load the
     /// asset
     pub fn get_asset_id(&self, asset_name: &str, data_string: &str) -> Result<AssetID, SceneError> {
-        if let Ok(id) = self.resolve_asset_id(asset_name, data_string) {
+        let key = Self::asset_key(asset_name, data_string);
+        if let Some(id) = self
+            .assets
+            .read()
+            .expect("scene asset lock poisoned")
+            .resolve_id(&key)
+        {
             return Ok(id);
         }
 
@@ -356,10 +368,11 @@ impl Scene {
             .ok_or(SceneError::AssetNotFound)?;
 
         let mut assets = self.assets.write().expect("scene asset lock poisoned");
-        if let Ok(id) = assets.resolve_asset_id(asset_name, data_string) {
+        if let Some(id) = assets.resolve_id(&key) {
             return Ok(id);
         }
-        assets.add_asset(data_string.to_owned(), &manifest)
+        let asset = Asset::new(&manifest).map_err(SceneError::from)?;
+        Ok(assets.insert_named(key, asset))
     }
 
     /// Get the assets field pointer to access an asset's field.
@@ -373,6 +386,9 @@ impl Scene {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .get_asset_field_ptr(asset_id, field_id)
+            .get(asset_id)
+            .ok_or(SceneError::AssetNotFound)?
+            .get_field(field_id)
+            .map_err(SceneError::from)
     }
 }

@@ -1,11 +1,9 @@
-use std::{collections::HashMap, ffi::c_void};
-
-use slotmap::SlotMap;
+use std::ffi::c_void;
 
 use crate::{
     definitions::components::Destroyer,
     errors::AssetError,
-    private::{fields::AssetField, manifests::assets::AssetManifest},
+    private::{fields::AssetField, id_store::IDStore, manifests::assets::AssetManifest},
     scene::AssetFieldID,
 };
 
@@ -13,8 +11,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Asset {
     destroyer: Destroyer,
-    fields: SlotMap<AssetFieldID, AssetField>,
-    field_ids: HashMap<String, AssetFieldID>,
+    fields: IDStore<AssetFieldID, AssetField>,
     data: *mut c_void,
 }
 
@@ -32,28 +29,24 @@ impl Asset {
             return Err(AssetError::CreationFailure);
         }
 
-        let mut fields = SlotMap::with_key();
-        let mut field_ids = HashMap::new();
+        let mut fields = IDStore::default();
         for field in manifest.fields.values() {
             let field = AssetField::from(field);
             let name = field.get_name().to_owned();
-            let id = fields.insert(field);
-            field_ids.insert(name, id);
+            fields.insert_named(name, field);
         }
 
         Ok(Self {
             destroyer: manifest.destroyer,
             fields,
-            field_ids,
             data,
         })
     }
 
     /// Get the [`FieldID`] from the name of a field
     pub(crate) fn resolve_field_id(&self, name: &str) -> Result<AssetFieldID, AssetError> {
-        self.field_ids
-            .get(name)
-            .copied()
+        self.fields
+            .resolve_id(name)
             .ok_or(AssetError::FieldNotFound)
     }
 

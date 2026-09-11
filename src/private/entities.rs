@@ -1,25 +1,19 @@
-use std::{collections::HashMap, sync::RwLock};
-
-use slotmap::SlotMap;
+use std::sync::RwLock;
 
 use crate::{
     errors::EntityError,
     field::{Field, FieldAccess},
-    private::{components::Component, manifests::components::ComponentManifest},
+    private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
     scene::{ComponentID, FieldID, PluginID},
 };
+
+type ComponentStorage = IDStore<ComponentID, RwLock<Component>>;
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
 #[derive(Debug, Default)]
 pub(crate) struct Entity {
     components: RwLock<ComponentStorage>,
-}
-
-#[derive(Debug, Default)]
-struct ComponentStorage {
-    components: SlotMap<ComponentID, RwLock<Component>>,
-    component_ids: HashMap<String, ComponentID>,
 }
 
 impl Entity {
@@ -40,10 +34,7 @@ impl Entity {
             .components
             .read()
             .expect("entity component lock poisoned");
-        let component = components
-            .components
-            .get(id)
-            .ok_or(EntityError::ComponentNotFound)?;
+        let component = components.get(id).ok_or(EntityError::ComponentNotFound)?;
         action(&component.read().expect("component lock poisoned"))
     }
 
@@ -60,12 +51,10 @@ impl Entity {
             .components
             .write()
             .expect("entity component lock poisoned");
-        if components.component_ids.contains_key(&name) {
+        if components.contains_name(&name) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        let id = components.components.insert(RwLock::new(component));
-        components.component_ids.insert(name, id);
-        Ok(id)
+        Ok(components.insert_named(name, RwLock::new(component)))
     }
 
     /// Remove a component from the entity
@@ -75,13 +64,10 @@ impl Entity {
             .write()
             .expect("entity component lock poisoned");
         let component = components
-            .components
             .remove(id)
             .ok_or(EntityError::ComponentNotFound)?
             .into_inner()
             .expect("component lock poisoned");
-        let name = component.get_name().to_owned();
-        components.component_ids.remove(&name);
         drop(components);
         drop(component);
         Ok(())
@@ -92,7 +78,6 @@ impl Entity {
         self.components
             .read()
             .expect("entity component lock poisoned")
-            .components
             .keys()
             .collect()
     }
@@ -103,9 +88,7 @@ impl Entity {
         self.components
             .read()
             .expect("entity component lock poisoned")
-            .component_ids
-            .get(name)
-            .copied()
+            .resolve_id(name)
             .ok_or(EntityError::ComponentNotFound)
     }
 
