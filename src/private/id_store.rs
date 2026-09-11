@@ -2,29 +2,33 @@ use std::collections::HashMap;
 
 use slotmap::{Key, SlotMap};
 
-/// Records addressed by cheap IDs and resolved by unique string names.
+/// Records addressed by cheap IDs and, optionally, unique string names.
 ///
 /// # Design decision
 ///
 /// A [`SlotMap`] provides cheap, copyable, generational IDs without exposing
 /// pointers, while a [`HashMap`] makes name resolution independent of the
-/// number of records. Storing the not-found error lets each domain choose its
-/// own error without requiring a separate error trait or factory.
+/// number of records. Lookups return [`Option`] like the underlying standard
+/// collections so callers can map absence to their own domain-specific error.
 #[derive(Debug)]
-pub(crate) struct IDStore<ID: Key, Record, Error> {
+pub(crate) struct IDStore<ID: Key, Record> {
     records: SlotMap<ID, Record>,
     ids: HashMap<String, ID>,
-    error: Error,
 }
 
-impl<ID: Key, Record, Error: Clone> IDStore<ID, Record, Error> {
-    /// Creates an empty store that returns `error` for failed lookups.
-    pub(crate) fn new(error: Error) -> Self {
+impl<ID: Key, Record> Default for IDStore<ID, Record> {
+    fn default() -> Self {
         Self {
             records: SlotMap::with_key(),
             ids: HashMap::new(),
-            error,
         }
+    }
+}
+
+impl<ID: Key, Record> IDStore<ID, Record> {
+    /// Inserts an unnamed record and returns its generated ID.
+    pub(crate) fn insert(&mut self, record: Record) -> ID {
+        self.records.insert(record)
     }
 
     /// Inserts `record` under its unique `name` and returns its generated ID.
@@ -32,38 +36,29 @@ impl<ID: Key, Record, Error: Clone> IDStore<ID, Record, Error> {
     /// # Panics
     ///
     /// Panics if `name` already exists in the store.
-    pub(crate) fn insert(&mut self, name: String, record: Record) -> ID {
+    pub(crate) fn insert_named(&mut self, name: String, record: Record) -> ID {
         assert!(!self.ids.contains_key(&name), "name already exists");
-        let id = self.records.insert(record);
+        let id = self.insert(record);
         self.ids.insert(name, id);
         id
     }
 
     /// Removes and returns the record identified by `id`.
-    ///
-    /// Returns the stored error when `id` is not present.
-    pub(crate) fn remove(&mut self, id: ID) -> Result<Record, Error> {
-        let record = self.records.remove(id).ok_or_else(|| self.error.clone())?;
+    pub(crate) fn remove(&mut self, id: ID) -> Option<Record> {
+        let record = self.records.remove(id)?;
         // Removal is O(n); add a reverse map only if profiling justifies it.
         self.ids.retain(|_, stored_id| *stored_id != id);
-        Ok(record)
+        Some(record)
     }
 
     /// Returns the record identified by `id`.
-    ///
-    /// Returns the stored error when `id` is not present.
-    pub(crate) fn get(&self, id: ID) -> Result<&Record, Error> {
-        self.records.get(id).ok_or_else(|| self.error.clone())
+    pub(crate) fn get(&self, id: ID) -> Option<&Record> {
+        self.records.get(id)
     }
 
     /// Resolves a record name to its ID.
-    ///
-    /// Returns the stored error when `name` is not present.
-    pub(crate) fn resolve_id(&self, name: &str) -> Result<ID, Error> {
-        self.ids
-            .get(name)
-            .copied()
-            .ok_or_else(|| self.error.clone())
+    pub(crate) fn resolve_id(&self, name: &str) -> Option<ID> {
+        self.ids.get(name).copied()
     }
 
     /// Returns whether a record with `name` exists.
@@ -99,19 +94,24 @@ mod tests {
 
     #[test]
     fn keeps_id_and_name_lookups_in_sync() {
-        let mut store: IDStore<TestId, i32, &str> = IDStore::new("not found");
-        let id = store.insert("record".to_owned(), 42);
+        let mut store: IDStore<TestId, i32> = IDStore::default();
+        let unnamed_id = store.insert(7);
+        let id = store.insert_named("record".to_owned(), 42);
 
-        assert_eq!(store.get(id), Ok(&42));
-        assert_eq!(store.resolve_id("record"), Ok(id));
+        assert_eq!(store.get(unnamed_id), Some(&7));
+        assert_eq!(store.get(id), Some(&42));
+        assert_eq!(store.resolve_id("record"), Some(id));
         assert!(store.contains_name("record"));
-        assert_eq!(store.keys().collect::<Vec<_>>(), vec![id]);
-        assert_eq!(store.values().copied().collect::<Vec<_>>(), vec![42]);
-        assert_eq!(store.iter().collect::<Vec<_>>(), vec![(id, &42)]);
+        assert_eq!(store.keys().collect::<Vec<_>>(), vec![unnamed_id, id]);
+        assert_eq!(store.values().copied().collect::<Vec<_>>(), vec![7, 42]);
+        assert_eq!(
+            store.iter().collect::<Vec<_>>(),
+            vec![(unnamed_id, &7), (id, &42)]
+        );
 
-        assert_eq!(store.remove(id), Ok(42));
-        assert_eq!(store.get(id), Err("not found"));
-        assert_eq!(store.resolve_id("record"), Err("not found"));
+        assert_eq!(store.remove(id), Some(42));
+        assert_eq!(store.get(id), None);
+        assert_eq!(store.resolve_id("record"), None);
         assert!(!store.contains_name("record"));
     }
 }
