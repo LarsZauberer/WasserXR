@@ -41,6 +41,22 @@ pub struct AssetID;
 /// Handle that is cheap to copy and uniquely identifies a field inside of an asset. It is only
 /// unique inside of a single Asset and it's data string.
 pub struct AssetFieldID;
+
+/// Handle for a component type. It is unique within its plugin manifest, but
+/// cannot be used across different plugin manifests.
+pub struct ComponentTypeID;
+
+/// Handle for a component field type. It is unique within its component type
+/// manifest, but cannot be used across different component type manifests.
+pub struct FieldTypeID;
+
+/// Handle for an asset field type. It is unique within its asset type manifest,
+/// but cannot be used across different asset type manifests.
+pub struct AssetFieldTypeID;
+
+/// Handle for an asset type. It is unique within its plugin manifest, but
+/// cannot be used across different plugin manifests.
+pub struct AssetTypeID;
 }
 
 type EntityStorage = IDStore<EntityID, RwLock<Entity>>;

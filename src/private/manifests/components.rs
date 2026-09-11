@@ -1,12 +1,14 @@
-use std::collections::HashMap;
-
 use crate::{
     definitions::{
         Definition,
         components::{ComponentDefinition, Creator, Destroyer},
         error::ComponentDefinitionError,
     },
-    private::manifests::{Manifest, fields::ComponentFieldManifest},
+    private::{
+        id_store::IDStore,
+        manifests::{Manifest, fields::ComponentFieldManifest},
+    },
+    scene::FieldTypeID,
 };
 
 #[derive(Debug)]
@@ -16,7 +18,7 @@ pub(crate) struct ComponentManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: HashMap<String, ComponentFieldManifest>,
+    pub fields: IDStore<FieldTypeID, ComponentFieldManifest>,
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {
@@ -33,18 +35,19 @@ impl Manifest<ComponentDefinition> for ComponentManifest {
             destroyer: value
                 .destroyer
                 .expect("validated component definitions have a destroyer"),
-            fields: if value.field_count == 0 {
-                HashMap::new()
-            } else {
-                unsafe { std::slice::from_raw_parts(value.fields, value.field_count) }
-                    .iter()
-                    .copied()
-                    .map(|field| {
-                        unsafe { ComponentFieldManifest::checked_convert(field) }
-                            .map(|manifest| (manifest.name.clone(), manifest))
-                            .map_err(|error| (name.clone(), error).into())
-                    })
-                    .collect::<Result<HashMap<_, _>, ComponentDefinitionError>>()?
+            fields: {
+                let mut fields = IDStore::default();
+                let definitions = if value.field_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.fields, value.field_count) }
+                };
+                for field in definitions {
+                    let manifest = unsafe { ComponentFieldManifest::checked_convert(*field) }
+                        .map_err(|error| (name.clone(), error))?;
+                    fields.insert_named(manifest.name.clone(), manifest);
+                }
+                fields
             },
         })
     }

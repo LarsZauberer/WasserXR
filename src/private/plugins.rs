@@ -102,12 +102,18 @@ impl Plugin {
     /// Searches in the current [`PluginManifest`] for the defined components
     /// and tries to find the requested [`ComponentManifest`]
     pub(crate) fn get_component(&self, name: &str) -> Option<&ComponentManifest> {
-        self.manifest.components.get(name)
+        self.manifest
+            .components
+            .resolve_id(name)
+            .and_then(|id| self.manifest.components.get(id))
     }
 
     /// Searches in the current [`PluginManifest`] for the defined assets and
     /// tries to find the requested [`AssetManifest`].
     pub(crate) fn get_asset(&self, name: &str) -> Option<&AssetManifest> {
-        self.manifest.assets.get(name)
+        self.manifest
+            .assets
+            .resolve_id(name)
+            .and_then(|id| self.manifest.assets.get(id))
     }
 }

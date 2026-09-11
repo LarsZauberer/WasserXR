@@ -1,9 +1,11 @@
-use std::collections::HashMap;
-
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
-    private::manifests::{Manifest, assets::AssetManifest, components::ComponentManifest},
+    private::{
+        id_store::IDStore,
+        manifests::{Manifest, assets::AssetManifest, components::ComponentManifest},
+    },
+    scene::{AssetTypeID, ComponentTypeID},
 };
 
 /// The plugin manifest is the main manifest of each wasserxr plugin. It
@@ -17,8 +19,8 @@ pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,
 
-    pub components: HashMap<String, ComponentManifest>,
-    pub assets: HashMap<String, AssetManifest>,
+    pub components: IDStore<ComponentTypeID, ComponentManifest>,
+    pub assets: IDStore<AssetTypeID, AssetManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {
@@ -28,31 +30,33 @@ impl Manifest<PluginDefinition> for PluginManifest {
         Ok(Self {
             name: name.clone(),
             engine_version: value.engine_version,
-            components: if value.component_count == 0 {
-                HashMap::new()
-            } else {
-                unsafe { std::slice::from_raw_parts(value.components, value.component_count) }
-                    .iter()
-                    .copied()
-                    .map(|component| {
-                        unsafe { ComponentManifest::checked_convert(component) }
-                            .map(|manifest| (manifest.name.clone(), manifest))
-                            .map_err(|error| (name.clone(), error).into())
-                    })
-                    .collect::<Result<HashMap<_, _>, PluginDefinitionError>>()?
+            components: {
+                let mut components = IDStore::default();
+                let definitions = if value.component_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.components, value.component_count) }
+                };
+                for component in definitions {
+                    let manifest = unsafe { ComponentManifest::checked_convert(*component) }
+                        .map_err(|error| (name.clone(), error))?;
+                    components.insert_named(manifest.name.clone(), manifest);
+                }
+                components
             },
-            assets: if value.asset_count == 0 {
-                HashMap::new()
-            } else {
-                unsafe { std::slice::from_raw_parts(value.assets, value.asset_count) }
-                    .iter()
-                    .copied()
-                    .map(|asset| {
-                        unsafe { AssetManifest::checked_convert(asset) }
-                            .map(|manifest| (manifest.name.clone(), manifest))
-                            .map_err(|error| (name.clone(), error).into())
-                    })
-                    .collect::<Result<HashMap<_, _>, PluginDefinitionError>>()?
+            assets: {
+                let mut assets = IDStore::default();
+                let definitions = if value.asset_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.assets, value.asset_count) }
+                };
+                for asset in definitions {
+                    let manifest = unsafe { AssetManifest::checked_convert(*asset) }
+                        .map_err(|error| (name.clone(), error))?;
+                    assets.insert_named(manifest.name.clone(), manifest);
+                }
+                assets
             },
         })
     }
