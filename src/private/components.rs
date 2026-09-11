@@ -60,6 +60,13 @@ impl LockedField<'_> {
 pub(crate) struct Component {
     plugin_id: PluginID,
     name: String,
+    /// # Design Decision
+    ///
+    /// The [`ComponentField`] requires an [`RwLock`] to make control the access
+    /// to the field pointers. From a concrete [`ComponentField`] or more
+    /// precisely a [`RwLockWriteGuard<'a, ComponentField>`] a
+    /// [`LockedField<'a>`] is then created that encompasses the state that the
+    /// Field is locked and carries the pointer with it.
     fields: IDStore<FieldID, RwLock<ComponentField>>,
     destroyer: Destroyer,
     data: *mut c_void,

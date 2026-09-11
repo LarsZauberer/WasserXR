@@ -38,13 +38,23 @@ pub struct FieldID;
 /// different ID's
 pub struct AssetID;
 
-/// HAndle that is cheap to copy and uniquely identifies a field inside of an asset. It is only
+/// Handle that is cheap to copy and uniquely identifies a field inside of an asset. It is only
 /// unique inside of a single Asset and it's data string.
 pub struct AssetFieldID;
 }
 
 type EntityStorage = IDStore<EntityID, RwLock<Entity>>;
+
+/// # Design Decision
+///
+/// A plugin doesn't require an RwLock since it is a read-only object. There are
+/// no operations that require exclusive access to it.
 type PluginStorage = IDStore<PluginID, Plugin>;
+
+/// # Design Decision
+///
+/// An asset doesn't require an RwLock since it is a read-only object. There are
+/// no operations that require exclusive access to it.
 type AssetStorage = IDStore<AssetID, Asset>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
