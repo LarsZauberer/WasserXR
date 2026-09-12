@@ -1,3 +1,5 @@
+//! Integration tests for system definitions and their resolved type IDs.
+
 use wasserxr::{
     definitions::{
         Definition,
@@ -5,14 +7,40 @@ use wasserxr::{
         systems::SystemDefinition,
         type_id_requests::TypeIDRequests,
     },
+    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, Scene, TypeID},
     utils::ffi::StringError,
 };
+
+unsafe extern "C" fn callback(_: *const Scene, _: *const TypeID, _: usize) {}
+
+#[test]
+fn type_ids_keep_their_requested_type() {
+    let component = ComponentTypeID::default();
+    let field = FieldTypeID::default();
+    let asset = AssetTypeID::default();
+    let asset_field = AssetFieldTypeID::default();
+
+    assert_eq!(
+        ComponentTypeID::try_from(TypeID::from(component)),
+        Ok(component)
+    );
+    assert_eq!(FieldTypeID::try_from(TypeID::from(field)), Ok(field));
+    assert_eq!(AssetTypeID::try_from(TypeID::from(asset)), Ok(asset));
+    assert_eq!(
+        AssetFieldTypeID::try_from(TypeID::from(asset_field)),
+        Ok(asset_field)
+    );
+    assert!(AssetTypeID::try_from(TypeID::from(component)).is_err());
+}
 
 fn system() -> SystemDefinition {
     static NAME: &[u8] = b"render\0";
 
     SystemDefinition {
         name: NAME.as_ptr().cast(),
+        attacher: Some(callback),
+        runner: Some(callback),
+        detacher: Some(callback),
         requires: std::ptr::null(),
         requires_count: 0,
         wanted_by: std::ptr::null(),
@@ -20,6 +48,20 @@ fn system() -> SystemDefinition {
         type_id_requests: std::ptr::null(),
         type_id_request_count: 0,
     }
+}
+
+#[test]
+fn requires_only_the_runner() {
+    let mut definition = system();
+    definition.attacher = None;
+    definition.detacher = None;
+    assert!(unsafe { definition.validate() }.is_ok());
+
+    definition.runner = None;
+    assert_eq!(
+        unsafe { definition.validate() },
+        Err(SystemDefinitionError::RunnerIsNull("render".to_owned()))
+    );
 }
 
 #[test]
