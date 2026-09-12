@@ -57,6 +57,10 @@ pub struct AssetFieldTypeID;
 /// Handle for an asset type. It is unique within its plugin manifest, but
 /// cannot be used across different plugin manifests.
 pub struct AssetTypeID;
+
+/// Handle for a system. It is unique within its plugin manifest, but cannot be
+/// used across different plugin manifests.
+pub struct SystemID;
 }
 
 type EntityStorage = IDStore<String, EntityID, RwLock<Entity>>;

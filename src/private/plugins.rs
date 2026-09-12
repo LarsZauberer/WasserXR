@@ -14,8 +14,9 @@ use crate::{
     errors::PluginError,
     private::manifests::{
         Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
+        systems::SystemManifest,
     },
-    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID},
+    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemID},
 };
 
 const WXR_PLUGIN_SYMBOL_NAME: &CStr = c"wxr_plugin";
@@ -136,5 +137,15 @@ impl Plugin {
     /// Returns the asset manifest identified by `id`.
     pub(crate) fn get_asset(&self, id: AssetTypeID) -> Option<&AssetManifest> {
         self.manifest.assets.get(id)
+    }
+
+    /// Resolves a system name to its ID.
+    pub(crate) fn resolve_system_id(&self, name: &str) -> Option<SystemID> {
+        self.manifest.systems.resolve_id(name)
+    }
+
+    /// Returns the system manifest identified by `id`.
+    pub(crate) fn get_system(&self, id: SystemID) -> Option<&SystemManifest> {
+        self.manifest.systems.get(id)
     }
 }

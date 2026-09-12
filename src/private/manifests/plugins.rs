@@ -3,9 +3,11 @@ use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
     private::{
         id_store::IDStore,
-        manifests::{Manifest, assets::AssetManifest, components::ComponentManifest},
+        manifests::{
+            Manifest, assets::AssetManifest, components::ComponentManifest, systems::SystemManifest,
+        },
     },
-    scene::{AssetTypeID, ComponentTypeID},
+    scene::{AssetTypeID, ComponentTypeID, SystemID},
 };
 
 /// The plugin manifest is the main manifest of each wasserxr plugin. It
@@ -29,6 +31,7 @@ pub(crate) struct PluginManifest {
 
     pub components: IDStore<String, ComponentTypeID, ComponentManifest>,
     pub assets: IDStore<String, AssetTypeID, AssetManifest>,
+    pub systems: IDStore<String, SystemID, SystemManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {
@@ -65,6 +68,20 @@ impl Manifest<PluginDefinition> for PluginManifest {
                     assets.insert_named(manifest.name.clone(), manifest);
                 }
                 assets
+            },
+            systems: {
+                let mut systems = IDStore::default();
+                let definitions = if value.system_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.systems, value.system_count) }
+                };
+                for system in definitions {
+                    let manifest = unsafe { SystemManifest::checked_convert(*system) }
+                        .map_err(|error| (name.clone(), error))?;
+                    systems.insert_named(manifest.name.clone(), manifest);
+                }
+                systems
             },
         })
     }

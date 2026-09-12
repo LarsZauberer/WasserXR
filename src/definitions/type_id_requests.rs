@@ -2,7 +2,10 @@
 
 use std::ffi::c_char;
 
-use crate::{definitions::error::TypeIDRequestError, utils::ffi::validate_string};
+use crate::{
+    definitions::{Definition, error::TypeIDRequestError},
+    utils::ffi::validate_string,
+};
 
 /// Describes the names needed to resolve one of WasserXR's type IDs.
 #[derive(Debug, Clone, Copy)]
@@ -24,14 +27,16 @@ pub enum TypeIDRequests {
     },
 }
 
-impl TypeIDRequests {
+impl Definition for TypeIDRequests {
+    type Error = TypeIDRequestError;
+
     /// Validates every name needed to resolve this request.
     ///
     /// # Safety
     ///
     /// Every pointer in this request must point to a valid, NUL-terminated C
     /// string for the duration of the call.
-    pub unsafe fn validate(&self) -> Result<(), TypeIDRequestError> {
+    unsafe fn validate(&self) -> Result<(), Self::Error> {
         match *self {
             Self::ComponentTypeID { component } => unsafe {
                 validate_string(component, |_| ()).map_err(TypeIDRequestError::Component)
