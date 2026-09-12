@@ -22,6 +22,7 @@ workspace = true
 [dependencies]
 bincode         = { version = "2.0.1", features = ["serde"] }
 libc            = "0.2.186"
+petgraph        = { version = "0.8.3", default-features = false, features = ["graphmap", "std"] }
 serde           = { version = "1.0.228", features = ["derive"] }
 wasserxr-macros = { path = "wasserxr-macros", version = "0.2.4" }
 uuid            = { version = "1.23.2", features = ["serde", "v4"] }
