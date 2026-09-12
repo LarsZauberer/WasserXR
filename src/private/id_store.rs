@@ -11,12 +11,12 @@ use slotmap::{Key, SlotMap};
 /// number of records. Lookups return [`Option`] like the underlying standard
 /// collections so callers can map absence to their own domain-specific error.
 #[derive(Debug)]
-pub(crate) struct IDStore<ID: Key, Record, OriginalID: Clone + Eq + Hash = String> {
+pub(crate) struct IDStore<OriginalID: Clone + Eq + Hash, ID: Key, Record> {
     records: SlotMap<ID, Record>,
     ids: HashMap<OriginalID, ID>,
 }
 
-impl<ID: Key, Record, OriginalID: Clone + Eq + Hash> Default for IDStore<ID, Record, OriginalID> {
+impl<OriginalID: Clone + Eq + Hash, ID: Key, Record> Default for IDStore<OriginalID, ID, Record> {
     fn default() -> Self {
         Self {
             records: SlotMap::with_key(),
@@ -25,7 +25,7 @@ impl<ID: Key, Record, OriginalID: Clone + Eq + Hash> Default for IDStore<ID, Rec
     }
 }
 
-impl<ID: Key, Record, OriginalID: Clone + Eq + Hash> IDStore<ID, Record, OriginalID> {
+impl<OriginalID: Clone + Eq + Hash, ID: Key, Record> IDStore<OriginalID, ID, Record> {
     /// Inserts an unnamed record and returns its generated ID.
     pub(crate) fn insert(&mut self, record: Record) -> ID {
         self.records.insert(record)
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn keeps_id_and_name_lookups_in_sync() {
-        let mut store: IDStore<TestId, i32> = IDStore::default();
+        let mut store: IDStore<String, TestId, i32> = IDStore::default();
         let unnamed_id = store.insert(7);
         let id = store.insert_named("record".to_owned(), 42);
 
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn supports_non_string_original_ids() {
-        let mut store: IDStore<TestId, &str, u32> = IDStore::default();
+        let mut store: IDStore<u32, TestId, &str> = IDStore::default();
         let id = store.insert_named(7, "record");
 
         assert_eq!(store.resolve_id(&7), Some(id));

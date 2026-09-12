@@ -15,7 +15,7 @@ pub(crate) struct Asset {
     ///
     /// The [`AssetField`] record doesn't require an [`RwLock`] since all fields
     /// are read-only by design. Hence, they don't need exclusive access
-    fields: IDStore<AssetFieldID, AssetField>,
+    fields: IDStore<String, AssetFieldID, AssetField>,
     data: *mut c_void,
 }
 

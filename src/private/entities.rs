@@ -7,7 +7,7 @@ use crate::{
     scene::{ComponentID, FieldID, PluginID},
 };
 
-type ComponentStorage = IDStore<ComponentID, RwLock<Component>>;
+type ComponentStorage = IDStore<String, ComponentID, RwLock<Component>>;
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.

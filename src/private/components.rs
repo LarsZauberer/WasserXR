@@ -67,7 +67,7 @@ pub(crate) struct Component {
     /// precisely a [`RwLockWriteGuard<'a, ComponentField>`] a
     /// [`LockedField<'a>`] is then created that encompasses the state that the
     /// Field is locked and carries the pointer with it.
-    fields: IDStore<FieldID, RwLock<ComponentField>>,
+    fields: IDStore<String, FieldID, RwLock<ComponentField>>,
     destroyer: Destroyer,
     data: *mut c_void,
 }

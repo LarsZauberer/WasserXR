@@ -27,8 +27,8 @@ pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,
 
-    pub components: IDStore<ComponentTypeID, ComponentManifest>,
-    pub assets: IDStore<AssetTypeID, AssetManifest>,
+    pub components: IDStore<String, ComponentTypeID, ComponentManifest>,
+    pub assets: IDStore<String, AssetTypeID, AssetManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {

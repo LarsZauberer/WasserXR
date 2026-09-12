@@ -18,7 +18,7 @@ pub(crate) struct ComponentManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: IDStore<FieldTypeID, ComponentFieldManifest>,
+    pub fields: IDStore<String, FieldTypeID, ComponentFieldManifest>,
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {

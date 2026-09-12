@@ -19,7 +19,7 @@ pub(crate) struct AssetManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: IDStore<AssetFieldTypeID, AssetFieldManifest>,
+    pub fields: IDStore<String, AssetFieldTypeID, AssetFieldManifest>,
 }
 
 impl Manifest<AssetDefinition> for AssetManifest {

@@ -1,6 +1,6 @@
 use std::{ffi::c_void, path::Path, sync::RwLock};
 
-use slotmap::{Key, new_key_type};
+use slotmap::new_key_type;
 
 use crate::{
     definitions::plugins::PluginDefinition,
@@ -59,19 +59,19 @@ pub struct AssetFieldTypeID;
 pub struct AssetTypeID;
 }
 
-type EntityStorage = IDStore<EntityID, RwLock<Entity>>;
+type EntityStorage = IDStore<String, EntityID, RwLock<Entity>>;
 
 /// # Design Decision
 ///
 /// A plugin doesn't require an RwLock since it is a read-only object. There are
 /// no operations that require exclusive access to it.
-type PluginStorage = IDStore<PluginID, Plugin>;
+type PluginStorage = IDStore<String, PluginID, Plugin>;
 
 /// # Design Decision
 ///
 /// An asset doesn't require an RwLock since it is a read-only object. There are
 /// no operations that require exclusive access to it.
-type AssetStorage = IDStore<AssetID, Asset>;
+type AssetStorage = IDStore<(PluginID, AssetTypeID, String), AssetID, Asset>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
 /// access and maintain all ECS objects.
@@ -89,37 +89,6 @@ pub struct Scene {
 }
 
 impl Scene {
-    /// Builds the internal lookup key for an asset.
-    ///
-    /// An asset is identified by the plugin that defines it, its asset type,
-    /// and the data string supplied by the caller. Combining all three values
-    /// ensures that repeated requests for the same asset resolve to the same
-    /// [`AssetID`], while requests that differ in any value remain distinct.
-    /// This key is local to a scene and must not be persisted or exposed as a
-    /// stable asset identifier.
-    ///
-    /// # Design Decision
-    ///
-    /// [`AssetStorage`] currently uses [`IDStore`], whose named lookup accepts
-    /// only a [`String`]. The natural asset key is instead the tuple
-    /// (`PluginID`, `AssetTypeID`, data string), so this function encodes that
-    /// tuple in the form expected by `IDStore`. The plugin ID is required
-    /// because an [`AssetTypeID`] is only unique within its plugin manifest,
-    /// and the data string distinguishes separate instances of the same asset
-    /// type. Keeping the encoding here also ensures that insertion and lookup
-    /// use exactly the same representation.
-    ///
-    /// This string encoding is an implementation workaround rather than part
-    /// of the asset model. It can be removed once asset storage supports a
-    /// typed composite key directly.
-    fn asset_key(plugin: PluginID, asset_type: AssetTypeID, data_string: &str) -> String {
-        format!(
-            "{}:{}:{data_string}",
-            plugin.data().as_ffi(),
-            asset_type.data().as_ffi()
-        )
-    }
-
     /// Creates a new empty scene
     pub fn new() -> Self {
         Self::default()
@@ -430,7 +399,7 @@ impl Scene {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .resolve_id(&Self::asset_key(plugin_id, asset_type_id, data_string))
+            .resolve_id(&(plugin_id, asset_type_id, data_string.to_owned()))
             .ok_or(SceneError::AssetNotFound)
     }
 
@@ -460,7 +429,7 @@ impl Scene {
         asset_type_id: AssetTypeID,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
-        let key = Self::asset_key(plugin_id, asset_type_id, data_string);
+        let key = (plugin_id, asset_type_id, data_string.to_owned());
         if let Some(id) = self
             .assets
             .read()
