@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
 use slotmap::{Key, SlotMap};
 
-/// Records addressed by cheap IDs and, optionally, unique string names.
+/// Records addressed by cheap IDs and, optionally, unique original IDs.
 ///
 /// # Design decision
 ///
@@ -11,12 +11,12 @@ use slotmap::{Key, SlotMap};
 /// number of records. Lookups return [`Option`] like the underlying standard
 /// collections so callers can map absence to their own domain-specific error.
 #[derive(Debug)]
-pub(crate) struct IDStore<ID: Key, Record> {
+pub(crate) struct IDStore<ID: Key, Record, OriginalID: Clone + Eq + Hash = String> {
     records: SlotMap<ID, Record>,
-    ids: HashMap<String, ID>,
+    ids: HashMap<OriginalID, ID>,
 }
 
-impl<ID: Key, Record> Default for IDStore<ID, Record> {
+impl<ID: Key, Record, OriginalID: Clone + Eq + Hash> Default for IDStore<ID, Record, OriginalID> {
     fn default() -> Self {
         Self {
             records: SlotMap::with_key(),
@@ -25,7 +25,7 @@ impl<ID: Key, Record> Default for IDStore<ID, Record> {
     }
 }
 
-impl<ID: Key, Record> IDStore<ID, Record> {
+impl<ID: Key, Record, OriginalID: Clone + Eq + Hash> IDStore<ID, Record, OriginalID> {
     /// Inserts an unnamed record and returns its generated ID.
     pub(crate) fn insert(&mut self, record: Record) -> ID {
         self.records.insert(record)
@@ -36,7 +36,7 @@ impl<ID: Key, Record> IDStore<ID, Record> {
     /// # Panics
     ///
     /// Panics if `name` already exists in the store.
-    pub(crate) fn insert_named(&mut self, name: String, record: Record) -> ID {
+    pub(crate) fn insert_named(&mut self, name: OriginalID, record: Record) -> ID {
         assert!(!self.ids.contains_key(&name), "name already exists");
         let id = self.insert(record);
         self.ids.insert(name, id);
@@ -57,12 +57,18 @@ impl<ID: Key, Record> IDStore<ID, Record> {
     }
 
     /// Resolves a record name to its ID.
-    pub(crate) fn resolve_id(&self, name: &str) -> Option<ID> {
+    pub(crate) fn resolve_id<Q: Eq + Hash + ?Sized>(&self, name: &Q) -> Option<ID>
+    where
+        OriginalID: Borrow<Q>,
+    {
         self.ids.get(name).copied()
     }
 
     /// Returns whether a record with `name` exists.
-    pub(crate) fn contains_name(&self, name: &str) -> bool {
+    pub(crate) fn contains_name<Q: Eq + Hash + ?Sized>(&self, name: &Q) -> bool
+    where
+        OriginalID: Borrow<Q>,
+    {
         self.ids.contains_key(name)
     }
 
@@ -113,5 +119,13 @@ mod tests {
         assert_eq!(store.get(id), None);
         assert_eq!(store.resolve_id("record"), None);
         assert!(!store.contains_name("record"));
+    }
+
+    #[test]
+    fn supports_non_string_original_ids() {
+        let mut store: IDStore<TestId, &str, u32> = IDStore::default();
+        let id = store.insert_named(7, "record");
+
+        assert_eq!(store.resolve_id(&7), Some(id));
     }
 }
