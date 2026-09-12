@@ -4,7 +4,7 @@ use crate::{
     definitions::components::Destroyer,
     errors::AssetError,
     private::{fields::AssetField, id_store::IDStore, manifests::assets::AssetManifest},
-    scene::AssetFieldID,
+    scene::{AssetFieldID, AssetFieldTypeID},
 };
 
 /// This is a concrete asset that is created from [`AssetManifest`]
@@ -15,7 +15,7 @@ pub(crate) struct Asset {
     ///
     /// The [`AssetField`] record doesn't require an [`RwLock`] since all fields
     /// are read-only by design. Hence, they don't need exclusive access
-    fields: IDStore<String, AssetFieldID, AssetField>,
+    fields: IDStore<AssetFieldTypeID, AssetFieldID, AssetField>,
     data: *mut c_void,
 }
 
@@ -34,10 +34,9 @@ impl Asset {
         }
 
         let mut fields = IDStore::default();
-        for field in manifest.fields.values() {
+        for (field_type_id, field) in manifest.fields.iter() {
             let field = AssetField::from(field);
-            let name = field.get_name().to_owned();
-            fields.insert_named(name, field);
+            fields.insert_named(field_type_id, field);
         }
 
         Ok(Self {
@@ -47,10 +46,13 @@ impl Asset {
         })
     }
 
-    /// Get the [`FieldID`] from the name of a field
-    pub(crate) fn resolve_field_id(&self, name: &str) -> Result<AssetFieldID, AssetError> {
+    /// Get the [`AssetFieldID`] from its field type ID.
+    pub(crate) fn resolve_field_id(
+        &self,
+        field_type_id: AssetFieldTypeID,
+    ) -> Result<AssetFieldID, AssetError> {
         self.fields
-            .resolve_id(name)
+            .resolve_id(&field_type_id)
             .ok_or(AssetError::FieldNotFound)
     }
 

@@ -12,7 +12,7 @@ use wasserxr::{
         assets::AssetDefinition, fields::AssetFieldDefinition, plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
-    scene::{AssetTypeID, PluginID, Scene},
+    scene::{AssetFieldTypeID, AssetTypeID, PluginID, Scene},
     utils::version::Version,
 };
 
@@ -143,11 +143,11 @@ fn asset_field_can_be_read() {
     reset_counts();
     let scene = scene();
     let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
-    scene
+    let field_type = scene
         .resolve_asset_field_type_id(plugin, asset_type, "value")
         .unwrap();
     let asset = scene.get_asset_id(plugin, asset_type, "field").unwrap();
-    let field = scene.resolve_asset_field_id(asset, "value").unwrap();
+    let field = scene.resolve_asset_field_id(asset, field_type).unwrap();
 
     let value = scene
         .query_asset_field(asset, field)
@@ -165,7 +165,7 @@ fn missing_asset_field_is_rejected() {
     let asset = scene.get_asset_id(plugin, asset_type, "field").unwrap();
 
     assert!(matches!(
-        scene.resolve_asset_field_id(asset, "missing"),
+        scene.resolve_asset_field_id(asset, AssetFieldTypeID::default()),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
 }

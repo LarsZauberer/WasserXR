@@ -302,7 +302,7 @@ impl Scene {
 
         self.with_entity(entity_id, |entity| {
             entity
-                .add_component(plugin_id, manifest)
+                .add_component(plugin_id, component_type_id, manifest)
                 .map_err(SceneError::EntityError)
         })
     }
@@ -338,31 +338,30 @@ impl Scene {
         })
     }
 
-    /// Resolves the [`ComponentID`] of a component given it's name and an
-    /// [`EntityID`] which should have the component attached to it
+    /// Resolves a component type attached to an entity to its [`ComponentID`].
     pub fn resolve_component_id(
         &self,
         entity_id: EntityID,
-        component_name: &str,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
     ) -> Result<ComponentID, SceneError> {
         self.with_entity(entity_id, |entity| {
             entity
-                .resolve_component_id(component_name)
+                .resolve_component_id(plugin_id, component_type_id)
                 .map_err(SceneError::from)
         })
     }
 
-    /// Resolve the [`FieldID`] from the name of a field providing the
-    /// [`EntityID`] and the [`ComponentID`].
+    /// Resolves a field type within a component to its [`FieldID`].
     pub fn resolve_field_id(
         &self,
         entity_id: EntityID,
         component_id: ComponentID,
-        name: &str,
+        field_type_id: FieldTypeID,
     ) -> Result<FieldID, SceneError> {
         self.with_entity(entity_id, |entity| {
             entity
-                .resolve_field_id(component_id, name)
+                .resolve_field_id(component_id, field_type_id)
                 .map_err(SceneError::from)
         })
     }
@@ -403,21 +402,20 @@ impl Scene {
             .ok_or(SceneError::AssetNotFound)
     }
 
-    /// Resolve the [`AssetFieldID`] from ta given [`AssetID`] and the field
-    /// name
+    /// Resolves an asset field type within an asset to its [`AssetFieldID`].
     ///
     /// This function will **not** load a new asset if the asset doesn't exist.
     pub fn resolve_asset_field_id(
         &self,
         asset_id: AssetID,
-        field_name: &str,
+        field_type_id: AssetFieldTypeID,
     ) -> Result<AssetFieldID, SceneError> {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
             .get(asset_id)
             .ok_or(SceneError::AssetNotFound)?
-            .resolve_field_id(field_name)
+            .resolve_field_id(field_type_id)
             .map_err(SceneError::from)
     }
 

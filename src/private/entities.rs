@@ -4,10 +4,10 @@ use crate::{
     errors::EntityError,
     field::{Field, FieldAccess},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
-    scene::{ComponentID, FieldID, PluginID},
+    scene::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
 };
 
-type ComponentStorage = IDStore<String, ComponentID, RwLock<Component>>;
+type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -43,18 +43,19 @@ impl Entity {
     pub(crate) fn add_component(
         &self,
         plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
         manifest: &ComponentManifest,
     ) -> Result<ComponentID, EntityError> {
         let component = Component::new(manifest, plugin_id);
-        let name = component.get_name().to_owned();
         let mut components = self
             .components
             .write()
             .expect("entity component lock poisoned");
-        if components.contains_name(&name) {
+        let type_id = (plugin_id, component_type_id);
+        if components.contains_name(&type_id) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        Ok(components.insert_named(name, RwLock::new(component)))
+        Ok(components.insert_named(type_id, RwLock::new(component)))
     }
 
     /// Remove a component from the entity
@@ -82,24 +83,29 @@ impl Entity {
             .collect()
     }
 
-    /// Resolve from component name to component id. If there is no component
-    /// with this type, it will return None.
-    pub(crate) fn resolve_component_id(&self, name: &str) -> Result<ComponentID, EntityError> {
+    /// Resolve a component type to its component ID.
+    pub(crate) fn resolve_component_id(
+        &self,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
+    ) -> Result<ComponentID, EntityError> {
         self.components
             .read()
             .expect("entity component lock poisoned")
-            .resolve_id(name)
+            .resolve_id(&(plugin_id, component_type_id))
             .ok_or(EntityError::ComponentNotFound)
     }
 
-    /// Resolve the [`FieldID`] from the field name
+    /// Resolve the [`FieldID`] from its field type ID.
     pub(crate) fn resolve_field_id(
         &self,
         component_id: ComponentID,
-        name: &str,
+        field_type_id: FieldTypeID,
     ) -> Result<FieldID, EntityError> {
         self.with_component(component_id, |component| {
-            component.resolve_field_id(name).map_err(EntityError::from)
+            component
+                .resolve_field_id(field_type_id)
+                .map_err(EntityError::from)
         })
     }
 

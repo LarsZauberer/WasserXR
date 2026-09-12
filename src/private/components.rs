@@ -10,7 +10,7 @@ use crate::{
     private::{
         fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
     },
-    scene::{FieldID, PluginID},
+    scene::{FieldID, FieldTypeID, PluginID},
 };
 
 /// Keeps a queried field pointer and its lock guard alive together.
@@ -67,7 +67,7 @@ pub(crate) struct Component {
     /// precisely a [`RwLockWriteGuard<'a, ComponentField>`] a
     /// [`LockedField<'a>`] is then created that encompasses the state that the
     /// Field is locked and carries the pointer with it.
-    fields: IDStore<String, FieldID, RwLock<ComponentField>>,
+    fields: IDStore<FieldTypeID, FieldID, RwLock<ComponentField>>,
     destroyer: Destroyer,
     data: *mut c_void,
 }
@@ -93,10 +93,9 @@ impl Component {
     pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
         let data = unsafe { (manifest.creator)() };
         let mut fields = IDStore::default();
-        for field in manifest.fields.values() {
+        for (field_type_id, field) in manifest.fields.iter() {
             let field = ComponentField::from(field);
-            let name = field.get_name().to_owned();
-            fields.insert_named(name, RwLock::new(field));
+            fields.insert_named(field_type_id, RwLock::new(field));
         }
         Self {
             plugin_id,
@@ -132,10 +131,13 @@ impl Component {
         })
     }
 
-    /// Get field id from the field name
-    pub(crate) fn resolve_field_id(&self, name: &str) -> Result<FieldID, ComponentError> {
+    /// Get a field ID from its field type ID.
+    pub(crate) fn resolve_field_id(
+        &self,
+        field_type_id: FieldTypeID,
+    ) -> Result<FieldID, ComponentError> {
         self.fields
-            .resolve_id(name)
+            .resolve_id(&field_type_id)
             .ok_or(ComponentError::FieldNotFound)
     }
 

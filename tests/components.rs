@@ -8,7 +8,7 @@ use wasserxr::{
     },
     errors::{ComponentError, EntityError, FieldError, SceneError},
     field::{Field, FieldAccess},
-    scene::{EntityID, Scene},
+    scene::{ComponentID, ComponentTypeID, EntityID, PluginID, Scene},
     utils::version::Version,
 };
 
@@ -79,12 +79,14 @@ fn reset_globals() {
 fn add_test_component(
     scene: &Scene,
     entity: EntityID,
-) -> Result<wasserxr::scene::ComponentID, SceneError> {
+) -> Result<(PluginID, ComponentTypeID, ComponentID), SceneError> {
     let plugin = scene
         .get_plugin("MyPlugin")
         .ok_or(SceneError::NoComponentType)?;
     let component_type = scene.resolve_component_type_id(plugin, "MyComponent")?;
-    scene.add_component(entity, plugin, component_type)
+    scene
+        .add_component(entity, plugin, component_type)
+        .map(|component| (plugin, component_type, component))
 }
 
 #[fixture]
@@ -111,13 +113,23 @@ fn component_fields_enforce_mutability(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = add_test_component(&scene, entity).unwrap();
+    let (plugin, component_type, added_component) = add_test_component(&scene, entity).unwrap();
+    let component = scene
+        .resolve_component_id(entity, plugin, component_type)
+        .unwrap();
+    assert_eq!(component, added_component);
+    let mutable_field_type = scene
+        .resolve_field_type_id(plugin, component_type, "MyField")
+        .unwrap();
     let mutable_field = scene
-        .resolve_field_id(entity, component, "MyField")
+        .resolve_field_id(entity, component, mutable_field_type)
         .unwrap();
 
+    let immutable_field_type = scene
+        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .unwrap();
     let immutable_field = scene
-        .resolve_field_id(entity, component, "ImmutableField")
+        .resolve_field_id(entity, component, immutable_field_type)
         .unwrap();
 
     let requests = [
@@ -161,12 +173,18 @@ fn component_fields_keep_requested_order(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = add_test_component(&scene, entity).unwrap();
+    let (plugin, component_type, component) = add_test_component(&scene, entity).unwrap();
+    let first_type = scene
+        .resolve_field_type_id(plugin, component_type, "MyField")
+        .unwrap();
     let first = scene
-        .resolve_field_id(entity, component, "MyField")
+        .resolve_field_id(entity, component, first_type)
+        .unwrap();
+    let second_type = scene
+        .resolve_field_type_id(plugin, component_type, "ImmutableField")
         .unwrap();
     let second = scene
-        .resolve_field_id(entity, component, "ImmutableField")
+        .resolve_field_id(entity, component, second_type)
         .unwrap();
     let requests = if first < second {
         [(second, FieldAccess::Read), (first, FieldAccess::Read)]
@@ -229,7 +247,7 @@ fn component_lifecycle(scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    let my_component_id =
+    let (_, _, my_component_id) =
         add_test_component(&scene, entity1).expect("Failed to add component to entity1");
 
     // Check component add status
@@ -262,11 +280,11 @@ fn component_is_scoped_to_entity(scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    let my_component_id =
+    let (plugin, component_type, my_component_id) =
         add_test_component(&scene, entity1).expect("Failed to add component to entity1");
 
     let err = scene
-        .resolve_component_id(entity2, "MyComponent")
+        .resolve_component_id(entity2, plugin, component_type)
         .expect_err("Got a component that shouldn't exist");
     assert!(matches!(
         err,
@@ -283,7 +301,7 @@ fn component_cannot_be_removed_twice(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let component = add_test_component(&scene, entity).expect("Failed to add component");
+    let (_, _, component) = add_test_component(&scene, entity).expect("Failed to add component");
     scene
         .remove_component(entity, component)
         .expect("Failed to remove component");
