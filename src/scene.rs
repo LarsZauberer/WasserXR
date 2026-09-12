@@ -6,14 +6,16 @@ use crate::{
     field::{Field, FieldAccess},
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
-        EntityID, FieldID, FieldTypeID, PluginID,
+        EntityID, FieldID, FieldTypeID, PluginID, SystemID, SystemTypeID, TypeID,
     },
     private::{
         assets::Asset,
         entities::Entity,
         id_store::IDStore,
-        manifests::{Manifest, plugins::PluginManifest},
+        manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
+        system::System,
+        system_storage::SystemStorage,
     },
 };
 
@@ -41,6 +43,7 @@ type AssetStorage = IDStore<(PluginID, AssetTypeID, String), AssetID, Asset>;
 /// threads.
 #[derive(Debug, Default)]
 pub struct Scene {
+    systems: RwLock<SystemStorage>,
     entities: RwLock<EntityStorage>,
     plugins: RwLock<PluginStorage>,
     assets: RwLock<AssetStorage>,
@@ -92,6 +95,13 @@ impl Scene {
     ///
     /// It will **not** unload any plugins or remove cached assets
     pub fn reset(&self) -> Result<(), SceneError> {
+        // Replace the old system ID store with a fresh, empty one before detaching
+        // its systems.
+        let systems =
+            std::mem::take(&mut *self.systems.write().expect("scene system lock poisoned"));
+        for system in systems.into_values() {
+            system.detach(self);
+        }
         let entities =
             std::mem::take(&mut *self.entities.write().expect("scene entity lock poisoned"));
         drop(entities);
@@ -240,6 +250,58 @@ impl Scene {
             .get(plugin_id)
             .and_then(|plugin| plugin.resolve_asset_field_type_id(asset_type_id, name))
             .ok_or(SceneError::AssetNotFound)
+    }
+
+    /// Resolves a system type name within a plugin manifest.
+    pub fn resolve_system_type_id(
+        &self,
+        plugin_id: PluginID,
+        name: &str,
+    ) -> Result<SystemTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id)
+            .and_then(|plugin| plugin.resolve_system_type_id(name))
+            .ok_or(SceneError::SystemNotFound)
+    }
+
+    /// Resolves the type IDs requested by a system manifest.
+    pub fn resolve_requested_type_ids(
+        &self,
+        plugin_id: PluginID,
+        system_type_id: SystemTypeID,
+    ) -> Result<Vec<TypeID>, SceneError> {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let plugin = plugins.get(plugin_id).ok_or(SceneError::SystemNotFound)?;
+        let manifest = plugin
+            .get_system(system_type_id)
+            .ok_or(SceneError::SystemNotFound)?;
+
+        manifest
+            .type_id_requests
+            .iter()
+            .map(|request| match request {
+                TypeIDRequestManifest::ComponentTypeID { component } => plugin
+                    .resolve_component_type_id(component)
+                    .map(TypeID::from)
+                    .ok_or(SceneError::NoComponentType),
+                TypeIDRequestManifest::FieldTypeID { component, field } => plugin
+                    .resolve_component_type_id(component)
+                    .and_then(|component| plugin.resolve_field_type_id(component, field))
+                    .map(TypeID::from)
+                    .ok_or(SceneError::NoComponentType),
+                TypeIDRequestManifest::AssetTypeID { asset } => plugin
+                    .resolve_asset_type_id(asset)
+                    .map(TypeID::from)
+                    .ok_or(SceneError::AssetNotFound),
+                TypeIDRequestManifest::AssetFieldTypeID { asset, field } => plugin
+                    .resolve_asset_type_id(asset)
+                    .and_then(|asset| plugin.resolve_asset_field_type_id(asset, field))
+                    .map(TypeID::from)
+                    .ok_or(SceneError::AssetNotFound),
+            })
+            .collect()
     }
 
     /// Add a component type to an entity
@@ -424,5 +486,70 @@ impl Scene {
             .ok_or(SceneError::AssetNotFound)?
             .get_field(field_id)
             .map_err(SceneError::from)
+    }
+
+    /// Resolves an instantiated system from its plugin and system type.
+    pub fn resolve_system_id(
+        &self,
+        plugin_id: PluginID,
+        system_type_id: SystemTypeID,
+    ) -> Result<SystemID, SceneError> {
+        self.systems
+            .read()
+            .expect("scene system lock poisoned")
+            .resolve_id(&(plugin_id, system_type_id))
+            .ok_or(SceneError::SystemNotFound)
+    }
+
+    /// Creates a system once and returns its concrete scene ID.
+    pub fn get_system_id(
+        &self,
+        plugin_id: PluginID,
+        system_type_id: SystemTypeID,
+    ) -> Result<SystemID, SceneError> {
+        let key = (plugin_id, system_type_id);
+        if let Some(id) = self
+            .systems
+            .read()
+            .expect("scene system lock poisoned")
+            .resolve_id(&key)
+        {
+            return Ok(id);
+        }
+
+        let type_ids = self.resolve_requested_type_ids(plugin_id, system_type_id)?;
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let plugin = plugins.get(plugin_id).ok_or(SceneError::SystemNotFound)?;
+        let manifest = plugin
+            .get_system(system_type_id)
+            .ok_or(SceneError::SystemNotFound)?;
+
+        let mut systems = self.systems.write().expect("scene system lock poisoned");
+        if let Some(id) = systems.resolve_id(&key) {
+            return Ok(id);
+        }
+        let system = System::new(self, plugin_id, manifest, type_ids);
+        Ok(systems.insert_named(key, system))
+    }
+
+    /// Removes a concrete system and runs its detacher.
+    pub fn remove_system(&self, system_id: SystemID) -> Result<(), SceneError> {
+        let system = self
+            .systems
+            .write()
+            .expect("scene system lock poisoned")
+            .remove(system_id)
+            .ok_or(SceneError::SystemNotFound)?;
+        system.detach(self);
+        Ok(())
+    }
+}
+
+impl Drop for Scene {
+    fn drop(&mut self) {
+        let systems = std::mem::take(self.systems.get_mut().expect("scene system lock poisoned"));
+        for system in systems.into_values() {
+            system.detach(self);
+        }
     }
 }

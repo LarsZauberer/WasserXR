@@ -82,6 +82,11 @@ impl<OriginalID: Clone + Eq + Hash, ID: Key, Record> IDStore<OriginalID, ID, Rec
         self.records.values()
     }
 
+    /// Consumes the store and iterates over all records.
+    pub(crate) fn into_values(self) -> impl Iterator<Item = Record> {
+        self.records.into_iter().map(|(_, record)| record)
+    }
+
     /// Iterates over every ID and record pair.
     pub(crate) fn iter(&self) -> impl Iterator<Item = (ID, &Record)> {
         self.records.iter()

@@ -40,6 +40,7 @@ pub enum SceneError {
     NoComponentType,
     AssetNotFound,
     AssetError(AssetError),
+    SystemNotFound,
 }
 
 impl Display for SceneError {
@@ -54,6 +55,7 @@ impl Display for SceneError {
             Self::NoComponentType => f.write_str("component type not found"),
             Self::AssetNotFound => f.write_str("asset not found"),
             Self::AssetError(error) => write!(f, "asset error: {error}"),
+            Self::SystemNotFound => f.write_str("system not found"),
         }
     }
 }
