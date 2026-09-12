@@ -1,5 +1,9 @@
 use crate::{
-    definitions::{Definition, error::SystemDefinitionError, systems::SystemDefinition},
+    definitions::{
+        Definition,
+        error::SystemDefinitionError,
+        systems::{Attacher, Detacher, Runner, SystemDefinition},
+    },
     private::manifests::{Manifest, type_id_requests::TypeIDRequestManifest},
     utils::ffi::validate_string,
 };
@@ -12,6 +16,9 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct SystemManifest {
     pub name: String,
+    pub attacher: Option<Attacher>,
+    pub runner: Runner,
+    pub detacher: Option<Detacher>,
     pub requires: Vec<String>,
     pub wanted_by: Vec<String>,
     pub type_id_requests: Vec<TypeIDRequestManifest>,
@@ -51,6 +58,11 @@ impl Manifest<SystemDefinition> for SystemManifest {
 
         Ok(Self {
             name,
+            attacher: value.attacher,
+            runner: value
+                .runner
+                .expect("validated system definitions have a runner"),
+            detacher: value.detacher,
             requires: requires.iter().map(|&name| string(name)).collect(),
             wanted_by: wanted_by.iter().map(|&name| string(name)).collect(),
             type_id_requests,

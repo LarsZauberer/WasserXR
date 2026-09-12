@@ -70,6 +70,7 @@ pub enum SystemDefinitionError {
     NameIsNull,
     NameIsNotUtf8,
     NameIsEmpty,
+    RunnerIsNull(String),
     RequiresIsNull(String),
     RequiredSystemInvalid(String, StringError),
     WantedByIsNull(String),
@@ -331,6 +332,7 @@ impl Display for SystemDefinitionError {
             Self::NameIsNull => f.write_str("system name is null"),
             Self::NameIsNotUtf8 => f.write_str("system name is not valid UTF-8"),
             Self::NameIsEmpty => f.write_str("system name is empty"),
+            Self::RunnerIsNull(name) => write!(f, "system '{name}' runner is null"),
             Self::RequiresIsNull(name) => {
                 write!(f, "system '{name}' requires list is null")
             }

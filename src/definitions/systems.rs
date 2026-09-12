@@ -4,17 +4,43 @@ use std::ffi::c_char;
 
 use crate::{
     definitions::{Definition, error::SystemDefinitionError, type_id_requests::TypeIDRequests},
+    scene::{Scene, TypeID},
     utils::ffi::validate_string,
 };
+
+/// Attaches a system to a scene.
+pub type Attacher =
+    unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize);
+
+/// Runs a system for a scene.
+pub type Runner =
+    unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize);
+
+/// Detaches a system from a scene.
+pub type Detacher =
+    unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize);
 
 /// Defines a system and its scheduling and type-ID requirements.
 ///
 /// All arrays use C-compatible pointer/count pairs. Their pointers must remain
 /// valid for the duration of validation and while the definition is in use.
+/// Each callback receives resolved type IDs in the same order as
+/// `type_id_requests`; the ID pointer is only valid for the duration of the
+/// callback.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct SystemDefinition {
     pub name: *const c_char,
+
+    pub attacher: Option<
+        unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize),
+    >,
+    pub runner: Option<
+        unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize),
+    >,
+    pub detacher: Option<
+        unsafe extern "C" fn(scene: *const Scene, type_ids: *const TypeID, type_id_count: usize),
+    >,
 
     pub requires: *const *const c_char,
     pub requires_count: usize,
@@ -35,6 +61,10 @@ impl Definition for SystemDefinition {
     /// of [`Definition::validate`].
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         let name = unsafe { self.name()? };
+
+        if self.runner.is_none() {
+            return Err(SystemDefinitionError::RunnerIsNull(name));
+        }
 
         let requires = if self.requires_count == 0 {
             &[]
