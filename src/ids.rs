@@ -45,9 +45,13 @@ pub struct AssetFieldTypeID;
 /// cannot be used across different plugin manifests.
 pub struct AssetTypeID;
 
-/// Handle for a system. It is unique within its plugin manifest, but cannot be
-/// used across different plugin manifests.
+/// Handle for a concrete system. It is unique within its scene, but cannot be
+/// used across different scenes.
 pub struct SystemID;
+
+/// Handle for a system type. It is unique within its plugin manifest, but
+/// cannot be used across different plugin manifests.
+pub struct SystemTypeID;
 }
 
 /// A resolved type ID passed to a system callback.

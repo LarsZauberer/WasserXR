@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::PluginError,
-    ids::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemID},
+    ids::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemTypeID},
     private::manifests::{
         Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
         systems::SystemManifest,
@@ -140,12 +140,12 @@ impl Plugin {
     }
 
     /// Resolves a system name to its ID.
-    pub(crate) fn resolve_system_id(&self, name: &str) -> Option<SystemID> {
+    pub(crate) fn resolve_system_type_id(&self, name: &str) -> Option<SystemTypeID> {
         self.manifest.systems.resolve_id(name)
     }
 
     /// Returns the system manifest identified by `id`.
-    pub(crate) fn get_system(&self, id: SystemID) -> Option<&SystemManifest> {
+    pub(crate) fn get_system(&self, id: SystemTypeID) -> Option<&SystemManifest> {
         self.manifest.systems.get(id)
     }
 }
