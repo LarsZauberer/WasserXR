@@ -4,11 +4,11 @@ use crate::{
         components::{ComponentDefinition, Creator, Destroyer},
         error::ComponentDefinitionError,
     },
+    ids::FieldTypeID,
     private::{
         id_store::IDStore,
         manifests::{Manifest, fields::ComponentFieldManifest},
     },
-    scene::FieldTypeID,
 };
 
 #[derive(Debug)]

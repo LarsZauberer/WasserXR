@@ -3,8 +3,8 @@ use std::ffi::c_void;
 use crate::{
     definitions::components::Destroyer,
     errors::AssetError,
+    ids::{AssetFieldID, AssetFieldTypeID},
     private::{fields::AssetField, id_store::IDStore, manifests::assets::AssetManifest},
-    scene::{AssetFieldID, AssetFieldTypeID},
 };
 
 /// This is a concrete asset that is created from [`AssetManifest`]

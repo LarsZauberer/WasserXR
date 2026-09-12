@@ -1,13 +1,13 @@
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
+    ids::{AssetTypeID, ComponentTypeID, SystemID},
     private::{
         id_store::IDStore,
         manifests::{
             Manifest, assets::AssetManifest, components::ComponentManifest, systems::SystemManifest,
         },
     },
-    scene::{AssetTypeID, ComponentTypeID, SystemID},
 };
 
 /// The plugin manifest is the main manifest of each wasserxr plugin. It

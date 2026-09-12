@@ -12,11 +12,11 @@ use uuid::Uuid;
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::PluginError,
+    ids::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemID},
     private::manifests::{
         Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
         systems::SystemManifest,
     },
-    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemID},
 };
 
 const WXR_PLUGIN_SYMBOL_NAME: &CStr = c"wxr_plugin";

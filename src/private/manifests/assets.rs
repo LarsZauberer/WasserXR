@@ -5,11 +5,11 @@ use crate::{
         components::{Creator, Destroyer},
         error::AssetDefinitionError,
     },
+    ids::AssetFieldTypeID,
     private::{
         id_store::IDStore,
         manifests::{Manifest, fields::AssetFieldManifest},
     },
-    scene::AssetFieldTypeID,
 };
 
 #[derive(Debug)]

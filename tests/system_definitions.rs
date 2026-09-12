@@ -7,7 +7,8 @@ use wasserxr::{
         systems::SystemDefinition,
         type_id_requests::TypeIDRequests,
     },
-    scene::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, Scene, TypeID},
+    ids::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, TypeID},
+    scene::Scene,
     utils::ffi::StringError,
 };
 

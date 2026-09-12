@@ -4,7 +4,8 @@ use std::ffi::c_char;
 
 use crate::{
     definitions::{Definition, error::SystemDefinitionError, type_id_requests::TypeIDRequests},
-    scene::{Scene, TypeID},
+    ids::TypeID,
+    scene::Scene,
     utils::ffi::validate_string,
 };
 

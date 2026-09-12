@@ -2,7 +2,7 @@
 
 use std::ffi::c_void;
 
-use crate::scene::FieldID;
+use crate::ids::FieldID;
 
 /// The access requested for a component field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

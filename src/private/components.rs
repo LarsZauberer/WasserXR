@@ -7,10 +7,10 @@ use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
     field::{Field, FieldAccess},
+    ids::{FieldID, FieldTypeID, PluginID},
     private::{
         fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
     },
-    scene::{FieldID, FieldTypeID, PluginID},
 };
 
 /// Keeps a queried field pointer and its lock guard alive together.

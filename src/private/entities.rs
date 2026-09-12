@@ -3,8 +3,8 @@ use std::sync::RwLock;
 use crate::{
     errors::EntityError,
     field::{Field, FieldAccess},
+    ids::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
-    scene::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
 };
 
 type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;

@@ -8,7 +8,8 @@ use wasserxr::{
     },
     errors::{ComponentError, EntityError, FieldError, SceneError},
     field::{Field, FieldAccess},
-    scene::{ComponentID, ComponentTypeID, EntityID, PluginID, Scene},
+    ids::{ComponentID, ComponentTypeID, EntityID, PluginID},
+    scene::Scene,
     utils::version::Version,
 };
 

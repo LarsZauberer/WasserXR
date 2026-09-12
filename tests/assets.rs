@@ -12,7 +12,8 @@ use wasserxr::{
         assets::AssetDefinition, fields::AssetFieldDefinition, plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
-    scene::{AssetFieldTypeID, AssetTypeID, PluginID, Scene},
+    ids::{AssetFieldTypeID, AssetTypeID, PluginID},
+    scene::Scene,
     utils::version::Version,
 };
 
