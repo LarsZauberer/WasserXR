@@ -49,3 +49,86 @@ pub struct AssetTypeID;
 /// used across different plugin manifests.
 pub struct SystemID;
 }
+
+/// A resolved type ID passed to a system callback.
+///
+/// The variant matches the corresponding
+/// [`crate::definitions::type_id_requests::TypeIDRequests`] entry. The inner
+/// value uses SlotMap's stable FFI representation rather than exposing a
+/// Rust-specific key layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
+pub enum TypeID {
+    ComponentTypeID(u64),
+    FieldTypeID(u64),
+    AssetTypeID(u64),
+    AssetFieldTypeID(u64),
+}
+
+impl From<ComponentTypeID> for TypeID {
+    fn from(id: ComponentTypeID) -> Self {
+        Self::ComponentTypeID(id.data().as_ffi())
+    }
+}
+
+impl From<FieldTypeID> for TypeID {
+    fn from(id: FieldTypeID) -> Self {
+        Self::FieldTypeID(id.data().as_ffi())
+    }
+}
+
+impl From<AssetTypeID> for TypeID {
+    fn from(id: AssetTypeID) -> Self {
+        Self::AssetTypeID(id.data().as_ffi())
+    }
+}
+
+impl From<AssetFieldTypeID> for TypeID {
+    fn from(id: AssetFieldTypeID) -> Self {
+        Self::AssetFieldTypeID(id.data().as_ffi())
+    }
+}
+
+impl TryFrom<TypeID> for ComponentTypeID {
+    type Error = TypeID;
+
+    fn try_from(id: TypeID) -> Result<Self, Self::Error> {
+        match id {
+            TypeID::ComponentTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            other => Err(other),
+        }
+    }
+}
+
+impl TryFrom<TypeID> for FieldTypeID {
+    type Error = TypeID;
+
+    fn try_from(id: TypeID) -> Result<Self, Self::Error> {
+        match id {
+            TypeID::FieldTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            other => Err(other),
+        }
+    }
+}
+
+impl TryFrom<TypeID> for AssetTypeID {
+    type Error = TypeID;
+
+    fn try_from(id: TypeID) -> Result<Self, Self::Error> {
+        match id {
+            TypeID::AssetTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            other => Err(other),
+        }
+    }
+}
+
+impl TryFrom<TypeID> for AssetFieldTypeID {
+    type Error = TypeID;
+
+    fn try_from(id: TypeID) -> Result<Self, Self::Error> {
+        match id {
+            TypeID::AssetFieldTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            other => Err(other),
+        }
+    }
+}
