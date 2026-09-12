@@ -83,6 +83,8 @@ const ASSET_PLUGIN: PluginDefinition = PluginDefinition {
     component_count: 0,
     assets: ASSETS.as_ptr(),
     asset_count: ASSETS.len(),
+    systems: std::ptr::null(),
+    system_count: 0,
 };
 
 fn scene() -> Scene {

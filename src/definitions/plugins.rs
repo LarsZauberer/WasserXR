@@ -5,7 +5,7 @@ use std::ffi::c_char;
 use crate::{
     definitions::{
         Definition, assets::AssetDefinition, components::ComponentDefinition,
-        error::PluginDefinitionError,
+        error::PluginDefinitionError, systems::SystemDefinition,
     },
     utils::ffi::validate_string,
     utils::version::Version,
@@ -30,6 +30,7 @@ use crate::{
 /// The component array uses a C-compatible pointer/count pair. The pointer must
 /// remain valid for the lifetime of the plugin definition.
 /// The asset array follows the same convention.
+/// The system array follows the same convention.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {
@@ -41,6 +42,9 @@ pub struct PluginDefinition {
 
     pub assets: *const AssetDefinition,
     pub asset_count: usize,
+
+    pub systems: *const SystemDefinition,
+    pub system_count: usize,
 }
 
 impl Definition for PluginDefinition {
@@ -103,6 +107,21 @@ impl Definition for PluginDefinition {
 
         for asset in assets {
             if let Err(error) = unsafe { asset.validate() } {
+                return Err((name.clone(), error).into());
+            }
+        }
+
+        let systems = if self.system_count == 0 {
+            &[]
+        } else {
+            if self.systems.is_null() {
+                return Err(PluginDefinitionError::SystemsIsNull(name));
+            }
+            unsafe { std::slice::from_raw_parts(self.systems, self.system_count) }
+        };
+
+        for system in systems {
+            if let Err(error) = unsafe { system.validate() } {
                 return Err((name.clone(), error).into());
             }
         }

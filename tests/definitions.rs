@@ -8,10 +8,11 @@ use wasserxr::{
         components::ComponentDefinition,
         error::{
             AssetDefinitionError, AssetFieldDefinitionError, ComponentDefinitionError,
-            ComponentFieldDefinitionError, PluginDefinitionError,
+            ComponentFieldDefinitionError, PluginDefinitionError, SystemDefinitionError,
         },
         fields::{AssetFieldDefinition, ComponentFieldDefinition},
         plugins::PluginDefinition,
+        systems::SystemDefinition,
     },
     utils::version::Version,
 };
@@ -319,6 +320,8 @@ mod plugins {
             component_count: 0,
             assets: std::ptr::null(),
             asset_count: 0,
+            systems: std::ptr::null(),
+            system_count: 0,
         }
     }
 
@@ -371,6 +374,39 @@ mod plugins {
         assert_eq!(
             unsafe { plugin.validate() },
             Err(PluginDefinitionError::AssetsIsNull("example".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_missing_systems(mut plugin: PluginDefinition) {
+        plugin.system_count = 1;
+
+        assert_eq!(
+            unsafe { plugin.validate() },
+            Err(PluginDefinitionError::SystemsIsNull("example".to_owned()))
+        );
+    }
+
+    #[rstest]
+    fn rejects_invalid_system(mut plugin: PluginDefinition) {
+        let system = SystemDefinition {
+            name: std::ptr::null(),
+            requires: std::ptr::null(),
+            requires_count: 0,
+            wanted_by: std::ptr::null(),
+            wanted_by_count: 0,
+            type_id_requests: std::ptr::null(),
+            type_id_request_count: 0,
+        };
+        plugin.systems = &system;
+        plugin.system_count = 1;
+
+        assert_eq!(
+            unsafe { plugin.validate() },
+            Err(PluginDefinitionError::SystemInvalid(
+                "example".to_owned(),
+                SystemDefinitionError::NameIsNull,
+            ))
         );
     }
 

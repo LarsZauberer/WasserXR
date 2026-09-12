@@ -16,6 +16,8 @@ pub enum PluginDefinitionError {
     ComponentInvalid(String, ComponentDefinitionError),
     AssetsIsNull(String),
     AssetInvalid(String, AssetDefinitionError),
+    SystemsIsNull(String),
+    SystemInvalid(String, SystemDefinitionError),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,6 +56,26 @@ pub enum AssetDefinitionError {
     DestroyerIsNull(String),
     FieldsIsNull(String),
     FieldInvalid(String, AssetFieldDefinitionError),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TypeIDRequestError {
+    Component(StringError),
+    Field(StringError),
+    Asset(StringError),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SystemDefinitionError {
+    NameIsNull,
+    NameIsNotUtf8,
+    NameIsEmpty,
+    RequiresIsNull(String),
+    RequiredSystemInvalid(String, StringError),
+    WantedByIsNull(String),
+    WantedBySystemInvalid(String, StringError),
+    TypeIDRequestsIsNull(String),
+    TypeIDRequestInvalid(String, TypeIDRequestError),
 }
 
 impl From<StringError> for PluginDefinitionError {
@@ -106,6 +128,16 @@ impl From<StringError> for AssetDefinitionError {
     }
 }
 
+impl From<StringError> for SystemDefinitionError {
+    fn from(error: StringError) -> Self {
+        match error {
+            StringError::Null => Self::NameIsNull,
+            StringError::NotUtf8 => Self::NameIsNotUtf8,
+            StringError::Empty => Self::NameIsEmpty,
+        }
+    }
+}
+
 impl<N> From<(N, ComponentFieldDefinitionError)> for ComponentDefinitionError
 where
     N: Into<String>,
@@ -130,6 +162,15 @@ where
 {
     fn from((name, error): (N, AssetDefinitionError)) -> Self {
         Self::AssetInvalid(name.into(), error)
+    }
+}
+
+impl<N> From<(N, SystemDefinitionError)> for PluginDefinitionError
+where
+    N: Into<String>,
+{
+    fn from((name, error): (N, SystemDefinitionError)) -> Self {
+        Self::SystemInvalid(name.into(), error)
     }
 }
 
@@ -166,6 +207,10 @@ impl Display for PluginDefinitionError {
             Self::AssetInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid asset: {error}")
             }
+            Self::SystemsIsNull(name) => write!(f, "plugin '{name}' system list is null"),
+            Self::SystemInvalid(name, error) => {
+                write!(f, "plugin '{name}' has an invalid system: {error}")
+            }
         }
     }
 }
@@ -175,6 +220,7 @@ impl Error for PluginDefinitionError {
         match self {
             Self::ComponentInvalid(_, error) => Some(error),
             Self::AssetInvalid(_, error) => Some(error),
+            Self::SystemInvalid(_, error) => Some(error),
             _ => None,
         }
     }
@@ -253,6 +299,68 @@ impl Error for AssetDefinitionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FieldInvalid(_, error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+fn string_error(error: &StringError) -> &'static str {
+    match error {
+        StringError::Null => "is null",
+        StringError::NotUtf8 => "is not valid UTF-8",
+        StringError::Empty => "is empty",
+    }
+}
+
+impl Display for TypeIDRequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (name, error) = match self {
+            Self::Component(error) => ("component", error),
+            Self::Field(error) => ("field", error),
+            Self::Asset(error) => ("asset", error),
+        };
+        write!(f, "{name} name {}", string_error(error))
+    }
+}
+
+impl Error for TypeIDRequestError {}
+
+impl Display for SystemDefinitionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NameIsNull => f.write_str("system name is null"),
+            Self::NameIsNotUtf8 => f.write_str("system name is not valid UTF-8"),
+            Self::NameIsEmpty => f.write_str("system name is empty"),
+            Self::RequiresIsNull(name) => {
+                write!(f, "system '{name}' requires list is null")
+            }
+            Self::RequiredSystemInvalid(name, error) => write!(
+                f,
+                "system '{name}' has a required system name that {}",
+                string_error(error)
+            ),
+            Self::WantedByIsNull(name) => {
+                write!(f, "system '{name}' wanted-by list is null")
+            }
+            Self::WantedBySystemInvalid(name, error) => write!(
+                f,
+                "system '{name}' has a wanted-by system name that {}",
+                string_error(error)
+            ),
+            Self::TypeIDRequestsIsNull(name) => {
+                write!(f, "system '{name}' type ID request list is null")
+            }
+            Self::TypeIDRequestInvalid(name, error) => {
+                write!(f, "system '{name}' has an invalid type ID request: {error}")
+            }
+        }
+    }
+}
+
+impl Error for SystemDefinitionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::TypeIDRequestInvalid(_, error) => Some(error),
             _ => None,
         }
     }

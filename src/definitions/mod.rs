@@ -47,3 +47,9 @@ pub mod components;
 pub mod fields;
 
 pub mod assets;
+
+/// Define the raw system information
+pub mod systems;
+
+/// Define requests for resolving type IDs
+pub mod type_id_requests;
