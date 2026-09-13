@@ -2,7 +2,7 @@ use std::{ffi::c_void, path::Path, sync::RwLock};
 
 use crate::{
     definitions::plugins::PluginDefinition,
-    errors::{PluginCompatibilityError, PluginError, SceneError},
+    errors::{PluginCompatibilityError, PluginError, SceneError, SystemError},
     field::{Field, FieldAccess},
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
@@ -14,7 +14,6 @@ use crate::{
         id_store::IDStore,
         manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
-        system::System,
         system_storage::SystemStorage,
     },
 };
@@ -281,25 +280,24 @@ impl Scene {
         manifest
             .type_id_requests
             .iter()
-            .map(|request| match request {
-                TypeIDRequestManifest::ComponentTypeID { component } => plugin
-                    .resolve_component_type_id(component)
-                    .map(TypeID::from)
-                    .ok_or(SceneError::NoComponentType),
-                TypeIDRequestManifest::FieldTypeID { component, field } => plugin
-                    .resolve_component_type_id(component)
-                    .and_then(|component| plugin.resolve_field_type_id(component, field))
-                    .map(TypeID::from)
-                    .ok_or(SceneError::NoComponentType),
-                TypeIDRequestManifest::AssetTypeID { asset } => plugin
-                    .resolve_asset_type_id(asset)
-                    .map(TypeID::from)
-                    .ok_or(SceneError::AssetNotFound),
-                TypeIDRequestManifest::AssetFieldTypeID { asset, field } => plugin
-                    .resolve_asset_type_id(asset)
-                    .and_then(|asset| plugin.resolve_asset_field_type_id(asset, field))
-                    .map(TypeID::from)
-                    .ok_or(SceneError::AssetNotFound),
+            .map(|request| {
+                let type_id = match request {
+                    TypeIDRequestManifest::ComponentTypeID { component } => plugin
+                        .resolve_component_type_id(component)
+                        .map(TypeID::from),
+                    TypeIDRequestManifest::FieldTypeID { component, field } => plugin
+                        .resolve_component_type_id(component)
+                        .and_then(|component| plugin.resolve_field_type_id(component, field))
+                        .map(TypeID::from),
+                    TypeIDRequestManifest::AssetTypeID { asset } => {
+                        plugin.resolve_asset_type_id(asset).map(TypeID::from)
+                    }
+                    TypeIDRequestManifest::AssetFieldTypeID { asset, field } => plugin
+                        .resolve_asset_type_id(asset)
+                        .and_then(|asset| plugin.resolve_asset_field_type_id(asset, field))
+                        .map(TypeID::from),
+                };
+                type_id.ok_or(SceneError::RequestedTypeIDNotFound)
             })
             .collect()
     }
@@ -488,8 +486,8 @@ impl Scene {
             .map_err(SceneError::from)
     }
 
-    /// Resolves an instantiated system from its plugin and system type.
-    pub fn resolve_system_id(
+    /// Gets an existing concrete system ID from its plugin and system type.
+    pub fn get_system_id(
         &self,
         plugin_id: PluginID,
         system_type_id: SystemTypeID,
@@ -501,45 +499,69 @@ impl Scene {
             .ok_or(SceneError::SystemNotFound)
     }
 
-    /// Creates a system once and returns its concrete scene ID.
-    pub fn get_system_id(
+    /// Adds a system to the scene and returns its concrete ID.
+    pub fn add_system(
         &self,
         plugin_id: PluginID,
         system_type_id: SystemTypeID,
     ) -> Result<SystemID, SceneError> {
         let key = (plugin_id, system_type_id);
-        if let Some(id) = self
+        if self
             .systems
             .read()
             .expect("scene system lock poisoned")
             .resolve_id(&key)
+            .is_some()
         {
-            return Ok(id);
+            return Err(SystemError::AlreadyExists.into());
         }
 
+        // Resolve every requested type ID before creating or attaching the system.
         let type_ids = self.resolve_requested_type_ids(plugin_id, system_type_id)?;
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let plugin = plugins.get(plugin_id).ok_or(SceneError::SystemNotFound)?;
         let manifest = plugin
             .get_system(system_type_id)
             .ok_or(SceneError::SystemNotFound)?;
+        // Resolve dependency names to stable keys so storage can check presence
+        // and build the dependency graph without string lookups.
+        let requires = manifest
+            .requires
+            .iter()
+            .map(|name| {
+                plugin
+                    .resolve_system_type_id(name)
+                    .map(|system_type_id| (plugin_id, system_type_id))
+                    .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let wanted_by = manifest
+            .wanted_by
+            .iter()
+            .map(|name| {
+                plugin
+                    .resolve_system_type_id(name)
+                    .map(|system_type_id| (plugin_id, system_type_id))
+                    .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut systems = self.systems.write().expect("scene system lock poisoned");
-        if let Some(id) = systems.resolve_id(&key) {
-            return Ok(id);
+        if systems.resolve_id(&key).is_some() {
+            return Err(SystemError::AlreadyExists.into());
         }
-        let system = System::new(self, plugin_id, manifest, type_ids);
-        Ok(systems.insert_named(key, system))
+        systems.add_system(self, key, manifest, type_ids, requires, wanted_by)
     }
 
     /// Removes a concrete system and runs its detacher.
+    ///
+    /// Removal fails while another active system requires this system.
     pub fn remove_system(&self, system_id: SystemID) -> Result<(), SceneError> {
         let system = self
             .systems
             .write()
             .expect("scene system lock poisoned")
-            .remove(system_id)
-            .ok_or(SceneError::SystemNotFound)?;
+            .remove(system_id)?;
         system.detach(self);
         Ok(())
     }

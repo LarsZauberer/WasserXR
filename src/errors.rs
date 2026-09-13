@@ -41,6 +41,8 @@ pub enum SceneError {
     AssetNotFound,
     AssetError(AssetError),
     SystemNotFound,
+    RequestedTypeIDNotFound,
+    SystemError(SystemError),
 }
 
 impl Display for SceneError {
@@ -56,6 +58,8 @@ impl Display for SceneError {
             Self::AssetNotFound => f.write_str("asset not found"),
             Self::AssetError(error) => write!(f, "asset error: {error}"),
             Self::SystemNotFound => f.write_str("system not found"),
+            Self::RequestedTypeIDNotFound => f.write_str("requested type ID not found"),
+            Self::SystemError(error) => write!(f, "system error: {error}"),
         }
     }
 }
@@ -182,5 +186,34 @@ impl Display for AssetError {
 impl From<AssetError> for SceneError {
     fn from(value: AssetError) -> Self {
         SceneError::AssetError(value)
+    }
+}
+
+#[derive(Debug)]
+pub enum SystemError {
+    AlreadyExists,
+    DependencyNotFound(String),
+    DependencyInUse,
+    DependencyCycle,
+}
+
+impl Error for SystemError {}
+
+impl Display for SystemError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlreadyExists => f.write_str("system already exists"),
+            Self::DependencyNotFound(name) => {
+                write!(f, "system dependency '{name}' could not be resolved")
+            }
+            Self::DependencyInUse => f.write_str("system is required by another system"),
+            Self::DependencyCycle => f.write_str("system dependencies contain a cycle"),
+        }
+    }
+}
+
+impl From<SystemError> for SceneError {
+    fn from(value: SystemError) -> Self {
+        SceneError::SystemError(value)
     }
 }

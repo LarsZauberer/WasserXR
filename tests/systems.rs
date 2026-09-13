@@ -1,6 +1,9 @@
-use std::sync::{
-    Mutex,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    ffi::{CStr, c_char},
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use wasserxr::{
@@ -8,7 +11,7 @@ use wasserxr::{
         components::ComponentDefinition, plugins::PluginDefinition, systems::SystemDefinition,
         type_id_requests::TypeIDRequests,
     },
-    errors::SceneError,
+    errors::{SceneError, SystemError},
     ids::TypeID,
     scene::Scene,
     utils::version::Version,
@@ -75,6 +78,40 @@ const PLUGIN: PluginDefinition = PluginDefinition {
     system_count: 1,
 };
 
+fn system_definition(
+    name: &CStr,
+    requires: &[*const c_char],
+    wanted_by: &[*const c_char],
+    type_id_requests: &[TypeIDRequests],
+) -> SystemDefinition {
+    SystemDefinition {
+        name: name.as_ptr(),
+        attacher: None,
+        runner: Some(run),
+        detacher: None,
+        requires: requires.as_ptr(),
+        requires_count: requires.len(),
+        wanted_by: wanted_by.as_ptr(),
+        wanted_by_count: wanted_by.len(),
+        type_id_requests: type_id_requests.as_ptr(),
+        type_id_request_count: type_id_requests.len(),
+    }
+}
+
+fn load_systems(scene: &Scene, systems: &[SystemDefinition]) -> wasserxr::ids::PluginID {
+    let plugin = PluginDefinition {
+        name: c"ValidationPlugin".as_ptr(),
+        engine_version: PLUGIN.engine_version,
+        components: &COMPONENT,
+        component_count: 1,
+        assets: std::ptr::null(),
+        asset_count: 0,
+        systems: systems.as_ptr(),
+        system_count: systems.len(),
+    };
+    unsafe { scene.load_static_plugin(plugin) }.unwrap()
+}
+
 #[test]
 fn concrete_system_lifecycle_uses_resolved_type_ids() {
     ATTACH_COUNT.store(0, Ordering::Relaxed);
@@ -89,11 +126,15 @@ fn concrete_system_lifecycle_uses_resolved_type_ids() {
         .unwrap();
 
     assert!(matches!(
-        scene.resolve_system_id(plugin, system_type),
+        scene.get_system_id(plugin, system_type),
         Err(SceneError::SystemNotFound)
     ));
-    let system = scene.get_system_id(plugin, system_type).unwrap();
+    let system = scene.add_system(plugin, system_type).unwrap();
     assert_eq!(scene.get_system_id(plugin, system_type).unwrap(), system);
+    assert!(matches!(
+        scene.add_system(plugin, system_type),
+        Err(SceneError::SystemError(SystemError::AlreadyExists))
+    ));
     assert_eq!(
         scene
             .resolve_requested_type_ids(plugin, system_type)
@@ -109,12 +150,86 @@ fn concrete_system_lifecycle_uses_resolved_type_ids() {
     scene.remove_system(system).unwrap();
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 1);
 
-    scene.get_system_id(plugin, system_type).unwrap();
+    scene.add_system(plugin, system_type).unwrap();
     scene.reset().unwrap();
     assert_eq!(ATTACH_COUNT.load(Ordering::Relaxed), 2);
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 2);
 
-    scene.get_system_id(plugin, system_type).unwrap();
+    scene.add_system(plugin, system_type).unwrap();
     drop(scene);
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 3);
+}
+
+#[test]
+fn required_system_must_already_be_in_the_scene() {
+    let requires_base = [c"base".as_ptr()];
+    let systems = [
+        system_definition(c"base", &[], &[], &[]),
+        system_definition(c"dependent", &requires_base, &[], &[]),
+    ];
+    let scene = Scene::new();
+    let plugin = load_systems(&scene, &systems);
+    let base_type = scene.resolve_system_type_id(plugin, "base").unwrap();
+    let dependent_type = scene.resolve_system_type_id(plugin, "dependent").unwrap();
+
+    assert!(matches!(
+        scene.add_system(plugin, dependent_type),
+        Err(SceneError::SystemError(SystemError::DependencyNotFound(name)))
+            if name == "base"
+    ));
+    let base = scene.add_system(plugin, base_type).unwrap();
+    let dependent = scene.add_system(plugin, dependent_type).unwrap();
+
+    assert!(matches!(
+        scene.remove_system(base),
+        Err(SceneError::SystemError(SystemError::DependencyInUse))
+    ));
+    assert_eq!(scene.get_system_id(plugin, base_type).unwrap(), base);
+
+    scene.remove_system(dependent).unwrap();
+    scene.remove_system(base).unwrap();
+}
+
+#[test]
+fn cyclic_system_dependencies_are_rejected() {
+    let wanted_by_b = [c"b".as_ptr()];
+    let wanted_by_a = [c"a".as_ptr()];
+    let systems = [
+        system_definition(c"a", &[], &wanted_by_b, &[]),
+        system_definition(c"b", &[], &wanted_by_a, &[]),
+    ];
+    let scene = Scene::new();
+    let plugin = load_systems(&scene, &systems);
+    let a = scene.resolve_system_type_id(plugin, "a").unwrap();
+    let b = scene.resolve_system_type_id(plugin, "b").unwrap();
+
+    scene.add_system(plugin, a).unwrap();
+    assert!(matches!(
+        scene.add_system(plugin, b),
+        Err(SceneError::SystemError(SystemError::DependencyCycle))
+    ));
+    assert!(matches!(
+        scene.get_system_id(plugin, b),
+        Err(SceneError::SystemNotFound)
+    ));
+}
+
+#[test]
+fn unresolved_requested_type_ids_reject_the_system() {
+    let requests = [TypeIDRequests::ComponentTypeID {
+        component: c"Missing".as_ptr(),
+    }];
+    let systems = [system_definition(c"invalid", &[], &[], &requests)];
+    let scene = Scene::new();
+    let plugin = load_systems(&scene, &systems);
+    let invalid = scene.resolve_system_type_id(plugin, "invalid").unwrap();
+
+    assert!(matches!(
+        scene.add_system(plugin, invalid),
+        Err(SceneError::RequestedTypeIDNotFound)
+    ));
+    assert!(matches!(
+        scene.get_system_id(plugin, invalid),
+        Err(SceneError::SystemNotFound)
+    ));
 }
