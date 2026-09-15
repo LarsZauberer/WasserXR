@@ -139,6 +139,11 @@ impl Plugin {
         self.manifest.assets.get(id)
     }
 
+    /// Returns the name of the asset type identified by `id`.
+    pub(crate) fn get_asset_name(&self, id: AssetTypeID) -> Option<&str> {
+        self.get_asset(id).map(|asset| asset.name.as_str())
+    }
+
     /// Resolves a system name to its ID.
     pub(crate) fn resolve_system_type_id(&self, name: &str) -> Option<SystemTypeID> {
         self.manifest.systems.resolve_id(name)
@@ -147,5 +152,10 @@ impl Plugin {
     /// Returns the system manifest identified by `id`.
     pub(crate) fn get_system(&self, id: SystemTypeID) -> Option<&SystemManifest> {
         self.manifest.systems.get(id)
+    }
+
+    /// Returns the name of the system type identified by `id`.
+    pub(crate) fn get_system_name(&self, id: SystemTypeID) -> Option<&str> {
+        self.get_system(id).map(|system| system.name.as_str())
     }
 }

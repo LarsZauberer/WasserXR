@@ -186,6 +186,24 @@ impl Scene {
             .resolve_id(name)
     }
 
+    /// Returns the name of the plugin identified by `id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` does not identify a loaded plugin.
+    pub fn get_plugin_name(&self, id: PluginID) -> &str {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let name = plugins
+            .get(id)
+            .expect("plugin ID does not identify a loaded plugin")
+            .get_name() as *const str;
+
+        // SAFETY: Plugins are never removed from a Scene and their owned names
+        // are never mutated, so the string data remains valid for the Scene's
+        // lifetime even after releasing the collection lock.
+        unsafe { &*name }
+    }
+
     /// Get all the [`PluginID`] of the currently actively loaded plugins in the
     /// scene
     pub fn get_plugins(&self) -> Vec<PluginID> {
@@ -239,6 +257,25 @@ impl Scene {
             .ok_or(SceneError::AssetNotFound)
     }
 
+    /// Returns the name of an asset type identified by `id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either ID does not identify a loaded plugin or one of its
+    /// asset types.
+    pub fn get_asset_name(&self, plugin_id: PluginID, id: AssetTypeID) -> &str {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let name = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_asset_name(id))
+            .expect("IDs do not identify a loaded asset type") as *const str;
+
+        // SAFETY: Plugin manifests are never removed from a Scene and their
+        // owned names are never mutated, so the string data remains valid for
+        // the Scene's lifetime after releasing the collection lock.
+        unsafe { &*name }
+    }
+
     /// Resolves an asset field type name within an asset type manifest.
     pub fn resolve_asset_field_type_id(
         &self,
@@ -266,6 +303,25 @@ impl Scene {
             .get(plugin_id)
             .and_then(|plugin| plugin.resolve_system_type_id(name))
             .ok_or(SceneError::SystemNotFound)
+    }
+
+    /// Returns the name of a system type identified by `id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either ID does not identify a loaded plugin or one of its
+    /// system types.
+    pub fn get_system_name(&self, plugin_id: PluginID, id: SystemTypeID) -> &str {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let name = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_system_name(id))
+            .expect("IDs do not identify a loaded system type") as *const str;
+
+        // SAFETY: Plugin manifests are never removed from a Scene and their
+        // owned names are never mutated, so the string data remains valid for
+        // the Scene's lifetime after releasing the collection lock.
+        unsafe { &*name }
     }
 
     /// Resolves the type IDs requested by a system manifest.
