@@ -126,7 +126,7 @@ fn get_plugin_name(#[case] definition: PluginDefinition) {
         unsafe { scene.load_static_plugin(definition) }.expect("Valid plugins should be loadable");
 
     let plugin2 = scene
-        .get_plugin("MyPlugin")
+        .resolve_plugin_id("MyPlugin")
         .expect("Cannot find the name of the newly added plugin");
     assert_eq!(
         plugin, plugin2,

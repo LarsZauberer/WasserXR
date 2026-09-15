@@ -46,7 +46,7 @@ fn add_dynamic_plugin(scene: Scene, valid_empty_plugin: &Path) {
     );
 
     let plugin_id2 = scene
-        .get_plugin("MyPlugin")
+        .resolve_plugin_id("MyPlugin")
         .expect("Failed to find the already added plugin");
     assert_eq!(plugin_id, plugin_id2);
 }

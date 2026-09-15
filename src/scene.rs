@@ -179,7 +179,7 @@ impl Scene {
 
     /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a
     /// plugin
-    pub fn get_plugin(&self, name: &str) -> Option<PluginID> {
+    pub fn resolve_plugin_id(&self, name: &str) -> Option<PluginID> {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")

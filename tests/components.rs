@@ -84,7 +84,7 @@ fn add_test_component(
     entity: EntityID,
 ) -> Result<(PluginID, ComponentTypeID, ComponentID), SceneError> {
     let plugin = scene
-        .get_plugin("MyPlugin")
+        .resolve_plugin_id("MyPlugin")
         .ok_or(SceneError::NoComponentType)?;
     let component_type = scene.resolve_component_type_id(plugin, "MyComponent")?;
     scene

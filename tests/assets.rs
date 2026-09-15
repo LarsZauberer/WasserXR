@@ -96,7 +96,7 @@ fn scene() -> Scene {
 
 fn asset_type(scene: &Scene, name: &str) -> Result<(PluginID, AssetTypeID), SceneError> {
     let plugin = scene
-        .get_plugin("AssetPlugin")
+        .resolve_plugin_id("AssetPlugin")
         .ok_or(SceneError::AssetNotFound)?;
     Ok((plugin, scene.resolve_asset_type_id(plugin, name)?))
 }
