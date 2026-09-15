@@ -1,5 +1,5 @@
 use crate::{
-    definitions::systems::Detacher,
+    definitions::systems::{Detacher, Runner},
     ids::{PluginID, SystemTypeID, TypeID},
     private::manifests::systems::SystemManifest,
     scene::Scene,
@@ -12,6 +12,7 @@ pub(crate) struct System {
     system_type_id: SystemTypeID,
     requires: Vec<(PluginID, SystemTypeID)>,
     wanted_by: Vec<(PluginID, SystemTypeID)>,
+    runner: Runner,
     detacher: Option<Detacher>,
     type_ids: Vec<TypeID>,
 }
@@ -34,6 +35,7 @@ impl System {
             system_type_id,
             requires,
             wanted_by,
+            runner: manifest.runner,
             detacher: manifest.detacher,
             type_ids,
         }
@@ -53,6 +55,10 @@ impl System {
 
     pub(crate) fn get_wanted_by(&self) -> &[(PluginID, SystemTypeID)] {
         &self.wanted_by
+    }
+
+    pub(crate) fn execution(&self) -> (Runner, &[TypeID]) {
+        (self.runner, &self.type_ids)
     }
 
     pub(crate) fn detach(self, scene: &Scene) {

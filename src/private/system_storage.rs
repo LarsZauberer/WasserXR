@@ -12,7 +12,7 @@ type SystemKey = (PluginID, SystemTypeID);
 /// Concrete systems and their validated dependency relationships.
 #[derive(Debug, Default)]
 pub(crate) struct SystemStorage {
-    systems: IDStore<SystemKey, SystemID, System>,
+    pub(super) systems: IDStore<SystemKey, SystemID, System>,
 }
 
 impl SystemStorage {

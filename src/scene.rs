@@ -15,6 +15,7 @@ use crate::{
         manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
         system_storage::SystemStorage,
+        system_storage_snapshot::SystemStorageSnapshot,
     },
 };
 
@@ -566,6 +567,19 @@ impl Scene {
             .remove(system_id)?;
         system.detach(self);
         Ok(())
+    }
+
+    /// Runs every system once in dependency order.
+    ///
+    /// Systems are run sequentially. Additions and removals made by a runner
+    /// take effect on the next tick.
+    pub fn tick(&mut self) {
+        let mut snapshot =
+            SystemStorageSnapshot::new(&self.systems.read().expect("scene system lock poisoned"));
+
+        while let Some((runner, type_ids)) = snapshot.next() {
+            unsafe { runner(self, type_ids.as_ptr(), type_ids.len()) };
+        }
     }
 }
 
