@@ -92,7 +92,7 @@ impl Scene {
     /// This will reset the scene's main objects. Meaning it will remove all the
     /// entities, components and systems
     ///
-    /// It will **not** unload any plugins or remove cached assets
+    /// It will **not** unload any plugins
     pub fn reset(&self) -> Result<(), SceneError> {
         // Replace the old system ID store with a fresh, empty one before detaching
         // its systems.
@@ -104,6 +104,8 @@ impl Scene {
         let entities =
             std::mem::take(&mut *self.entities.write().expect("scene entity lock poisoned"));
         drop(entities);
+        let assets = std::mem::take(&mut *self.assets.write().expect("scene asset lock poisoned"));
+        drop(assets);
         Ok(())
     }
 

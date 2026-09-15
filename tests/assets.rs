@@ -239,3 +239,22 @@ fn cached_assets_are_destroyed_with_the_scene() {
 
     assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 2);
 }
+
+#[test]
+fn reset_destroys_cached_assets() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_counts();
+    let scene = scene();
+    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+
+    scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    scene.reset().unwrap();
+
+    assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 1);
+    assert!(matches!(
+        scene.resolve_asset_id(plugin, asset_type, "first"),
+        Err(SceneError::AssetNotFound)
+    ));
+    scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
+}
