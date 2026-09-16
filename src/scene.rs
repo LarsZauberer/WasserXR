@@ -407,6 +407,38 @@ impl Scene {
         })
     }
 
+    /// Returns an arbitrary entity with the requested component, creating one
+    /// if none exists.
+    ///
+    /// Existing duplicate components are left untouched. Concurrent calls to
+    /// this function cannot create duplicates.
+    pub fn ensure_singleton(
+        &self,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
+    ) -> Result<EntityID, SceneError> {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let manifest = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_component(component_type_id))
+            .ok_or(SceneError::NoComponentType)?;
+        let mut entities = self.entities.write().expect("scene entity lock poisoned");
+
+        if let Some((id, _)) = entities.iter().find(|(_, entity)| {
+            entity
+                .resolve_component_id(plugin_id, component_type_id)
+                .is_ok()
+        }) {
+            return Ok(id);
+        }
+
+        let entity = Entity::new();
+        entity
+            .add_component(plugin_id, component_type_id, manifest)
+            .map_err(SceneError::from)?;
+        Ok(entities.insert(entity))
+    }
+
     /// Remove a component type from an entity
     ///
     /// The function may fail, if the [`EntityID`] cannot be found in the scene.
@@ -464,6 +496,40 @@ impl Scene {
                 .resolve_field_id(component_id, field_type_id)
                 .map_err(SceneError::from)
         })
+    }
+
+    /// Ensures an entity with the requested component exists, then calls
+    /// `action` with that component's requested fields in field order.
+    ///
+    /// If multiple entities have the component, an arbitrary one's fields are
+    /// passed to `action`; all matches are locked in the global order used by
+    /// [`Self::query_components`]. Pointers follow the same access and lifetime
+    /// contract.
+    ///
+    /// # Errors
+    ///
+    /// For a query with fields, returns [`SceneError::EntityNotFound`] if all
+    /// matching entities or components are removed after ensuring the singleton
+    /// but before the component query acquires its locks. In that case,
+    /// `action` is not called.
+    pub fn query_singleton(
+        &self,
+        query: ComponentQuery<'_>,
+        action: impl FnOnce(&[*mut c_void]),
+    ) -> Result<(), SceneError> {
+        let (plugin_id, component_type_id, _, fields) = query;
+        self.ensure_singleton(plugin_id, component_type_id)?;
+        let mut queried = false;
+        self.query_components(std::slice::from_ref(&query), |pointers| {
+            // Component queries flatten the fields from every match. Expose only the
+            // first match, using `get` so concurrent removal returns an error instead
+            // of panicking on an out-of-bounds slice.
+            if let Some(pointers) = pointers.get(..fields.len()) {
+                queried = true;
+                action(pointers);
+            }
+        })?;
+        queried.then_some(()).ok_or(SceneError::EntityNotFound)
     }
 
     /// Calls `action` once with fields from all entities matching every query
