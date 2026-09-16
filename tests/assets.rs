@@ -12,6 +12,7 @@ use wasserxr::{
         assets::AssetDefinition, fields::AssetFieldDefinition, plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
+    field::AssetField,
     ids::{AssetFieldTypeID, AssetTypeID, PluginID},
     scene::Scene,
     utils::version::Version,
@@ -149,14 +150,28 @@ fn asset_field_can_be_read() {
     let field_type = scene
         .resolve_asset_field_type_id(plugin, asset_type, "value")
         .unwrap();
-    let asset = scene.get_asset_id(plugin, asset_type, "field").unwrap();
-    let field = scene.resolve_asset_field_id(asset, field_type).unwrap();
+    let fields = [field_type];
+    let first_asset = scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    let first_field = scene
+        .resolve_asset_field_id(first_asset, field_type)
+        .unwrap();
+    let requests = [
+        (plugin, asset_type, "first", fields.as_slice()),
+        (plugin, asset_type, "second", fields.as_slice()),
+    ];
 
-    let value = scene
-        .query_asset_field(asset, field)
-        .unwrap()
-        .cast::<usize>();
-    assert_eq!(unsafe { *value }, 42);
+    scene
+        .query_assets(&requests, |assets| {
+            assert_eq!(assets.len(), 2);
+            assert!(assets.iter().all(|fields| fields.len() == 1));
+            assert!(matches!(assets[0][0], AssetField::Read(id, _) if id == first_field));
+            for field in assets.iter().flatten() {
+                let AssetField::Read(_, value) = field;
+                assert_eq!(unsafe { *value.cast::<usize>() }, 42);
+            }
+        })
+        .unwrap();
+    assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }
 
 #[test]
@@ -169,6 +184,15 @@ fn missing_asset_field_is_rejected() {
 
     assert!(matches!(
         scene.resolve_asset_field_id(asset, AssetFieldTypeID::default()),
+        Err(SceneError::AssetError(AssetError::FieldNotFound))
+    ));
+
+    let missing_fields = [AssetFieldTypeID::default()];
+    assert!(matches!(
+        scene.query_assets(
+            &[(plugin, asset_type, "field", missing_fields.as_slice())],
+            |_| ()
+        ),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
 }

@@ -5,9 +5,34 @@ use crate::{
     field::{Field, FieldAccess},
     ids::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
+    query::{ComponentQuery, QueriedComponentFields, ResolvedComponent, ResolvedComponentQuery},
 };
 
 type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
+
+/// Recursively locks each component's fields so earlier locks remain alive
+/// while later components and the final action are processed.
+fn lock_component_fields<T>(
+    components: &ComponentStorage,
+    requests: &[ResolvedComponent],
+    fields: &mut Vec<QueriedComponentFields>,
+    action: impl FnOnce(&[QueriedComponentFields]) -> T,
+) -> Result<T, EntityError> {
+    let Some(((component_id, requested_fields), remaining)) = requests.split_first() else {
+        return Ok(action(fields));
+    };
+    let component = components
+        .get(*component_id)
+        .ok_or(EntityError::ComponentNotFound)?
+        .read()
+        .expect("component lock poisoned");
+    component
+        .query_fields(requested_fields, |component_fields| {
+            fields.push((*component_id, component_fields.to_vec()));
+            lock_component_fields(components, remaining, fields, action)
+        })
+        .map_err(EntityError::from)?
+}
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -110,7 +135,7 @@ impl Entity {
     }
 
     /// Locks component fields in a consistent order.
-    pub(crate) fn query_component_fields<T>(
+    pub(crate) fn query_single_component<T>(
         &self,
         component_id: ComponentID,
         requests: &[(FieldID, FieldAccess)],
@@ -121,6 +146,61 @@ impl Entity {
                 .query_fields(requests, action)
                 .map_err(EntityError::from)
         })
+    }
+
+    /// Resolves a component query for this entity, returning `None` when the
+    /// entity does not contain every requested component.
+    pub(crate) fn resolve_query(
+        &self,
+        requests: &[ComponentQuery<'_>],
+    ) -> Result<Option<ResolvedComponentQuery>, EntityError> {
+        let components = self
+            .components
+            .read()
+            .expect("entity component lock poisoned");
+        requests
+            .iter()
+            .map(|(plugin_id, component_type_id, fields)| {
+                let Some(component_id) = components.resolve_id(&(*plugin_id, *component_type_id))
+                else {
+                    return Ok(None);
+                };
+                let component = components
+                    .get(component_id)
+                    .expect("resolved component missing")
+                    .read()
+                    .expect("component lock poisoned");
+                let fields = fields
+                    .iter()
+                    .map(|(field_type_id, access)| {
+                        component
+                            .resolve_field_id(*field_type_id)
+                            .map(|field_id| (field_id, *access))
+                            .map_err(EntityError::from)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Some((component_id, fields)))
+            })
+            .collect::<Result<Option<Vec<_>>, _>>()
+    }
+
+    /// Locks fields across multiple components in the supplied component-ID
+    /// order and holds every lock until `action` returns.
+    pub(crate) fn query_components<T>(
+        &self,
+        requests: &[ResolvedComponent],
+        action: impl FnOnce(&[QueriedComponentFields]) -> T,
+    ) -> Result<T, EntityError> {
+        let components = self
+            .components
+            .read()
+            .expect("entity component lock poisoned");
+        lock_component_fields(
+            &components,
+            requests,
+            &mut Vec::with_capacity(requests.len()),
+            action,
+        )
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]

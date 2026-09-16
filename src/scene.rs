@@ -1,9 +1,9 @@
-use std::{ffi::c_void, path::Path, sync::RwLock};
+use std::{path::Path, sync::RwLock};
 
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError, SystemError},
-    field::{Field, FieldAccess},
+    field::{AssetField, Field, FieldAccess},
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
         EntityID, FieldID, FieldTypeID, PluginID, SystemID, SystemTypeID, TypeID,
@@ -17,9 +17,10 @@ use crate::{
         system_storage::SystemStorage,
         system_storage_snapshot::SystemStorageSnapshot,
     },
+    query::{self, AssetQuery, ComponentQuery, ComponentQueryResult},
 };
 
-type EntityStorage = IDStore<String, EntityID, RwLock<Entity>>;
+pub(crate) type EntityStorage = IDStore<String, EntityID, RwLock<Entity>>;
 
 /// # Design Decision
 ///
@@ -31,7 +32,7 @@ type PluginStorage = IDStore<String, PluginID, Plugin>;
 ///
 /// An asset doesn't require an RwLock since it is a read-only object. There are
 /// no operations that require exclusive access to it.
-type AssetStorage = IDStore<(PluginID, AssetTypeID, String), AssetID, Asset>;
+pub(crate) type AssetStorage = IDStore<(PluginID, AssetTypeID, String), AssetID, Asset>;
 
 /// The scene is the core object in WasserXR. It contains the main public API to
 /// access and maintain all ECS objects.
@@ -449,7 +450,7 @@ impl Scene {
     /// are passed to `action` in the order requested. They remain locked until
     /// `action` returns. Write access to an immutable field returns
     /// [`crate::errors::FieldError::NotMutable`].
-    pub fn query_component_fields<T>(
+    pub fn query_single_component<T>(
         &self,
         entity_id: EntityID,
         component_id: ComponentID,
@@ -458,9 +459,23 @@ impl Scene {
     ) -> Result<T, SceneError> {
         self.with_entity(entity_id, |entity| {
             entity
-                .query_component_fields(component_id, requests, action)
+                .query_single_component(component_id, requests, action)
                 .map_err(SceneError::from)
         })
+    }
+
+    /// Queries groups of components across all entities and invokes `action`
+    /// once while every returned field remains locked.
+    ///
+    /// An entity matches a group when it contains every component in that
+    /// group. Results preserve group, entity, component, and field order.
+    pub fn query_components<T>(
+        &self,
+        groups: &[&[ComponentQuery<'_>]],
+        action: impl FnOnce(&[ComponentQueryResult]) -> T,
+    ) -> Result<T, SceneError> {
+        let entities = self.entities.read().expect("scene entity lock poisoned");
+        query::query_components(&entities, groups, action)
     }
 
     /// Resolve the [`AssetID`] from a given asset type and data string.
@@ -528,21 +543,24 @@ impl Scene {
         Ok(assets.insert_named(key, asset))
     }
 
-    /// Get the assets field pointer to access an asset's field.
-    ///
-    /// This can be thread safely done, since all the assets are read-only
-    pub fn query_asset_field(
+    /// Loads and queries asset fields, keeping all assets alive until the
+    /// single callback returns.
+    pub fn query_assets<T>(
         &self,
-        asset_id: AssetID,
-        field_id: AssetFieldID,
-    ) -> Result<*const c_void, SceneError> {
-        self.assets
-            .read()
-            .expect("scene asset lock poisoned")
-            .get(asset_id)
-            .ok_or(SceneError::AssetNotFound)?
-            .get_field(field_id)
-            .map_err(SceneError::from)
+        requests: &[AssetQuery<'_>],
+        action: impl FnOnce(&[Vec<AssetField>]) -> T,
+    ) -> Result<T, SceneError> {
+        // Loading requires write access, so finish it before taking the shared
+        // asset lock that protects every pointer passed to the callback.
+        let asset_ids = requests
+            .iter()
+            .map(|(plugin_id, asset_type_id, data_string, _)| {
+                self.get_asset_id(*plugin_id, *asset_type_id, data_string)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let assets = self.assets.read().expect("scene asset lock poisoned");
+        let fields = query::asset_query_results(&assets, requests, &asset_ids)?;
+        Ok(action(&fields))
     }
 
     /// Gets an existing concrete system ID from its plugin and system type.
