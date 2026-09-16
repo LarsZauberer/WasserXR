@@ -3,7 +3,6 @@ use std::{ffi::c_void, path::Path, sync::RwLock};
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError, SystemError},
-    field::FieldAccess,
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
         EntityID, FieldID, FieldTypeID, PluginID, SystemID, SystemTypeID, TypeID,
@@ -440,28 +439,6 @@ impl Scene {
         self.with_entity(entity_id, |entity| {
             entity
                 .resolve_field_id(component_id, field_type_id)
-                .map_err(SceneError::from)
-        })
-    }
-
-    /// Locks component fields in field-ID order.
-    ///
-    /// The fields are locked in field-ID order to avoid ordering deadlocks, but
-    /// are passed to `action` in the order requested. They remain locked until
-    /// `action` returns, and their pointers are valid only during that
-    /// callback. A pointer may be mutated only when its corresponding
-    /// request uses [`FieldAccess::Write`]. Write access to an immutable
-    /// field returns [`crate::errors::FieldError::NotMutable`].
-    pub fn query_single_component<T>(
-        &self,
-        entity_id: EntityID,
-        component_id: ComponentID,
-        requests: &[(FieldID, FieldAccess)],
-        action: impl FnOnce(&[(FieldID, *mut c_void)]) -> T,
-    ) -> Result<T, SceneError> {
-        self.with_entity(entity_id, |entity| {
-            entity
-                .query_single_component(component_id, requests, action)
                 .map_err(SceneError::from)
         })
     }
