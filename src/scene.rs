@@ -444,12 +444,11 @@ impl Scene {
     }
 
     /// Queries components across all entities and invokes `action` once while
-    /// every returned field remains locked.
+    /// every matched component remains locked.
     ///
     /// An entity matches when it contains every requested component. Results
-    /// preserve entity, component, and field order. Field access is governed by
-    /// each corresponding request, and pointers are valid only during the
-    /// callback.
+    /// preserve entity, component, and field order. Any write field makes its
+    /// whole component exclusive. Pointers are valid only during the callback.
     pub fn query_components<T>(
         &self,
         requests: &[ComponentQuery<'_>],

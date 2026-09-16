@@ -2,12 +2,52 @@ use std::sync::RwLock;
 
 use crate::{
     errors::EntityError,
+    field::FieldAccess,
     ids::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
     query::{ComponentQuery, QueriedComponentFields, ResolvedComponent, ResolvedComponentQuery},
 };
 
-type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, Component>;
+type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
+
+/// Acquires component locks in ID order and retains them until `action`
+/// returns. Any requested write makes the whole component exclusive.
+fn lock_components<T>(
+    components: &ComponentStorage,
+    requests: &[ResolvedComponent],
+    fields: &mut Vec<QueriedComponentFields>,
+    action: impl FnOnce(&[QueriedComponentFields]) -> T,
+) -> Result<T, EntityError> {
+    let Some(((component_id, requested_fields), remaining)) = requests.split_first() else {
+        return Ok(action(fields));
+    };
+    let component = components
+        .get(*component_id)
+        .ok_or(EntityError::ComponentNotFound)?;
+
+    if requested_fields
+        .iter()
+        .any(|(_, access)| *access == FieldAccess::Write)
+    {
+        let component = component.write().expect("component lock poisoned");
+        fields.push((
+            *component_id,
+            component
+                .query_fields(requested_fields)
+                .map_err(EntityError::from)?,
+        ));
+        lock_components(components, remaining, fields, action)
+    } else {
+        let component = component.read().expect("component lock poisoned");
+        fields.push((
+            *component_id,
+            component
+                .query_fields(requested_fields)
+                .map_err(EntityError::from)?,
+        ));
+        lock_components(components, remaining, fields, action)
+    }
+}
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -35,7 +75,7 @@ impl Entity {
             .read()
             .expect("entity component lock poisoned");
         let component = components.get(id).ok_or(EntityError::ComponentNotFound)?;
-        action(component)
+        action(&component.read().expect("component lock poisoned"))
     }
 
     /// Add a new component to the entity. The function will reject the add, if
@@ -55,7 +95,7 @@ impl Entity {
         if components.contains_name(&type_id) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        Ok(components.insert_named(type_id, component))
+        Ok(components.insert_named(type_id, RwLock::new(component)))
     }
 
     /// Remove a component from the entity
@@ -66,7 +106,9 @@ impl Entity {
             .expect("entity component lock poisoned");
         let component = components
             .remove(id)
-            .ok_or(EntityError::ComponentNotFound)?;
+            .ok_or(EntityError::ComponentNotFound)?
+            .into_inner()
+            .expect("component lock poisoned");
         drop(components);
         drop(component);
         Ok(())
@@ -125,7 +167,9 @@ impl Entity {
             };
             let component = components
                 .get(component_id)
-                .expect("resolved component missing");
+                .expect("resolved component missing")
+                .read()
+                .expect("component lock poisoned");
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_type_id, access) in *fields {
                 resolved_fields.push((
@@ -140,39 +184,28 @@ impl Entity {
         Ok(Some(resolved))
     }
 
-    /// Locks fields across multiple components in the supplied component-ID
-    /// order and holds every lock until `action` returns.
-    pub(crate) fn with_locked_fields<T>(
+    /// Locks components in the supplied component-ID order and holds every
+    /// lock until `action` returns.
+    pub(crate) fn with_locked_components<T>(
         &self,
         requests: &[ResolvedComponent],
         action: impl FnOnce(&[QueriedComponentFields]) -> T,
     ) -> Result<T, EntityError> {
+        debug_assert!(
+            requests
+                .windows(2)
+                .all(|components| components[0].0 < components[1].0)
+        );
         let components = self
             .components
             .read()
             .expect("entity component lock poisoned");
-        let mut locked = Vec::with_capacity(requests.len());
-        for (component_id, requested_fields) in requests {
-            let component = components
-                .get(*component_id)
-                .ok_or(EntityError::ComponentNotFound)?;
-            locked.push((
-                *component_id,
-                component
-                    .lock_fields(requested_fields)
-                    .map_err(EntityError::from)?,
-            ));
-        }
-        let fields = locked
-            .iter()
-            .map(|(component_id, fields)| {
-                (
-                    *component_id,
-                    fields.iter().map(|field| field.field()).collect(),
-                )
-            })
-            .collect::<Vec<QueriedComponentFields>>();
-        Ok(action(&fields))
+        lock_components(
+            &components,
+            requests,
+            &mut Vec::with_capacity(requests.len()),
+            action,
+        )
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]

@@ -1,4 +1,10 @@
-use std::{ffi::c_void, ptr::null_mut, sync::Mutex};
+use std::{
+    ffi::c_void,
+    ptr::null_mut,
+    sync::{Mutex, mpsc},
+    thread,
+    time::Duration,
+};
 
 use rstest::{fixture, rstest};
 use wasserxr::{
@@ -233,6 +239,61 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
             ComponentError::FieldError(FieldError::NotMutable)
         )))
     ));
+    drop(scene);
+}
+
+#[rstest]
+fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let entity = scene.add_entity();
+    let (plugin, component_type, _) = add_test_component(&scene, entity).unwrap();
+    let mutable_field = scene
+        .resolve_field_type_id(plugin, component_type, "MyField")
+        .unwrap();
+    let immutable_field = scene
+        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .unwrap();
+    let read_fields = [(immutable_field, FieldAccess::Read)];
+    let write_fields = [(mutable_field, FieldAccess::Write)];
+    let read_request = [(plugin, component_type, read_fields.as_slice())];
+    let write_request = [(plugin, component_type, write_fields.as_slice())];
+    let (read_locked, read_locked_rx) = mpsc::channel();
+    let (release_read, release_read_rx) = mpsc::channel();
+    let (write_started, write_started_rx) = mpsc::channel();
+    let (write_locked, write_locked_rx) = mpsc::channel();
+
+    thread::scope(|scope| {
+        let scene = &scene;
+        scope.spawn(move || {
+            scene
+                .query_components(&read_request, |_| {
+                    read_locked.send(()).unwrap();
+                    release_read_rx.recv().unwrap();
+                })
+                .unwrap();
+        });
+        read_locked_rx.recv().unwrap();
+
+        scope.spawn(move || {
+            write_started.send(()).unwrap();
+            scene
+                .query_components(&write_request, |_| write_locked.send(()).unwrap())
+                .unwrap();
+        });
+        write_started_rx.recv().unwrap();
+        assert!(
+            write_locked_rx
+                .recv_timeout(Duration::from_millis(200))
+                .is_err()
+        );
+
+        release_read.send(()).unwrap();
+        write_locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap();
+    });
+
     drop(scene);
 }
 

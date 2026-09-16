@@ -37,14 +37,13 @@ pub(crate) type QueriedComponentFields = (ComponentID, Vec<(FieldID, *mut c_void
 /// Resolved component requests grouped by entity.
 type ResolvedEntities = Vec<(EntityID, ResolvedComponentQuery)>;
 
-/// Unique requested fields gathered before conversion to a stable lock order.
-/// A write request supersedes read requests for the same field.
+/// Unique requested fields grouped into a stable component lock order. A write
+/// request supersedes read requests for the same field.
 type PendingComponentLocks =
     BTreeMap<EntityID, BTreeMap<ComponentID, BTreeMap<FieldID, FieldAccess>>>;
 
-/// Stores each physically locked field by its concrete location. Duplicate
-/// logical requests use the same entry, so a field is never locked twice by
-/// one query. It acts as a cache of locked fields within that query.
+/// Stores each queried pointer by its concrete location. Duplicate logical
+/// requests use the same entry.
 type LockedComponentFields = BTreeMap<(EntityID, ComponentID, FieldID), *mut c_void>;
 
 /// Finds matching entities and builds their unique, globally ordered lock plan.
@@ -59,12 +58,13 @@ fn plan_component_query(
             continue;
         };
         for (component_id, fields) in &components {
+            let pending_fields = pending
+                .entry(entity_id)
+                .or_default()
+                .entry(*component_id)
+                .or_default();
             for (field_id, access) in fields {
-                pending
-                    .entry(entity_id)
-                    .or_default()
-                    .entry(*component_id)
-                    .or_default()
+                pending_fields
                     .entry(*field_id)
                     .and_modify(|current| {
                         if *access == FieldAccess::Write {
@@ -92,7 +92,7 @@ fn plan_component_query(
 
 /// Acquires the complete lock plan recursively, keeping every prior guard on
 /// the stack until the final action returns.
-fn with_locked_component_fields<T>(
+fn with_locked_components<T>(
     entities: &EntityStorage,
     plans: &[(EntityID, ResolvedComponentQuery)],
     locked: &mut LockedComponentFields,
@@ -103,13 +103,13 @@ fn with_locked_component_fields<T>(
     };
     let entity = entities.get(*entity_id).ok_or(SceneError::EntityNotFound)?;
     entity
-        .with_locked_fields(components, |component_fields| {
+        .with_locked_components(components, |component_fields| {
             for (component_id, fields) in component_fields {
                 for (field_id, pointer) in fields {
                     locked.insert((*entity_id, *component_id, *field_id), *pointer);
                 }
             }
-            with_locked_component_fields(entities, remaining, locked, action)
+            with_locked_components(entities, remaining, locked, action)
         })
         .map_err(SceneError::from)?
 }
@@ -147,7 +147,12 @@ pub(crate) fn query_components<T>(
     action: impl FnOnce(&ComponentQueryResult) -> T,
 ) -> Result<T, SceneError> {
     let (matches, plans) = plan_component_query(entities, requests)?;
-    with_locked_component_fields(entities, &plans, &mut BTreeMap::new(), |locked| {
+    debug_assert!(
+        plans
+            .windows(2)
+            .all(|entities| entities[0].0 < entities[1].0)
+    );
+    with_locked_components(entities, &plans, &mut BTreeMap::new(), |locked| {
         action(&component_query_results(&matches, locked))
     })
 }
