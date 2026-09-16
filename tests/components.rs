@@ -1,7 +1,6 @@
 use std::{
     ffi::c_void,
-    ptr::null_mut,
-    sync::{Mutex, mpsc},
+    sync::{Arc, Barrier, Mutex, mpsc},
     thread,
     time::Duration,
 };
@@ -13,8 +12,8 @@ use wasserxr::{
         plugins::PluginDefinition,
     },
     errors::{ComponentError, EntityError, FieldError, SceneError},
-    field::FieldAccess,
-    ids::{ComponentID, ComponentTypeID, EntityID, PluginID},
+    field::AccessRequest,
+    ids::{ComponentID, ComponentTypeID, EntityID, FieldTypeID, PluginID},
     scene::Scene,
     utils::version::Version,
 };
@@ -23,17 +22,45 @@ static TEST_LOCK: Mutex<()> = Mutex::new(());
 static CREATOR_COUNTER: Mutex<usize> = Mutex::new(0);
 static DESTROYER_COUNTER: Mutex<usize> = Mutex::new(0);
 
+/// Concrete data makes query ordering and mutation observable.
+struct TestComponent {
+    mutable: usize,
+    immutable: usize,
+}
+
+/// Allocates distinct field values for each component created by a test.
 unsafe extern "C" fn simple_creator() -> *mut c_void {
-    *CREATOR_COUNTER.lock().unwrap() += 1;
-    null_mut()
+    let mut count = CREATOR_COUNTER.lock().unwrap();
+    *count += 1;
+    Box::into_raw(Box::new(TestComponent {
+        mutable: *count,
+        immutable: 100 + *count,
+    }))
+    .cast()
 }
 
-unsafe extern "C" fn simple_destroyer(_: *mut c_void) {
+/// Releases the component and records its destruction.
+unsafe extern "C" fn simple_destroyer(data: *mut c_void) {
     *DESTROYER_COUNTER.lock().unwrap() += 1;
+    unsafe { drop(Box::from_raw(data.cast::<TestComponent>())) };
 }
 
-unsafe extern "C" fn simple_getter(_: *const c_void) -> *mut c_void {
-    null_mut()
+/// Exposes the mutable field without creating a Rust reference to plugin data.
+unsafe extern "C" fn simple_getter(data: *const c_void) -> *mut c_void {
+    unsafe {
+        (&raw const (*data.cast::<TestComponent>()).mutable)
+            .cast_mut()
+            .cast()
+    }
+}
+
+/// Exposes the immutable field for read queries and rejected write queries.
+unsafe extern "C" fn immutable_getter(data: *const c_void) -> *mut c_void {
+    unsafe {
+        (&raw const (*data.cast::<TestComponent>()).immutable)
+            .cast_mut()
+            .cast()
+    }
 }
 
 const COMPATIBLE_ENGINE_VERSION: Version = Version {
@@ -52,14 +79,23 @@ const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition
 
 const IMMUTABLE_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
     name: c"ImmutableField".as_ptr(),
-    getter: Some(simple_getter),
+    getter: Some(immutable_getter),
     mutable: 0,
     serializer: None,
     deserializer: None,
 };
 
-const VALID_COMPONENT_FIELDS: [ComponentFieldDefinition; 2] =
-    [VALID_COMPONENT_FIELD, IMMUTABLE_COMPONENT_FIELD];
+const VALID_COMPONENT_FIELDS: [ComponentFieldDefinition; 3] = [
+    VALID_COMPONENT_FIELD,
+    IMMUTABLE_COMPONENT_FIELD,
+    ComponentFieldDefinition {
+        name: c"HiddenField".as_ptr(),
+        getter: None,
+        mutable: 0,
+        serializer: None,
+        deserializer: None,
+    },
+];
 
 const VALID_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
     name: c"MyComponent".as_ptr(),
@@ -128,6 +164,8 @@ fn empty_scene_cannot_add_component() {
     assert!(matches!(err, SceneError::NoComponentType));
 }
 
+/// Checks intersection, flat pointer order, duplicate locks, and field
+/// mutability.
 #[rstest]
 fn component_query_matches_entities_preserves_order_and_calls_action_once(scene: Scene) {
     use std::cell::Cell;
@@ -136,13 +174,12 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     reset_globals();
     let first_entity = scene.add_entity();
     let second_entity = scene.add_entity();
-    let (plugin, component_type, first_component) =
-        add_test_component(&scene, first_entity).unwrap();
+    let (plugin, component_type, _) = add_test_component(&scene, first_entity).unwrap();
     add_test_component(&scene, second_entity).unwrap();
     let other_type = scene
         .resolve_component_type_id(plugin, "OtherComponent")
         .unwrap();
-    let other_component = scene
+    scene
         .add_component(first_entity, plugin, other_type)
         .unwrap();
 
@@ -155,56 +192,46 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     let other_field = scene
         .resolve_field_type_id(plugin, other_type, "ImmutableField")
         .unwrap();
-    let first_mutable_field = scene
-        .resolve_field_id(first_entity, first_component, mutable_field)
-        .unwrap();
-    let first_immutable_field = scene
-        .resolve_field_id(first_entity, first_component, immutable_field)
-        .unwrap();
-    let first_other_field = scene
-        .resolve_field_id(first_entity, other_component, other_field)
-        .unwrap();
-    let requested_fields = if first_mutable_field < first_immutable_field {
-        [
-            (immutable_field, FieldAccess::Read),
-            (mutable_field, FieldAccess::Write),
-        ]
-    } else {
-        [
-            (mutable_field, FieldAccess::Write),
-            (immutable_field, FieldAccess::Read),
-        ]
-    };
-    let requested_field_ids = if first_mutable_field < first_immutable_field {
-        [first_immutable_field, first_mutable_field]
-    } else {
-        [first_mutable_field, first_immutable_field]
-    };
-    let read_fields = [(mutable_field, FieldAccess::Read)];
-    let duplicate_write_fields = [(mutable_field, FieldAccess::Write)];
-    let other_fields = [(other_field, FieldAccess::Read)];
-    let all_with_component = [(plugin, component_type, requested_fields.as_slice())];
+    let requested_fields = [immutable_field, mutable_field];
+    let read_fields = [mutable_field];
+    let other_fields = [other_field];
+    let all_with_component = [(
+        plugin,
+        component_type,
+        AccessRequest::Read,
+        requested_fields.as_slice(),
+    )];
     let only_first_entity = [
-        (plugin, component_type, read_fields.as_slice()),
-        (plugin, other_type, other_fields.as_slice()),
-        (plugin, component_type, duplicate_write_fields.as_slice()),
+        (
+            plugin,
+            component_type,
+            AccessRequest::Read,
+            read_fields.as_slice(),
+        ),
+        (
+            plugin,
+            other_type,
+            AccessRequest::Read,
+            other_fields.as_slice(),
+        ),
+        (
+            plugin,
+            component_type,
+            AccessRequest::Write,
+            read_fields.as_slice(),
+        ),
     ];
     let calls = Cell::new(0);
 
     scene
         .query_components(&all_with_component, |results| {
             calls.set(calls.get() + 1);
-            assert_eq!(results.len(), 2);
-            assert_eq!(results[0].0, first_entity);
-            assert_eq!(results[1].0, second_entity);
-            assert_eq!(results[0].1[0].0, first_component);
             assert_eq!(
-                results[0].1[0]
-                    .1
+                results
                     .iter()
-                    .map(|(field_id, _)| *field_id)
+                    .map(|pointer| unsafe { *pointer.cast::<usize>() })
                     .collect::<Vec<_>>(),
-                requested_field_ids
+                [101, 1, 102, 2]
             );
         })
         .unwrap();
@@ -214,34 +241,46 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     scene
         .query_components(&only_first_entity, |results| {
             calls.set(calls.get() + 1);
-            assert_eq!(results.len(), 1);
-            assert_eq!(results[0].0, first_entity);
-            assert_eq!(results[0].1.len(), 3);
-            assert_eq!(results[0].1[0].1[0].0, first_mutable_field);
-            assert_eq!(results[0].1[1].1[0].0, first_other_field);
-            assert_eq!(results[0].1[2].0, first_component);
-            assert_eq!(results[0].1[2].1[0].0, first_mutable_field);
-            assert_eq!(results[0].1[0].1[0].1, results[0].1[2].1[0].1);
+            assert_eq!(results.len(), 3);
+            assert_eq!(results[0], results[2]);
+            assert_eq!(unsafe { *results[1].cast::<usize>() }, 103);
+            unsafe { *results[2].cast::<usize>() = 7 };
         })
         .unwrap();
 
     assert_eq!(calls.get(), 2);
 
-    let immutable_read = [(immutable_field, FieldAccess::Read)];
-    let immutable_write = [(immutable_field, FieldAccess::Write)];
+    let immutable_fields = [immutable_field];
     let component = [
-        (plugin, component_type, immutable_read.as_slice()),
-        (plugin, component_type, immutable_write.as_slice()),
+        (
+            plugin,
+            component_type,
+            AccessRequest::Read,
+            immutable_fields.as_slice(),
+        ),
+        (
+            plugin,
+            component_type,
+            AccessRequest::Write,
+            immutable_fields.as_slice(),
+        ),
     ];
     assert!(matches!(
-        scene.query_components(&component, |_| ()),
+        scene.query_components(&component, |_| panic!("invalid query called callback")),
         Err(SceneError::EntityError(EntityError::ComponentError(
             ComponentError::FieldError(FieldError::NotMutable)
         )))
     ));
+    // The failed query released its locks, and the previous write is visible.
+    scene
+        .query_components(&all_with_component, |results| {
+            assert_eq!(unsafe { *results[1].cast::<usize>() }, 7);
+        })
+        .unwrap();
     drop(scene);
 }
 
+/// A write to one field excludes reads of other fields in the same component.
 #[rstest]
 fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
@@ -254,10 +293,20 @@ fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
     let immutable_field = scene
         .resolve_field_type_id(plugin, component_type, "ImmutableField")
         .unwrap();
-    let read_fields = [(immutable_field, FieldAccess::Read)];
-    let write_fields = [(mutable_field, FieldAccess::Write)];
-    let read_request = [(plugin, component_type, read_fields.as_slice())];
-    let write_request = [(plugin, component_type, write_fields.as_slice())];
+    let read_fields = [immutable_field];
+    let write_fields = [mutable_field];
+    let read_request = [(
+        plugin,
+        component_type,
+        AccessRequest::Read,
+        read_fields.as_slice(),
+    )];
+    let write_request = [(
+        plugin,
+        component_type,
+        AccessRequest::Write,
+        write_fields.as_slice(),
+    )];
     let (read_locked, read_locked_rx) = mpsc::channel();
     let (release_read, release_read_rx) = mpsc::channel();
     let (write_started, write_started_rx) = mpsc::channel();
@@ -294,6 +343,224 @@ fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
             .unwrap();
     });
 
+    drop(scene);
+}
+
+/// Covers empty groups, missing components/fields, and mixed access to one
+/// component.
+#[rstest]
+fn component_query_edge_cases(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let entity = scene.add_entity();
+    let (plugin, component_type, _) = add_test_component(&scene, entity).unwrap();
+    let mutable = scene
+        .resolve_field_type_id(plugin, component_type, "MyField")
+        .unwrap();
+    let immutable = scene
+        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .unwrap();
+    let hidden = scene
+        .resolve_field_type_id(plugin, component_type, "HiddenField")
+        .unwrap();
+    let other = scene
+        .resolve_component_type_id(plugin, "OtherComponent")
+        .unwrap();
+    let mut calls = 0;
+    for query in [
+        vec![],
+        vec![(plugin, other, AccessRequest::Read, &[][..])],
+        vec![(plugin, component_type, AccessRequest::Write, &[][..])],
+    ] {
+        scene
+            .query_components(&query, |pointers| {
+                calls += 1;
+                assert!(pointers.is_empty());
+            })
+            .unwrap();
+    }
+    assert_eq!(calls, 3);
+    let error = scene
+        .query_components(
+            &[(
+                plugin,
+                component_type,
+                AccessRequest::Read,
+                &[FieldTypeID::default()],
+            )],
+            |_| panic!("missing field called callback"),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SceneError::EntityError(EntityError::ComponentError(ComponentError::FieldNotFound))
+    ));
+    let error = scene
+        .query_components(
+            &[(plugin, component_type, AccessRequest::Read, &[hidden])],
+            |_| panic!("hidden field called callback"),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SceneError::EntityError(EntityError::ComponentError(ComponentError::FieldError(
+            FieldError::NoGetter
+        )))
+    ));
+    scene
+        .query_components(
+            &[
+                (plugin, component_type, AccessRequest::Read, &[immutable]),
+                (
+                    plugin,
+                    component_type,
+                    AccessRequest::Write,
+                    &[mutable, mutable],
+                ),
+            ],
+            |pointers| {
+                assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 101);
+                assert_eq!(pointers[1], pointers[2]);
+                unsafe { *pointers[1].cast::<usize>() = 9 };
+            },
+        )
+        .unwrap();
+    drop(scene);
+}
+
+/// Opposite request orders must finish and serialize writes across all
+/// entities.
+#[rstest]
+fn reversed_component_queries_do_not_deadlock(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let first = scene.add_entity();
+    let (plugin, component_type, _) = add_test_component(&scene, first).unwrap();
+    let other = scene
+        .resolve_component_type_id(plugin, "OtherComponent")
+        .unwrap();
+    scene.add_component(first, plugin, other).unwrap();
+    let second = scene.add_entity();
+    // Reverse concrete component IDs on the second entity as well.
+    scene.add_component(second, plugin, other).unwrap();
+    add_test_component(&scene, second).unwrap();
+    let field = scene
+        .resolve_field_type_id(plugin, component_type, "MyField")
+        .unwrap();
+    let other_field = scene
+        .resolve_field_type_id(plugin, other, "MyField")
+        .unwrap();
+    let scene = Arc::new(scene);
+    let start = Arc::new(Barrier::new(2));
+    let (done, finished) = mpsc::channel();
+    let handles: Vec<_> = [false, true]
+        .into_iter()
+        .map(|reverse| {
+            let scene = Arc::clone(&scene);
+            let start = Arc::clone(&start);
+            let done = done.clone();
+            thread::spawn(move || {
+                let mut query = [
+                    (plugin, component_type, AccessRequest::Write, &[field][..]),
+                    (plugin, other, AccessRequest::Write, &[other_field][..]),
+                ];
+                if reverse {
+                    query.reverse();
+                }
+                for _ in 0..100 {
+                    start.wait();
+                    scene
+                        .query_components(&query, |pointers| {
+                            for &pointer in pointers {
+                                unsafe { *pointer.cast::<usize>() += 1 };
+                            }
+                        })
+                        .unwrap();
+                }
+                done.send(()).unwrap();
+            })
+        })
+        .collect();
+    for _ in 0..2 {
+        finished
+            .recv_timeout(Duration::from_secs(5))
+            .expect("queries deadlocked");
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    scene
+        .query_components(
+            &[
+                (plugin, component_type, AccessRequest::Read, &[field]),
+                (plugin, other, AccessRequest::Read, &[other_field]),
+            ],
+            |pointers| {
+                let values: Vec<_> = pointers
+                    .iter()
+                    .map(|pointer| unsafe { *pointer.cast::<usize>() })
+                    .collect();
+                assert_eq!(values, [201, 202, 204, 203]);
+            },
+        )
+        .unwrap();
+    drop(scene);
+}
+
+/// Shared readers overlap, while component/entity removal waits for the
+/// callback.
+#[rstest]
+fn component_queries_keep_owners_alive(scene: Scene) {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_globals();
+    let scene = Arc::new(scene);
+    for remove_entity in [false, true] {
+        let entity = scene.add_entity();
+        let (plugin, component_type, component) = add_test_component(&scene, entity).unwrap();
+        let field = scene
+            .resolve_field_type_id(plugin, component_type, "MyField")
+            .unwrap();
+        let (locked, locked_rx) = mpsc::channel();
+        let (release, release_rx) = mpsc::channel();
+        let reader_scene = Arc::clone(&scene);
+        let reader = thread::spawn(move || {
+            reader_scene
+                .query_components(
+                    &[(plugin, component_type, AccessRequest::Read, &[field])],
+                    |pointers| {
+                        locked.send(()).unwrap();
+                        release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                        assert!(unsafe { *pointers[0].cast::<usize>() } > 0);
+                    },
+                )
+                .unwrap();
+        });
+        locked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        scene
+            .query_components(
+                &[(plugin, component_type, AccessRequest::Read, &[field])],
+                |_| (),
+            )
+            .unwrap();
+        let (started, started_rx) = mpsc::channel();
+        let (removed, removed_rx) = mpsc::channel();
+        let remover_scene = Arc::clone(&scene);
+        let remover = thread::spawn(move || {
+            started.send(()).unwrap();
+            if remove_entity {
+                remover_scene.remove_entity(entity).unwrap();
+            } else {
+                remover_scene.remove_component(entity, component).unwrap();
+            }
+            removed.send(()).unwrap();
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(removed_rx.recv_timeout(Duration::from_millis(100)).is_err());
+        release.send(()).unwrap();
+        removed_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        reader.join().unwrap();
+        remover.join().unwrap();
+    }
     drop(scene);
 }
 

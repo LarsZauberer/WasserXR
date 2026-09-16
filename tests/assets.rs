@@ -2,9 +2,12 @@ use std::{
     ffi::c_void,
     ptr::null_mut,
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
+        mpsc,
     },
+    thread,
+    time::Duration,
 };
 
 use wasserxr::{
@@ -140,8 +143,9 @@ fn different_data_strings_create_distinct_assets() {
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }
 
+/// Whole-asset pointers preserve request order and repeat cached identities.
 #[test]
-fn asset_field_can_be_read() {
+fn asset_query_returns_complete_assets_in_request_order() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
@@ -149,26 +153,36 @@ fn asset_field_can_be_read() {
     let field_type = scene
         .resolve_asset_field_type_id(plugin, asset_type, "value")
         .unwrap();
-    let fields = [field_type];
     let first_asset = scene.get_asset_id(plugin, asset_type, "first").unwrap();
-    let first_field = scene
+    scene
         .resolve_asset_field_id(first_asset, field_type)
         .unwrap();
     let requests = [
-        (plugin, asset_type, "first", fields.as_slice()),
-        (plugin, asset_type, "second", fields.as_slice()),
+        (plugin, asset_type, "second"),
+        (plugin, asset_type, "first"),
+        (plugin, asset_type, "second"),
     ];
 
+    let mut first_pointer = std::ptr::null();
+    scene
+        .query_assets(&[(plugin, asset_type, "first")], |pointers| {
+            first_pointer = pointers[0];
+        })
+        .unwrap();
+    let mut calls = 0;
     scene
         .query_assets(&requests, |assets| {
-            assert_eq!(assets.len(), 2);
-            assert!(assets.iter().all(|fields| fields.len() == 1));
-            assert_eq!(assets[0][0].0, first_field);
-            for (_, value) in assets.iter().flatten() {
-                assert_eq!(unsafe { *value.cast::<usize>() }, 42);
+            calls += 1;
+            assert_eq!(assets.len(), 3);
+            assert_eq!(assets[0], assets[2]);
+            assert_eq!(assets[1], first_pointer);
+            assert_ne!(assets[0], assets[1]);
+            for value in assets {
+                assert_eq!(unsafe { (*value.cast::<TestAsset>()).value }, 42);
             }
         })
         .unwrap();
+    assert_eq!(calls, 1);
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }
 
@@ -184,15 +198,88 @@ fn missing_asset_field_is_rejected() {
         scene.resolve_asset_field_id(asset, AssetFieldTypeID::default()),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
+}
 
-    let missing_fields = [AssetFieldTypeID::default()];
+/// Empty queries call once; failures skip the callback and release cache locks.
+#[test]
+fn asset_query_empty_and_failure_behavior() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_counts();
+    let scene = scene();
+    let (plugin, valid) = asset_type(&scene, "TestAsset").unwrap();
+    let (_, failing) = asset_type(&scene, "FailingAsset").unwrap();
+    let mut calls = 0;
+    scene
+        .query_assets(&[], |pointers| {
+            calls += 1;
+            assert!(pointers.is_empty());
+        })
+        .unwrap();
+    assert_eq!(calls, 1);
     assert!(matches!(
-        scene.query_assets(
-            &[(plugin, asset_type, "field", missing_fields.as_slice())],
-            |_| ()
-        ),
-        Err(SceneError::AssetError(AssetError::FieldNotFound))
+        scene.query_assets(&[(plugin, valid, "ok"), (plugin, failing, "bad")], |_| {
+            panic!("failed query called callback");
+        }),
+        Err(SceneError::AssetError(AssetError::CreationFailure))
     ));
+    assert!(scene.resolve_asset_id(plugin, valid, "ok").is_ok());
+    assert!(matches!(
+        scene.query_assets(&[(plugin, AssetTypeID::default(), "missing")], |_| {
+            panic!("invalid query called callback");
+        }),
+        Err(SceneError::AssetNotFound)
+    ));
+    scene.reset().unwrap();
+}
+
+/// Reset cannot destroy data during a callback; a callback panic releases its
+/// lock.
+#[test]
+fn asset_query_keeps_data_alive_until_callback_finishes() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    reset_counts();
+    let scene = Arc::new(scene());
+    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let (locked, locked_rx) = mpsc::channel();
+    let (release, release_rx) = mpsc::channel();
+    let reader_scene = Arc::clone(&scene);
+    let reader = thread::spawn(move || {
+        reader_scene
+            .query_assets(&[(plugin, asset_type, "first")], |pointers| {
+                locked.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                assert_eq!(unsafe { (*pointers[0].cast::<TestAsset>()).value }, 42);
+                assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 0);
+            })
+            .unwrap();
+    });
+    locked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (started, started_rx) = mpsc::channel();
+    let (reset, reset_rx) = mpsc::channel();
+    let reset_scene = Arc::clone(&scene);
+    let resetter = thread::spawn(move || {
+        started.send(()).unwrap();
+        reset_scene.reset().unwrap();
+        reset.send(()).unwrap();
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(reset_rx.recv_timeout(Duration::from_millis(100)).is_err());
+    release.send(()).unwrap();
+    reset_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    reader.join().unwrap();
+    resetter.join().unwrap();
+    assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 1);
+
+    let panic = std::panic::catch_unwind(|| {
+        scene
+            .query_assets(&[(plugin, asset_type, "again")], |_| {
+                panic!("callback panic")
+            })
+            .unwrap();
+    });
+    assert!(panic.is_err());
+    scene.reset().unwrap();
+    assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 2);
 }
 
 #[test]

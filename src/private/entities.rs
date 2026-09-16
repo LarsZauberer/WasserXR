@@ -1,13 +1,13 @@
-use std::sync::RwLock;
+use std::sync::{RwLock, RwLockReadGuard};
 
 use crate::{
     errors::EntityError,
-    field::FieldAccess,
     ids::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
 };
 
-type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
+pub(crate) type ComponentStorage =
+    IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -20,6 +20,19 @@ impl Entity {
     /// Create a new entity
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// Keeps this entity's component membership stable during a scene query.
+    ///
+    /// # Design decisions
+    ///
+    /// The scene holds these guards before taking any component data locks.
+    /// Borrowing the existing storage prevents removal without copying data
+    /// or introducing shared ownership of individual components.
+    pub(crate) fn lock_components(&self) -> RwLockReadGuard<'_, ComponentStorage> {
+        self.components
+            .read()
+            .expect("entity component lock poisoned")
     }
 
     /// Runs an action with a component while holding the component collection's

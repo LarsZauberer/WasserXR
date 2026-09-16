@@ -1,9 +1,12 @@
-use std::ffi::c_void;
+use std::{
+    ffi::c_void,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
-    field::FieldAccess,
+    field::AccessRequest,
     ids::{FieldID, FieldTypeID, PluginID},
     private::{
         fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
@@ -80,23 +83,60 @@ impl Component {
             .ok_or(ComponentError::FieldNotFound)
     }
 
-    /// Resolves requested field pointers while the caller holds this
-    /// component's lock.
-    pub(crate) fn query_fields(
+    /// Resolves one field pointer under the caller's component lock.
+    ///
+    /// # Design decisions
+    ///
+    /// Access is checked per query entry, even if another entry upgraded the
+    /// component's lock to exclusive. This allows immutable fields to be read
+    /// alongside writes to other fields of the same component.
+    pub(crate) fn query_field(
         &self,
-        requests: &[(FieldID, FieldAccess)],
-    ) -> Result<Vec<(FieldID, *mut c_void)>, ComponentError> {
-        debug_assert!(requests.windows(2).all(|fields| fields[0].0 < fields[1].0));
-        let mut fields = Vec::with_capacity(requests.len());
-        for (id, access) in requests {
-            let field = self.fields.get(*id).ok_or(ComponentError::FieldNotFound)?;
-            let pointer = match access {
-                FieldAccess::Read => field.get(self.data)?.cast_mut(),
-                FieldAccess::Write => field.get_mut(self.data)?,
-            };
-            fields.push((*id, pointer));
+        field_type: FieldTypeID,
+        access: AccessRequest,
+    ) -> Result<*mut c_void, ComponentError> {
+        let id = self.resolve_field_id(field_type)?;
+        let field = self.fields.get(id).ok_or(ComponentError::FieldNotFound)?;
+        match access {
+            AccessRequest::Read => Ok(field.get(self.data)?.cast_mut()),
+            AccessRequest::Write => Ok(field.get_mut(self.data)?),
         }
-        Ok(fields)
+    }
+}
+
+/// Owns either kind of component lock until the query callback finishes.
+pub(crate) enum ComponentGuard<'a> {
+    Read(RwLockReadGuard<'a, Component>),
+    Write(RwLockWriteGuard<'a, Component>),
+}
+
+impl<'a> ComponentGuard<'a> {
+    /// Acquires the requested lock; the caller must enforce global ordering.
+    ///
+    /// # Design decisions
+    ///
+    /// An enum keeps standard-library guards of both kinds in one collection.
+    /// Their normal drop behavior releases locks on success, error, or unwind.
+    pub(crate) fn lock(component: &'a RwLock<Component>, access: AccessRequest) -> Self {
+        match access {
+            AccessRequest::Read => Self::Read(component.read().expect("component lock poisoned")),
+            AccessRequest::Write => {
+                Self::Write(component.write().expect("component lock poisoned"))
+            }
+        }
+    }
+
+    /// Borrows the locked record to resolve its opaque field pointers.
+    ///
+    /// # Design decisions
+    ///
+    /// The record's metadata is immutable in both modes. Mutation of plugin
+    /// data happens only through field pointers inside the query callback.
+    pub(crate) fn component(&self) -> &Component {
+        match self {
+            Self::Read(component) => component,
+            Self::Write(component) => component,
+        }
     }
 }
 

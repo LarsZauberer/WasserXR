@@ -1,9 +1,12 @@
 //! Public component-field query types.
 
-/// The access requested for a component field. Any write access makes the
-/// containing component exclusive for the complete query callback.
+/// The lock requested for an entire component during a query callback.
+///
+/// This controls access even though both modes expose `*mut c_void` pointers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FieldAccess {
+pub enum AccessRequest {
+    /// Shared access. The callback must not write through the pointers.
     Read,
+    /// Exclusive access. Requested fields must also be declared mutable.
     Write,
 }
