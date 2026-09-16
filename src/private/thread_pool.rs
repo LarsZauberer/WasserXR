@@ -19,6 +19,7 @@ use std::{
 type Task = Box<dyn FnOnce() + Send + 'static>;
 
 /// Tracks tasks that are queued or running and wakes callers waiting for idle.
+#[derive(Debug)]
 struct Activity {
     pending: Mutex<usize>,
     idle: Condvar,
@@ -75,10 +76,21 @@ struct Activity {
 /// assert!(pool.is_idle());
 /// assert_eq!(completed.load(Ordering::Relaxed), 4);
 /// ```
+#[derive(Debug)]
 pub(crate) struct ThreadPool {
     sender: Option<Sender<Task>>,
     workers: Vec<JoinHandle<()>>,
     activity: Arc<Activity>,
+}
+
+// Worker handles are only accessed while dropping the pool through `&mut self`.
+// Unwinding across a shared pool reference cannot expose their internal state.
+impl std::panic::RefUnwindSafe for ThreadPool {}
+
+impl Default for ThreadPool {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ThreadPool {

@@ -2,8 +2,10 @@ use std::{
     ffi::{CStr, c_char},
     sync::{
         Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    thread,
+    time::Duration,
 };
 
 use wasserxr::{
@@ -18,6 +20,8 @@ static ADD_ON_TICK: Mutex<Option<(PluginID, SystemTypeID)>> = Mutex::new(None);
 static REMOVE_ON_TICK: Mutex<Option<SystemID>> = Mutex::new(None);
 static ADDED_RUNS: AtomicUsize = AtomicUsize::new(0);
 static REMOVED_RUNS: AtomicUsize = AtomicUsize::new(0);
+static SLOW_FINISHED: AtomicBool = AtomicBool::new(false);
+static DEPENDENT_RAN_BEFORE_SLOW_FINISHED: AtomicBool = AtomicBool::new(false);
 
 unsafe extern "C" fn run(_: *const Scene, _: *const TypeID, _: usize) {}
 
@@ -35,6 +39,10 @@ unsafe extern "C" fn run_c(_: *const Scene, _: *const TypeID, _: usize) {
 
 unsafe extern "C" fn run_d(_: *const Scene, _: *const TypeID, _: usize) {
     TICK_ORDER.lock().unwrap().push("d");
+}
+
+unsafe extern "C" fn run_e(_: *const Scene, _: *const TypeID, _: usize) {
+    TICK_ORDER.lock().unwrap().push("e");
 }
 
 unsafe extern "C" fn add_on_tick(scene: *const Scene, _: *const TypeID, _: usize) {
@@ -55,6 +63,16 @@ unsafe extern "C" fn remove_on_tick(scene: *const Scene, _: *const TypeID, _: us
 
 unsafe extern "C" fn run_removed(_: *const Scene, _: *const TypeID, _: usize) {
     REMOVED_RUNS.fetch_add(1, Ordering::Relaxed);
+}
+
+unsafe extern "C" fn run_slow(_: *const Scene, _: *const TypeID, _: usize) {
+    thread::sleep(Duration::from_millis(100));
+    SLOW_FINISHED.store(true, Ordering::Release);
+}
+
+unsafe extern "C" fn run_after_fast(_: *const Scene, _: *const TypeID, _: usize) {
+    DEPENDENT_RAN_BEFORE_SLOW_FINISHED
+        .store(!SLOW_FINISHED.load(Ordering::Acquire), Ordering::Relaxed);
 }
 
 fn system_definition(
@@ -98,21 +116,24 @@ fn load_systems(scene: &Scene, systems: &[SystemDefinition]) -> PluginID {
 fn tick_honors_requires_and_wanted_by() {
     TICK_ORDER.lock().unwrap().clear();
     let requires_a = [c"a".as_ptr()];
+    let requires_a_and_c = [c"a".as_ptr(), c"c".as_ptr()];
     let wanted_by_d = [c"d".as_ptr()];
     let mut systems = [
         system_definition(c"a", &[], &[]),
         system_definition(c"b", &requires_a, &[]),
         system_definition(c"c", &[], &wanted_by_d),
         system_definition(c"d", &[], &[]),
+        system_definition(c"e", &requires_a_and_c, &[]),
     ];
     systems[0].runner = Some(run_a);
     systems[1].runner = Some(run_b);
     systems[2].runner = Some(run_c);
     systems[3].runner = Some(run_d);
+    systems[4].runner = Some(run_e);
 
     let mut scene = Scene::new();
     let plugin = load_systems(&scene, &systems);
-    for name in ["d", "c", "a", "b"] {
+    for name in ["d", "c", "a", "b", "e"] {
         let system_type = scene.resolve_system_type_id(plugin, name).unwrap();
         scene.add_system(plugin, system_type).unwrap();
     }
@@ -123,6 +144,8 @@ fn tick_honors_requires_and_wanted_by() {
     let position = |name| order.iter().position(|entry| *entry == name).unwrap();
     assert!(position("a") < position("b"));
     assert!(position("c") < position("d"));
+    assert!(position("a") < position("e"));
+    assert!(position("c") < position("e"));
 }
 
 #[test]
@@ -173,4 +196,34 @@ fn systems_removed_during_tick_finish_the_current_tick() {
 
     scene.tick();
     assert_eq!(REMOVED_RUNS.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn tick_runs_ready_systems_without_waiting_for_unrelated_systems() {
+    if thread::available_parallelism().map_or(1, usize::from) < 2 {
+        return;
+    }
+
+    SLOW_FINISHED.store(false, Ordering::Relaxed);
+    DEPENDENT_RAN_BEFORE_SLOW_FINISHED.store(false, Ordering::Relaxed);
+    let requires_fast = [c"fast".as_ptr()];
+    let mut systems = [
+        system_definition(c"slow", &[], &[]),
+        system_definition(c"fast", &[], &[]),
+        system_definition(c"after_fast", &requires_fast, &[]),
+    ];
+    systems[0].runner = Some(run_slow);
+    systems[2].runner = Some(run_after_fast);
+
+    let mut scene = Scene::new();
+    let plugin = load_systems(&scene, &systems);
+    for name in ["slow", "fast", "after_fast"] {
+        let system_type = scene.resolve_system_type_id(plugin, name).unwrap();
+        scene.add_system(plugin, system_type).unwrap();
+    }
+
+    scene.tick();
+
+    assert!(DEPENDENT_RAN_BEFORE_SLOW_FINISHED.load(Ordering::Relaxed));
+    assert!(SLOW_FINISHED.load(Ordering::Acquire));
 }

@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, ffi::c_void, path::Path, sync::RwLock};
+use std::{
+    collections::BTreeMap,
+    ffi::c_void,
+    path::Path,
+    sync::{RwLock, mpsc},
+};
 
 use crate::{
     definitions::plugins::PluginDefinition,
@@ -17,6 +22,7 @@ use crate::{
         plugins::Plugin,
         system_storage::SystemStorage,
         system_storage_snapshot::SystemStorageSnapshot,
+        thread_pool::ThreadPool,
     },
 };
 
@@ -55,10 +61,15 @@ pub struct Scene {
     entities: RwLock<EntityStorage>,
     plugins: RwLock<PluginStorage>,
     assets: RwLock<AssetStorage>,
+    thread_pool: ThreadPool,
 }
 
 impl Scene {
     /// Creates a new empty scene
+    ///
+    /// # Panics
+    ///
+    /// Panics if one of the worker threads cannot be created.
     pub fn new() -> Self {
         Self::default()
     }
@@ -878,17 +889,46 @@ impl Scene {
         Ok(())
     }
 
-    /// Runs every system once in dependency order.
+    /// Runs every system once, in parallel where dependencies allow it.
     ///
-    /// Systems are run sequentially. Additions and removals made by a runner
-    /// take effect on the next tick.
+    /// Additions and removals made by a runner take effect on the next tick.
+    /// Returns only after every scheduled system has finished and the scene's
+    /// thread pool is idle.
     pub fn tick(&mut self) {
         let mut snapshot =
             SystemStorageSnapshot::new(&self.systems.read().expect("scene system lock poisoned"));
+        let system_count = snapshot.len();
+        let scene = self as *const Self as usize;
+        let (completed, completions) = mpsc::channel();
 
-        while let Some((runner, type_ids)) = snapshot.next() {
-            unsafe { runner(self, type_ids.as_ptr(), type_ids.len()) };
+        let schedule = |(id, (runner, type_ids)): (
+            SystemID,
+            (crate::definitions::systems::Runner, Vec<TypeID>),
+        )| {
+            let completed = completed.clone();
+            self.thread_pool.execute(move || {
+                // SAFETY: `tick` holds an exclusive borrow of the Scene and
+                // waits for the pool to become idle before returning, so the
+                // Scene remains alive and stationary for the whole callback.
+                unsafe { runner(scene as *const Self, type_ids.as_ptr(), type_ids.len()) };
+                completed
+                    .send(id)
+                    .expect("tick stopped receiving system completions");
+            });
+        };
+
+        for execution in snapshot.take_ready() {
+            schedule(execution);
         }
+        for _ in 0..system_count {
+            let id = completions
+                .recv()
+                .expect("system task ended without reporting completion");
+            for execution in snapshot.complete(id) {
+                schedule(execution);
+            }
+        }
+        self.thread_pool.wait_until_idle();
     }
 }
 
