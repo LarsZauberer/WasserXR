@@ -37,11 +37,6 @@ pub(crate) type QueriedComponentFields = (ComponentID, Vec<(FieldID, *mut c_void
 /// Resolved component requests grouped by entity.
 type ResolvedEntities = Vec<(EntityID, ResolvedComponentQuery)>;
 
-/// Unique requested fields grouped into a stable component lock order. A write
-/// request supersedes read requests for the same field.
-type PendingComponentLocks =
-    BTreeMap<EntityID, BTreeMap<ComponentID, BTreeMap<FieldID, FieldAccess>>>;
-
 /// Stores each queried pointer by its concrete location. Duplicate logical
 /// requests use the same entry.
 type LockedComponentFields = BTreeMap<(EntityID, ComponentID, FieldID), *mut c_void>;
@@ -52,17 +47,14 @@ fn plan_component_query(
     requests: &[ComponentQuery<'_>],
 ) -> Result<(ResolvedEntities, ResolvedEntities), SceneError> {
     let mut matches = Vec::new();
-    let mut pending = PendingComponentLocks::new();
+    let mut plans = Vec::new();
     for (entity_id, entity) in entities.iter() {
         let Some(components) = entity.resolve_query(requests).map_err(SceneError::from)? else {
             continue;
         };
+        let mut pending = BTreeMap::<ComponentID, BTreeMap<FieldID, FieldAccess>>::new();
         for (component_id, fields) in &components {
-            let pending_fields = pending
-                .entry(entity_id)
-                .or_default()
-                .entry(*component_id)
-                .or_default();
+            let pending_fields = pending.entry(*component_id).or_default();
             for (field_id, access) in fields {
                 pending_fields
                     .entry(*field_id)
@@ -74,20 +66,16 @@ fn plan_component_query(
                     .or_insert(*access);
             }
         }
-        matches.push((entity_id, components));
-    }
-
-    let plan = pending
-        .into_iter()
-        .map(|(entity_id, components)| {
-            let components = components
+        plans.push((
+            entity_id,
+            pending
                 .into_iter()
                 .map(|(component_id, fields)| (component_id, fields.into_iter().collect()))
-                .collect::<Vec<_>>();
-            (entity_id, components)
-        })
-        .collect::<Vec<_>>();
-    Ok((matches, plan))
+                .collect(),
+        ));
+        matches.push((entity_id, components));
+    }
+    Ok((matches, plans))
 }
 
 /// Acquires the complete lock plan recursively, keeping every prior guard on
