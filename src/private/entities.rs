@@ -9,28 +9,6 @@ use crate::{
 
 type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, Component>;
 
-/// Recursively locks each component's fields so earlier locks remain alive
-/// while later components and the final action are processed.
-fn lock_component_fields<T>(
-    components: &ComponentStorage,
-    requests: &[ResolvedComponent],
-    fields: &mut Vec<QueriedComponentFields>,
-    action: impl FnOnce(&[QueriedComponentFields]) -> T,
-) -> Result<T, EntityError> {
-    let Some(((component_id, requested_fields), remaining)) = requests.split_first() else {
-        return Ok(action(fields));
-    };
-    let component = components
-        .get(*component_id)
-        .ok_or(EntityError::ComponentNotFound)?;
-    component
-        .query_fields(requested_fields, |component_fields| {
-            fields.push((*component_id, component_fields.to_vec()));
-            lock_component_fields(components, remaining, fields, action)
-        })
-        .map_err(EntityError::from)?
-}
-
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
 #[derive(Debug, Default)]
@@ -139,33 +117,32 @@ impl Entity {
             .components
             .read()
             .expect("entity component lock poisoned");
-        requests
-            .iter()
-            .map(|(plugin_id, component_type_id, fields)| {
-                let Some(component_id) = components.resolve_id(&(*plugin_id, *component_type_id))
-                else {
-                    return Ok(None);
-                };
-                let component = components
-                    .get(component_id)
-                    .expect("resolved component missing");
-                let fields = fields
-                    .iter()
-                    .map(|(field_type_id, access)| {
-                        component
-                            .resolve_field_id(*field_type_id)
-                            .map(|field_id| (field_id, *access))
-                            .map_err(EntityError::from)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(Some((component_id, fields)))
-            })
-            .collect::<Result<Option<Vec<_>>, _>>()
+        let mut resolved = Vec::with_capacity(requests.len());
+        for (plugin_id, component_type_id, fields) in requests {
+            let Some(component_id) = components.resolve_id(&(*plugin_id, *component_type_id))
+            else {
+                return Ok(None);
+            };
+            let component = components
+                .get(component_id)
+                .expect("resolved component missing");
+            let mut resolved_fields = Vec::with_capacity(fields.len());
+            for (field_type_id, access) in *fields {
+                resolved_fields.push((
+                    component
+                        .resolve_field_id(*field_type_id)
+                        .map_err(EntityError::from)?,
+                    *access,
+                ));
+            }
+            resolved.push((component_id, resolved_fields));
+        }
+        Ok(Some(resolved))
     }
 
     /// Locks fields across multiple components in the supplied component-ID
     /// order and holds every lock until `action` returns.
-    pub(crate) fn query_components<T>(
+    pub(crate) fn with_locked_fields<T>(
         &self,
         requests: &[ResolvedComponent],
         action: impl FnOnce(&[QueriedComponentFields]) -> T,
@@ -174,12 +151,28 @@ impl Entity {
             .components
             .read()
             .expect("entity component lock poisoned");
-        lock_component_fields(
-            &components,
-            requests,
-            &mut Vec::with_capacity(requests.len()),
-            action,
-        )
+        let mut locked = Vec::with_capacity(requests.len());
+        for (component_id, requested_fields) in requests {
+            let component = components
+                .get(*component_id)
+                .ok_or(EntityError::ComponentNotFound)?;
+            locked.push((
+                *component_id,
+                component
+                    .lock_fields(requested_fields)
+                    .map_err(EntityError::from)?,
+            ));
+        }
+        let fields = locked
+            .iter()
+            .map(|(component_id, fields)| {
+                (
+                    *component_id,
+                    fields.iter().map(|field| field.field()).collect(),
+                )
+            })
+            .collect::<Vec<QueriedComponentFields>>();
+        Ok(action(&fields))
     }
 
     /// Get the name of a [`Component`] from a [`ComponentID`]

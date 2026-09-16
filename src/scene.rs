@@ -534,15 +534,27 @@ impl Scene {
     ) -> Result<T, SceneError> {
         // Loading requires write access, so finish it before taking the shared
         // asset lock that protects every pointer passed to the callback.
-        let asset_ids = requests
-            .iter()
-            .map(|(plugin_id, asset_type_id, data_string, _)| {
-                self.get_asset_id(*plugin_id, *asset_type_id, data_string)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut requested_assets = Vec::with_capacity(requests.len());
+        for (plugin_id, asset_type_id, data_string, fields) in requests {
+            let asset_id = self.get_asset_id(*plugin_id, *asset_type_id, data_string)?;
+            requested_assets.push((asset_id, *fields));
+        }
+
         let assets = self.assets.read().expect("scene asset lock poisoned");
-        let fields = query::asset_query_results(&assets, requests, &asset_ids)?;
-        Ok(action(&fields))
+        let mut results = Vec::with_capacity(requested_assets.len());
+        for (asset_id, requested_fields) in requested_assets {
+            let asset = assets.get(asset_id).ok_or(SceneError::AssetNotFound)?;
+            let mut fields = Vec::with_capacity(requested_fields.len());
+            for field_type_id in requested_fields {
+                let field_id = asset
+                    .resolve_field_id(*field_type_id)
+                    .map_err(SceneError::from)?;
+                let pointer = asset.get_field(field_id).map_err(SceneError::from)?;
+                fields.push((field_id, pointer));
+            }
+            results.push(fields);
+        }
+        Ok(action(&results))
     }
 
     /// Gets an existing concrete system ID from its plugin and system type.

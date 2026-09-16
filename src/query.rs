@@ -1,15 +1,15 @@
 //! Query request, result, resolution, and locking support.
 
-use std::{collections::HashMap, ffi::c_void};
+use std::{collections::BTreeMap, ffi::c_void};
 
 use crate::{
     errors::SceneError,
     field::FieldAccess,
     ids::{
-        AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
-        EntityID, FieldID, FieldTypeID, PluginID,
+        AssetFieldTypeID, AssetTypeID, ComponentID, ComponentTypeID, EntityID, FieldID,
+        FieldTypeID, PluginID,
     },
-    scene::{AssetStorage, EntityStorage},
+    scene::EntityStorage,
 };
 
 /// One asset request: its plugin, type, data string, and requested field types.
@@ -34,82 +34,60 @@ pub(crate) type ResolvedComponentQuery = Vec<ResolvedComponent>;
 /// One queried component and the locked fields returned for it.
 pub(crate) type QueriedComponentFields = (ComponentID, Vec<(FieldID, *mut c_void)>);
 
-/// Resolved component requests for each matching entity.
-type ComponentQueryMatches = Vec<(EntityID, ResolvedComponentQuery)>;
-
-/// Unique component fields arranged in their stable global acquisition order.
-type ComponentLockPlan = Vec<(EntityID, ResolvedComponentQuery)>;
+/// Resolved component requests grouped by entity.
+type ResolvedEntities = Vec<(EntityID, ResolvedComponentQuery)>;
 
 /// Unique requested fields gathered before conversion to a stable lock order.
 /// A write request supersedes read requests for the same field.
-type PendingComponentLocks = HashMap<EntityID, HashMap<ComponentID, HashMap<FieldID, FieldAccess>>>;
+type PendingComponentLocks =
+    BTreeMap<EntityID, BTreeMap<ComponentID, BTreeMap<FieldID, FieldAccess>>>;
 
 /// Stores each physically locked field by its concrete location. Duplicate
 /// logical requests use the same entry, so a field is never locked twice by
 /// one query. It acts as a cache of locked fields within that query.
-type LockedComponentFields = HashMap<(EntityID, ComponentID, FieldID), *mut c_void>;
+type LockedComponentFields = BTreeMap<(EntityID, ComponentID, FieldID), *mut c_void>;
 
-fn add_component_locks(
-    pending: &mut PendingComponentLocks,
-    entity_id: EntityID,
-    components: &ResolvedComponentQuery,
-) {
-    for (component_id, fields) in components {
-        for (field_id, access) in fields {
-            pending
-                .entry(entity_id)
-                .or_default()
-                .entry(*component_id)
-                .or_default()
-                .entry(*field_id)
-                .and_modify(|current| {
-                    if *access == FieldAccess::Write {
-                        *current = FieldAccess::Write;
-                    }
-                })
-                .or_insert(*access);
-        }
-    }
-}
-
-/// Finds the matching entities and gathers their unique field locks. Matching
-/// order follows the scene's entity order.
-fn resolve_component_query(
+/// Finds matching entities and builds their unique, globally ordered lock plan.
+fn plan_component_query(
     entities: &EntityStorage,
     requests: &[ComponentQuery<'_>],
-) -> Result<(ComponentQueryMatches, PendingComponentLocks), SceneError> {
+) -> Result<(ResolvedEntities, ResolvedEntities), SceneError> {
     let mut matches = Vec::new();
     let mut pending = PendingComponentLocks::new();
     for (entity_id, entity) in entities.iter() {
         let Some(components) = entity.resolve_query(requests).map_err(SceneError::from)? else {
             continue;
         };
-        add_component_locks(&mut pending, entity_id, &components);
+        for (component_id, fields) in &components {
+            for (field_id, access) in fields {
+                pending
+                    .entry(entity_id)
+                    .or_default()
+                    .entry(*component_id)
+                    .or_default()
+                    .entry(*field_id)
+                    .and_modify(|current| {
+                        if *access == FieldAccess::Write {
+                            *current = FieldAccess::Write;
+                        }
+                    })
+                    .or_insert(*access);
+            }
+        }
         matches.push((entity_id, components));
     }
-    Ok((matches, pending))
-}
 
-/// Converts the gathered locks to a stable global acquisition order. This
-/// prevents two concurrent queries from deadlocking on reversed requests.
-fn order_component_locks(pending: PendingComponentLocks) -> ComponentLockPlan {
-    let mut entities = pending
+    let plan = pending
         .into_iter()
         .map(|(entity_id, components)| {
-            let mut components = components
+            let components = components
                 .into_iter()
-                .map(|(component_id, fields)| {
-                    let mut fields = fields.into_iter().collect::<Vec<_>>();
-                    fields.sort_by_key(|(field_id, _)| *field_id);
-                    (component_id, fields)
-                })
+                .map(|(component_id, fields)| (component_id, fields.into_iter().collect()))
                 .collect::<Vec<_>>();
-            components.sort_by_key(|(component_id, _)| *component_id);
             (entity_id, components)
         })
         .collect::<Vec<_>>();
-    entities.sort_by_key(|(entity_id, _)| *entity_id);
-    entities
+    Ok((matches, plan))
 }
 
 /// Acquires the complete lock plan recursively, keeping every prior guard on
@@ -125,7 +103,7 @@ fn with_locked_component_fields<T>(
     };
     let entity = entities.get(*entity_id).ok_or(SceneError::EntityNotFound)?;
     entity
-        .query_components(components, |component_fields| {
+        .with_locked_fields(components, |component_fields| {
             for (component_id, fields) in component_fields {
                 for (field_id, pointer) in fields {
                     locked.insert((*entity_id, *component_id, *field_id), *pointer);
@@ -139,7 +117,7 @@ fn with_locked_component_fields<T>(
 /// Rebuilds the public entity/component shape in request order from the
 /// uniquely locked physical fields.
 fn component_query_results(
-    matches: &ComponentQueryMatches,
+    matches: &ResolvedEntities,
     locked: &LockedComponentFields,
 ) -> ComponentQueryResult {
     matches
@@ -168,36 +146,8 @@ pub(crate) fn query_components<T>(
     requests: &[ComponentQuery<'_>],
     action: impl FnOnce(&ComponentQueryResult) -> T,
 ) -> Result<T, SceneError> {
-    let (matches, pending) = resolve_component_query(entities, requests)?;
-    let plans = order_component_locks(pending);
-    with_locked_component_fields(entities, &plans, &mut HashMap::new(), |locked| {
+    let (matches, plans) = plan_component_query(entities, requests)?;
+    with_locked_component_fields(entities, &plans, &mut BTreeMap::new(), |locked| {
         action(&component_query_results(&matches, locked))
     })
-}
-
-/// Resolves the requested fields while the asset collection is read-locked.
-pub(crate) fn asset_query_results(
-    assets: &AssetStorage,
-    requests: &[AssetQuery<'_>],
-    asset_ids: &[AssetID],
-) -> Result<Vec<Vec<(AssetFieldID, *const c_void)>>, SceneError> {
-    requests
-        .iter()
-        .zip(asset_ids)
-        .map(|((_, _, _, field_type_ids), asset_id)| {
-            let asset = assets.get(*asset_id).ok_or(SceneError::AssetNotFound)?;
-            field_type_ids
-                .iter()
-                .map(|field_type_id| {
-                    let field_id = asset
-                        .resolve_field_id(*field_type_id)
-                        .map_err(SceneError::from)?;
-                    asset
-                        .get_field(field_id)
-                        .map(|pointer| (field_id, pointer))
-                        .map_err(SceneError::from)
-                })
-                .collect()
-        })
-        .collect()
 }
