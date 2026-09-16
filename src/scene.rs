@@ -98,11 +98,8 @@ impl Scene {
             .collect()
     }
 
-    /// This will reset the scene's main objects. Meaning it will remove all the
-    /// entities, components and systems
-    ///
-    /// It will **not** unload any plugins
-    pub fn reset(&self) -> Result<(), SceneError> {
+    /// Removes all systems from the scene and runs their detachers.
+    pub fn reset_systems(&self) {
         // Replace the old system ID store with a fresh, empty one before detaching
         // its systems.
         let systems =
@@ -110,11 +107,29 @@ impl Scene {
         for system in systems.into_values() {
             system.detach(self);
         }
+    }
+
+    /// Removes all entities and their components from the scene.
+    pub fn reset_entities(&self) {
         let entities =
             std::mem::take(&mut *self.entities.write().expect("scene entity lock poisoned"));
         drop(entities);
+    }
+
+    /// Removes all cached assets from the scene.
+    pub fn reset_assets(&self) {
         let assets = std::mem::take(&mut *self.assets.write().expect("scene asset lock poisoned"));
         drop(assets);
+    }
+
+    /// This will reset the scene's main objects. Meaning it will remove all the
+    /// entities, components, systems, and cached assets.
+    ///
+    /// It will **not** unload any plugins
+    pub fn reset(&self) -> Result<(), SceneError> {
+        self.reset_systems();
+        self.reset_entities();
+        self.reset_assets();
         Ok(())
     }
 
