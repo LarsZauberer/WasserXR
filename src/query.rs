@@ -135,6 +135,7 @@ pub(crate) fn query_components<T>(
     action: impl FnOnce(&ComponentQueryResult) -> T,
 ) -> Result<T, SceneError> {
     let (matches, plans) = plan_component_query(entities, requests)?;
+    // Assert that all entities are globaly sorted in the plan
     debug_assert!(
         plans
             .windows(2)
