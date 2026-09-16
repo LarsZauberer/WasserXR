@@ -8,7 +8,7 @@ use crate::{
     query::{ComponentQuery, QueriedComponentFields, ResolvedComponent, ResolvedComponentQuery},
 };
 
-type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, RwLock<Component>>;
+type ComponentStorage = IDStore<(PluginID, ComponentTypeID), ComponentID, Component>;
 
 /// Recursively locks each component's fields so earlier locks remain alive
 /// while later components and the final action are processed.
@@ -23,9 +23,7 @@ fn lock_component_fields<T>(
     };
     let component = components
         .get(*component_id)
-        .ok_or(EntityError::ComponentNotFound)?
-        .read()
-        .expect("component lock poisoned");
+        .ok_or(EntityError::ComponentNotFound)?;
     component
         .query_fields(requested_fields, |component_fields| {
             fields.push((*component_id, component_fields.to_vec()));
@@ -60,7 +58,7 @@ impl Entity {
             .read()
             .expect("entity component lock poisoned");
         let component = components.get(id).ok_or(EntityError::ComponentNotFound)?;
-        action(&component.read().expect("component lock poisoned"))
+        action(component)
     }
 
     /// Add a new component to the entity. The function will reject the add, if
@@ -80,7 +78,7 @@ impl Entity {
         if components.contains_name(&type_id) {
             return Err(EntityError::ComponentAlreadyExists);
         }
-        Ok(components.insert_named(type_id, RwLock::new(component)))
+        Ok(components.insert_named(type_id, component))
     }
 
     /// Remove a component from the entity
@@ -91,9 +89,7 @@ impl Entity {
             .expect("entity component lock poisoned");
         let component = components
             .remove(id)
-            .ok_or(EntityError::ComponentNotFound)?
-            .into_inner()
-            .expect("component lock poisoned");
+            .ok_or(EntityError::ComponentNotFound)?;
         drop(components);
         drop(component);
         Ok(())
@@ -167,9 +163,7 @@ impl Entity {
                 };
                 let component = components
                     .get(component_id)
-                    .expect("resolved component missing")
-                    .read()
-                    .expect("component lock poisoned");
+                    .expect("resolved component missing");
                 let fields = fields
                     .iter()
                     .map(|(field_type_id, access)| {

@@ -81,7 +81,6 @@ fn resolve_component_queries(
     for group in groups {
         let mut group_matches = Vec::new();
         for (entity_id, entity) in entities.iter() {
-            let entity = entity.read().expect("entity lock poisoned");
             let Some(components) = entity.resolve_query(group).map_err(SceneError::from)? else {
                 continue;
             };
@@ -126,11 +125,7 @@ fn with_locked_component_fields<T>(
     let Some(((entity_id, components), remaining)) = plans.split_first() else {
         return Ok(action(locked));
     };
-    let entity = entities
-        .get(*entity_id)
-        .ok_or(SceneError::EntityNotFound)?
-        .read()
-        .expect("entity lock poisoned");
+    let entity = entities.get(*entity_id).ok_or(SceneError::EntityNotFound)?;
     entity
         .query_components(components, |component_fields| {
             for (component_id, fields) in component_fields {

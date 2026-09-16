@@ -20,7 +20,7 @@ use crate::{
     query::{self, AssetQuery, ComponentQuery, ComponentQueryResult},
 };
 
-pub(crate) type EntityStorage = IDStore<String, EntityID, RwLock<Entity>>;
+pub(crate) type EntityStorage = IDStore<String, EntityID, Entity>;
 
 /// # Design Decision
 ///
@@ -63,7 +63,7 @@ impl Scene {
         self.entities
             .write()
             .expect("scene entity lock poisoned")
-            .insert(RwLock::new(entity))
+            .insert(entity)
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -136,7 +136,7 @@ impl Scene {
     ) -> Result<T, SceneError> {
         let entities = self.entities.read().expect("scene entity lock poisoned");
         let entity = entities.get(id).ok_or(SceneError::EntityNotFound)?;
-        action(&entity.read().expect("entity lock poisoned"))
+        action(entity)
     }
 
     /// Load a plugin from a shared object library.
