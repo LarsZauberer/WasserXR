@@ -1,8 +1,8 @@
-use std::sync::RwLock;
+use std::{ffi::c_void, sync::RwLock};
 
 use crate::{
     errors::EntityError,
-    field::{Field, FieldAccess},
+    field::FieldAccess,
     ids::{ComponentID, ComponentTypeID, FieldID, FieldTypeID, PluginID},
     private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
     query::{ComponentQuery, QueriedComponentFields, ResolvedComponent, ResolvedComponentQuery},
@@ -135,7 +135,7 @@ impl Entity {
         &self,
         component_id: ComponentID,
         requests: &[(FieldID, FieldAccess)],
-        action: impl FnOnce(&[Field]) -> T,
+        action: impl FnOnce(&[(FieldID, *mut c_void)]) -> T,
     ) -> Result<T, EntityError> {
         self.with_component(component_id, |component| {
             component

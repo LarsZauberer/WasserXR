@@ -12,7 +12,6 @@ use wasserxr::{
         assets::AssetDefinition, fields::AssetFieldDefinition, plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
-    field::AssetField,
     ids::{AssetFieldTypeID, AssetTypeID, PluginID},
     scene::Scene,
     utils::version::Version,
@@ -164,9 +163,8 @@ fn asset_field_can_be_read() {
         .query_assets(&requests, |assets| {
             assert_eq!(assets.len(), 2);
             assert!(assets.iter().all(|fields| fields.len() == 1));
-            assert!(matches!(assets[0][0], AssetField::Read(id, _) if id == first_field));
-            for field in assets.iter().flatten() {
-                let AssetField::Read(_, value) = field;
+            assert_eq!(assets[0][0].0, first_field);
+            for (_, value) in assets.iter().flatten() {
                 assert_eq!(unsafe { *value.cast::<usize>() }, 42);
             }
         })

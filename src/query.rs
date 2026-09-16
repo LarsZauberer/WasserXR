@@ -1,13 +1,13 @@
 //! Query request, result, resolution, and locking support.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::c_void};
 
 use crate::{
     errors::SceneError,
-    field::{AssetField, Field, FieldAccess},
+    field::FieldAccess,
     ids::{
-        AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID, EntityID, FieldID,
-        FieldTypeID, PluginID,
+        AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
+        EntityID, FieldID, FieldTypeID, PluginID,
     },
     scene::{AssetStorage, EntityStorage},
 };
@@ -19,8 +19,10 @@ pub type AssetQuery<'a> = (PluginID, AssetTypeID, &'a str, &'a [AssetFieldTypeID
 pub type ComponentQuery<'a> = (PluginID, ComponentTypeID, &'a [(FieldTypeID, FieldAccess)]);
 
 /// Results for one query group, grouped by matching entity and then by
-/// concrete component ID.
-pub type ComponentQueryResult = Vec<(EntityID, Vec<(ComponentID, Vec<Field>)>)>;
+/// concrete component ID. Field access is governed by its corresponding
+/// [`ComponentQuery`] request, and each pointer is valid only during the query
+/// callback.
+pub type ComponentQueryResult = Vec<(EntityID, Vec<(ComponentID, Vec<(FieldID, *mut c_void)>)>)>;
 
 /// A component request after its type IDs have been resolved to concrete IDs
 /// for one entity.
@@ -30,7 +32,7 @@ pub(crate) type ResolvedComponent = (ComponentID, Vec<(FieldID, FieldAccess)>);
 pub(crate) type ResolvedComponentQuery = Vec<ResolvedComponent>;
 
 /// One queried component and the locked fields returned for it.
-pub(crate) type QueriedComponentFields = (ComponentID, Vec<Field>);
+pub(crate) type QueriedComponentFields = (ComponentID, Vec<(FieldID, *mut c_void)>);
 
 /// Resolved component requests grouped by query group and matching entity.
 type ComponentQueryMatches = Vec<Vec<(EntityID, ResolvedComponentQuery)>>;
@@ -45,7 +47,7 @@ type PendingComponentLocks = HashMap<EntityID, HashMap<ComponentID, HashMap<Fiel
 /// Stores each physically locked field by its concrete location. Duplicate
 /// logical requests use the same entry, so a field is never locked twice by
 /// one query. It acts as a cache of locked fields within that query.
-type LockedComponentFields = HashMap<(EntityID, ComponentID, FieldID), Field>;
+type LockedComponentFields = HashMap<(EntityID, ComponentID, FieldID), *mut c_void>;
 
 fn add_component_locks(
     pending: &mut PendingComponentLocks,
@@ -129,23 +131,13 @@ fn with_locked_component_fields<T>(
     entity
         .query_components(components, |component_fields| {
             for (component_id, fields) in component_fields {
-                for field in fields {
-                    let field_id = match field {
-                        Field::Read(id, _) | Field::Write(id, _) => *id,
-                    };
-                    locked.insert((*entity_id, *component_id, field_id), *field);
+                for (field_id, pointer) in fields {
+                    locked.insert((*entity_id, *component_id, *field_id), *pointer);
                 }
             }
             with_locked_component_fields(entities, remaining, locked, action)
         })
         .map_err(SceneError::from)?
-}
-
-fn requested_field(access: FieldAccess, locked: Field) -> Field {
-    match (access, locked) {
-        (FieldAccess::Read, Field::Write(id, pointer)) => Field::Read(id, pointer.cast_const()),
-        (_, field) => field,
-    }
 }
 
 /// Rebuilds the public group/entity/component shape in request order from the
@@ -165,11 +157,8 @@ fn component_query_results(
                         .map(|(component_id, fields)| {
                             let fields = fields
                                 .iter()
-                                .map(|(field_id, access)| {
-                                    requested_field(
-                                        *access,
-                                        locked[&(*entity_id, *component_id, *field_id)],
-                                    )
+                                .map(|(field_id, _)| {
+                                    (*field_id, locked[&(*entity_id, *component_id, *field_id)])
                                 })
                                 .collect();
                             (*component_id, fields)
@@ -200,7 +189,7 @@ pub(crate) fn asset_query_results(
     assets: &AssetStorage,
     requests: &[AssetQuery<'_>],
     asset_ids: &[AssetID],
-) -> Result<Vec<Vec<AssetField>>, SceneError> {
+) -> Result<Vec<Vec<(AssetFieldID, *const c_void)>>, SceneError> {
     requests
         .iter()
         .zip(asset_ids)
@@ -214,7 +203,7 @@ pub(crate) fn asset_query_results(
                         .map_err(SceneError::from)?;
                     asset
                         .get_field(field_id)
-                        .map(|pointer| AssetField::Read(field_id, pointer))
+                        .map(|pointer| (field_id, pointer))
                         .map_err(SceneError::from)
                 })
                 .collect()

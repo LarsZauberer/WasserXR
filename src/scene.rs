@@ -1,9 +1,9 @@
-use std::{path::Path, sync::RwLock};
+use std::{ffi::c_void, path::Path, sync::RwLock};
 
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::{PluginCompatibilityError, PluginError, SceneError, SystemError},
-    field::{AssetField, Field, FieldAccess},
+    field::FieldAccess,
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
         EntityID, FieldID, FieldTypeID, PluginID, SystemID, SystemTypeID, TypeID,
@@ -448,14 +448,16 @@ impl Scene {
     ///
     /// The fields are locked in field-ID order to avoid ordering deadlocks, but
     /// are passed to `action` in the order requested. They remain locked until
-    /// `action` returns. Write access to an immutable field returns
-    /// [`crate::errors::FieldError::NotMutable`].
+    /// `action` returns, and their pointers are valid only during that
+    /// callback. A pointer may be mutated only when its corresponding
+    /// request uses [`FieldAccess::Write`]. Write access to an immutable
+    /// field returns [`crate::errors::FieldError::NotMutable`].
     pub fn query_single_component<T>(
         &self,
         entity_id: EntityID,
         component_id: ComponentID,
         requests: &[(FieldID, FieldAccess)],
-        action: impl FnOnce(&[Field]) -> T,
+        action: impl FnOnce(&[(FieldID, *mut c_void)]) -> T,
     ) -> Result<T, SceneError> {
         self.with_entity(entity_id, |entity| {
             entity
@@ -468,7 +470,9 @@ impl Scene {
     /// once while every returned field remains locked.
     ///
     /// An entity matches a group when it contains every component in that
-    /// group. Results preserve group, entity, component, and field order.
+    /// group. Results preserve group, entity, component, and field order. Field
+    /// access is governed by each corresponding request, and pointers are valid
+    /// only during the callback.
     pub fn query_components<T>(
         &self,
         groups: &[&[ComponentQuery<'_>]],
@@ -544,11 +548,12 @@ impl Scene {
     }
 
     /// Loads and queries asset fields, keeping all assets alive until the
-    /// single callback returns.
+    /// single callback returns. The returned read-only pointers are valid only
+    /// during that callback.
     pub fn query_assets<T>(
         &self,
         requests: &[AssetQuery<'_>],
-        action: impl FnOnce(&[Vec<AssetField>]) -> T,
+        action: impl FnOnce(&[Vec<(AssetFieldID, *const c_void)>]) -> T,
     ) -> Result<T, SceneError> {
         // Loading requires write access, so finish it before taking the shared
         // asset lock that protects every pointer passed to the callback.

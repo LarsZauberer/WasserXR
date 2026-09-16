@@ -6,7 +6,7 @@ use std::{
 use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
-    field::{Field, FieldAccess},
+    field::FieldAccess,
     ids::{FieldID, FieldTypeID, PluginID},
     private::{
         fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
@@ -23,8 +23,7 @@ use crate::{
 /// # Usage
 ///
 /// [`Component::query_fields`] creates these after sorting requests by field
-/// ID, then converts them to the public [`Field`] values passed to the
-/// callback.
+/// ID, then exposes their raw pointers to the callback.
 ///
 /// # Design decision
 ///
@@ -45,10 +44,10 @@ enum LockedField<'a> {
 }
 
 impl LockedField<'_> {
-    fn field(&self) -> Field {
+    fn field(&self) -> (FieldID, *mut c_void) {
         match self {
-            Self::Read { id, pointer, .. } => Field::Read(*id, *pointer),
-            Self::Write { id, pointer, .. } => Field::Write(*id, *pointer),
+            Self::Read { id, pointer, .. } => (*id, pointer.cast_mut()),
+            Self::Write { id, pointer, .. } => (*id, *pointer),
         }
     }
 }
@@ -66,7 +65,7 @@ pub(crate) struct Component {
     /// to the field pointers. From a concrete [`ComponentField`] or more
     /// precisely a [`RwLockWriteGuard<'a, ComponentField>`] a
     /// [`LockedField<'a>`] is then created that encompasses the state that the
-    /// Field is locked and carries the pointer with it.
+    /// field is locked and carries the pointer with it.
     fields: IDStore<FieldTypeID, FieldID, RwLock<ComponentField>>,
     destroyer: Destroyer,
     data: *mut c_void,
@@ -145,7 +144,7 @@ impl Component {
     pub(crate) fn query_fields<T>(
         &self,
         requests: &[(FieldID, FieldAccess)],
-        action: impl FnOnce(&[Field]) -> T,
+        action: impl FnOnce(&[(FieldID, *mut c_void)]) -> T,
     ) -> Result<T, ComponentError> {
         let mut requests = requests.iter().copied().enumerate().collect::<Vec<_>>();
         requests.sort_by_key(|(_, (field, _))| *field);
