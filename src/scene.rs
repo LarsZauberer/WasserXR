@@ -443,20 +443,20 @@ impl Scene {
         })
     }
 
-    /// Queries groups of components across all entities and invokes `action`
-    /// once while every returned field remains locked.
+    /// Queries components across all entities and invokes `action` once while
+    /// every returned field remains locked.
     ///
-    /// An entity matches a group when it contains every component in that
-    /// group. Results preserve group, entity, component, and field order. Field
-    /// access is governed by each corresponding request, and pointers are valid
-    /// only during the callback.
+    /// An entity matches when it contains every requested component. Results
+    /// preserve entity, component, and field order. Field access is governed by
+    /// each corresponding request, and pointers are valid only during the
+    /// callback.
     pub fn query_components<T>(
         &self,
-        groups: &[&[ComponentQuery<'_>]],
-        action: impl FnOnce(&[ComponentQueryResult]) -> T,
+        requests: &[ComponentQuery<'_>],
+        action: impl FnOnce(&ComponentQueryResult) -> T,
     ) -> Result<T, SceneError> {
         let entities = self.entities.read().expect("scene entity lock poisoned");
-        query::query_components(&entities, groups, action)
+        query::query_components(&entities, requests, action)
     }
 
     /// Resolve the [`AssetID`] from a given asset type and data string.

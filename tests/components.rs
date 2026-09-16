@@ -123,7 +123,7 @@ fn empty_scene_cannot_add_component() {
 }
 
 #[rstest]
-fn component_queries_group_matching_entities_and_call_action_once(scene: Scene) {
+fn component_query_matches_entities_preserves_order_and_calls_action_once(scene: Scene) {
     use std::cell::Cell;
 
     let _guard = TEST_LOCK.lock().unwrap();
@@ -175,45 +175,60 @@ fn component_queries_group_matching_entities_and_call_action_once(scene: Scene) 
         [first_mutable_field, first_immutable_field]
     };
     let read_fields = [(mutable_field, FieldAccess::Read)];
+    let duplicate_write_fields = [(mutable_field, FieldAccess::Write)];
     let other_fields = [(other_field, FieldAccess::Read)];
     let all_with_component = [(plugin, component_type, requested_fields.as_slice())];
     let only_first_entity = [
         (plugin, component_type, read_fields.as_slice()),
         (plugin, other_type, other_fields.as_slice()),
+        (plugin, component_type, duplicate_write_fields.as_slice()),
     ];
-    let groups = [all_with_component.as_slice(), only_first_entity.as_slice()];
     let calls = Cell::new(0);
 
     scene
-        .query_components(&groups, |results| {
+        .query_components(&all_with_component, |results| {
             calls.set(calls.get() + 1);
             assert_eq!(results.len(), 2);
-            assert_eq!(results[0].len(), 2);
-            assert_eq!(results[0][0].0, first_entity);
-            assert_eq!(results[0][1].0, second_entity);
-            assert_eq!(results[0][0].1[0].0, first_component);
+            assert_eq!(results[0].0, first_entity);
+            assert_eq!(results[1].0, second_entity);
+            assert_eq!(results[0].1[0].0, first_component);
             assert_eq!(
-                results[0][0].1[0]
+                results[0].1[0]
                     .1
                     .iter()
                     .map(|(field_id, _)| *field_id)
                     .collect::<Vec<_>>(),
                 requested_field_ids
             );
-            assert_eq!(results[1].len(), 1);
-            assert_eq!(results[1][0].0, first_entity);
-            assert_eq!(results[1][0].1.len(), 2);
-            assert_eq!(results[1][0].1[0].1[0].0, first_mutable_field);
-            assert_eq!(results[1][0].1[1].1[0].0, first_other_field);
         })
         .unwrap();
 
     assert_eq!(calls.get(), 1);
 
+    scene
+        .query_components(&only_first_entity, |results| {
+            calls.set(calls.get() + 1);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].0, first_entity);
+            assert_eq!(results[0].1.len(), 3);
+            assert_eq!(results[0].1[0].1[0].0, first_mutable_field);
+            assert_eq!(results[0].1[1].1[0].0, first_other_field);
+            assert_eq!(results[0].1[2].0, first_component);
+            assert_eq!(results[0].1[2].1[0].0, first_mutable_field);
+            assert_eq!(results[0].1[0].1[0].1, results[0].1[2].1[0].1);
+        })
+        .unwrap();
+
+    assert_eq!(calls.get(), 2);
+
+    let immutable_read = [(immutable_field, FieldAccess::Read)];
     let immutable_write = [(immutable_field, FieldAccess::Write)];
-    let component = [(plugin, component_type, immutable_write.as_slice())];
+    let component = [
+        (plugin, component_type, immutable_read.as_slice()),
+        (plugin, component_type, immutable_write.as_slice()),
+    ];
     assert!(matches!(
-        scene.query_components(&[component.as_slice()], |_| ()),
+        scene.query_components(&component, |_| ()),
         Err(SceneError::EntityError(EntityError::ComponentError(
             ComponentError::FieldError(FieldError::NotMutable)
         )))

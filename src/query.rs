@@ -18,7 +18,7 @@ pub type AssetQuery<'a> = (PluginID, AssetTypeID, &'a str, &'a [AssetFieldTypeID
 /// One component request: its plugin, type, and requested field types/access.
 pub type ComponentQuery<'a> = (PluginID, ComponentTypeID, &'a [(FieldTypeID, FieldAccess)]);
 
-/// Results for one query group, grouped by matching entity and then by
+/// Results for one component query, grouped by matching entity and then by
 /// concrete component ID. Field access is governed by its corresponding
 /// [`ComponentQuery`] request, and each pointer is valid only during the query
 /// callback.
@@ -34,8 +34,8 @@ pub(crate) type ResolvedComponentQuery = Vec<ResolvedComponent>;
 /// One queried component and the locked fields returned for it.
 pub(crate) type QueriedComponentFields = (ComponentID, Vec<(FieldID, *mut c_void)>);
 
-/// Resolved component requests grouped by query group and matching entity.
-type ComponentQueryMatches = Vec<Vec<(EntityID, ResolvedComponentQuery)>>;
+/// Resolved component requests for each matching entity.
+type ComponentQueryMatches = Vec<(EntityID, ResolvedComponentQuery)>;
 
 /// Unique component fields arranged in their stable global acquisition order.
 type ComponentLockPlan = Vec<(EntityID, ResolvedComponentQuery)>;
@@ -72,24 +72,20 @@ fn add_component_locks(
     }
 }
 
-/// Finds the entities matching each query group and gathers their unique field
-/// locks. Matching order follows the scene's entity order.
-fn resolve_component_queries(
+/// Finds the matching entities and gathers their unique field locks. Matching
+/// order follows the scene's entity order.
+fn resolve_component_query(
     entities: &EntityStorage,
-    groups: &[&[ComponentQuery<'_>]],
+    requests: &[ComponentQuery<'_>],
 ) -> Result<(ComponentQueryMatches, PendingComponentLocks), SceneError> {
-    let mut matches = Vec::with_capacity(groups.len());
+    let mut matches = Vec::new();
     let mut pending = PendingComponentLocks::new();
-    for group in groups {
-        let mut group_matches = Vec::new();
-        for (entity_id, entity) in entities.iter() {
-            let Some(components) = entity.resolve_query(group).map_err(SceneError::from)? else {
-                continue;
-            };
-            add_component_locks(&mut pending, entity_id, &components);
-            group_matches.push((entity_id, components));
-        }
-        matches.push(group_matches);
+    for (entity_id, entity) in entities.iter() {
+        let Some(components) = entity.resolve_query(requests).map_err(SceneError::from)? else {
+            continue;
+        };
+        add_component_locks(&mut pending, entity_id, &components);
+        matches.push((entity_id, components));
     }
     Ok((matches, pending))
 }
@@ -140,33 +136,28 @@ fn with_locked_component_fields<T>(
         .map_err(SceneError::from)?
 }
 
-/// Rebuilds the public group/entity/component shape in request order from the
+/// Rebuilds the public entity/component shape in request order from the
 /// uniquely locked physical fields.
 fn component_query_results(
     matches: &ComponentQueryMatches,
     locked: &LockedComponentFields,
-) -> Vec<ComponentQueryResult> {
+) -> ComponentQueryResult {
     matches
         .iter()
-        .map(|group| {
-            group
+        .map(|(entity_id, components)| {
+            let components = components
                 .iter()
-                .map(|(entity_id, components)| {
-                    let components = components
+                .map(|(component_id, fields)| {
+                    let fields = fields
                         .iter()
-                        .map(|(component_id, fields)| {
-                            let fields = fields
-                                .iter()
-                                .map(|(field_id, _)| {
-                                    (*field_id, locked[&(*entity_id, *component_id, *field_id)])
-                                })
-                                .collect();
-                            (*component_id, fields)
+                        .map(|(field_id, _)| {
+                            (*field_id, locked[&(*entity_id, *component_id, *field_id)])
                         })
                         .collect();
-                    (*entity_id, components)
+                    (*component_id, fields)
                 })
-                .collect()
+                .collect();
+            (*entity_id, components)
         })
         .collect()
 }
@@ -174,10 +165,10 @@ fn component_query_results(
 /// Resolves, locks, and shapes one complete component query.
 pub(crate) fn query_components<T>(
     entities: &EntityStorage,
-    groups: &[&[ComponentQuery<'_>]],
-    action: impl FnOnce(&[ComponentQueryResult]) -> T,
+    requests: &[ComponentQuery<'_>],
+    action: impl FnOnce(&ComponentQueryResult) -> T,
 ) -> Result<T, SceneError> {
-    let (matches, pending) = resolve_component_queries(entities, groups)?;
+    let (matches, pending) = resolve_component_query(entities, requests)?;
     let plans = order_component_locks(pending);
     with_locked_component_fields(entities, &plans, &mut HashMap::new(), |locked| {
         action(&component_query_results(&matches, locked))
