@@ -16,7 +16,6 @@ use crate::{
         system_storage::SystemStorage,
         system_storage_snapshot::SystemStorageSnapshot,
     },
-    query::{self, AssetQuery, ComponentQuery, ComponentQueryResult},
 };
 
 pub(crate) type EntityStorage = IDStore<String, EntityID, Entity>;
@@ -443,21 +442,6 @@ impl Scene {
         })
     }
 
-    /// Queries components across all entities and invokes `action` once while
-    /// every matched component remains locked.
-    ///
-    /// An entity matches when it contains every requested component. Results
-    /// preserve entity, component, and field order. Any write field makes its
-    /// whole component exclusive. Pointers are valid only during the callback.
-    pub fn query_components<T>(
-        &self,
-        requests: &[ComponentQuery<'_>],
-        action: impl FnOnce(&ComponentQueryResult) -> T,
-    ) -> Result<T, SceneError> {
-        let entities = self.entities.read().expect("scene entity lock poisoned");
-        query::query_components(&entities, requests, action)
-    }
-
     /// Resolve the [`AssetID`] from a given asset type and data string.
     ///
     /// This function will **not** load a new asset if the asset doesn't exist.
@@ -521,39 +505,6 @@ impl Scene {
         }
         let asset = Asset::new(manifest).map_err(SceneError::from)?;
         Ok(assets.insert_named(key, asset))
-    }
-
-    /// Loads and queries asset fields, keeping all assets alive until the
-    /// single callback returns. The returned read-only pointers are valid only
-    /// during that callback.
-    pub fn query_assets<T>(
-        &self,
-        requests: &[AssetQuery<'_>],
-        action: impl FnOnce(&[Vec<(AssetFieldID, *const c_void)>]) -> T,
-    ) -> Result<T, SceneError> {
-        // Loading requires write access, so finish it before taking the shared
-        // asset lock that protects every pointer passed to the callback.
-        let mut requested_assets = Vec::with_capacity(requests.len());
-        for (plugin_id, asset_type_id, data_string, fields) in requests {
-            let asset_id = self.get_asset_id(*plugin_id, *asset_type_id, data_string)?;
-            requested_assets.push((asset_id, *fields));
-        }
-
-        let assets = self.assets.read().expect("scene asset lock poisoned");
-        let mut results = Vec::with_capacity(requested_assets.len());
-        for (asset_id, requested_fields) in requested_assets {
-            let asset = assets.get(asset_id).ok_or(SceneError::AssetNotFound)?;
-            let mut fields = Vec::with_capacity(requested_fields.len());
-            for field_type_id in requested_fields {
-                let field_id = asset
-                    .resolve_field_id(*field_type_id)
-                    .map_err(SceneError::from)?;
-                let pointer = asset.get_field(field_id).map_err(SceneError::from)?;
-                fields.push((field_id, pointer));
-            }
-            results.push(fields);
-        }
-        Ok(action(&results))
     }
 
     /// Gets an existing concrete system ID from its plugin and system type.
