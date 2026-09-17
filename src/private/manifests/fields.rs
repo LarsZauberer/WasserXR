@@ -4,6 +4,7 @@ use crate::{
         error::{AssetFieldDefinitionError, ComponentFieldDefinitionError},
         fields::{
             AssetFieldDefinition, ComponentFieldDefinition, Deserializer, Getter, Serializer,
+            TypeHint,
         },
     },
     private::manifests::Manifest,
@@ -12,6 +13,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct ComponentFieldManifest {
     pub name: String,
+    pub type_hint: TypeHint,
 
     pub mutable: bool,
     pub getter: Option<Getter>,
@@ -26,6 +28,8 @@ impl Manifest<ComponentFieldDefinition> for ComponentFieldManifest {
         unsafe { value.validate()? };
         Ok(Self {
             name: unsafe { value.name() }.expect("validated definitions have valid names"),
+            type_hint: TypeHint::try_from(value.type_hint)
+                .expect("validated definitions have valid type hints"),
             mutable: value.mutable != 0,
             getter: value.getter,
             serializer: value.serializer,
@@ -37,6 +41,7 @@ impl Manifest<ComponentFieldDefinition> for ComponentFieldManifest {
 #[derive(Debug)]
 pub(crate) struct AssetFieldManifest {
     pub name: String,
+    pub type_hint: TypeHint,
     pub getter: Getter,
 }
 
@@ -47,6 +52,8 @@ impl Manifest<AssetFieldDefinition> for AssetFieldManifest {
         unsafe { value.validate()? };
         Ok(Self {
             name: unsafe { value.name() }.expect("validated definitions have valid names"),
+            type_hint: TypeHint::try_from(value.type_hint)
+                .expect("validated definitions have valid type hints"),
             getter: value
                 .getter
                 .expect("validated asset field definitions have a getter"),
@@ -72,6 +79,7 @@ mod component_field_tests {
 
         ComponentFieldDefinition {
             name: NAME.as_ptr().cast(),
+            type_hint: TypeHint::F32 as u32,
             getter: Some(getter),
             mutable: 1,
             serializer: None,
@@ -91,6 +99,7 @@ mod component_field_tests {
         let manifest = unsafe { ComponentFieldManifest::checked_convert(component_field) }.unwrap();
 
         assert_eq!(manifest.name, "position");
+        assert_eq!(manifest.type_hint, TypeHint::F32);
         assert_eq!(manifest.mutable, mutable);
         assert!(manifest.getter.is_some());
         assert!(manifest.serializer.is_none());
