@@ -6,8 +6,11 @@ use std::{
 };
 
 use crate::{
-    definitions::plugins::PluginDefinition,
-    errors::{EntityError, PluginCompatibilityError, PluginError, SceneError, SystemError},
+    definitions::{fields::TypeHint, plugins::PluginDefinition},
+    errors::{
+        AssetError, ComponentError, EntityError, PluginCompatibilityError, PluginError, SceneError,
+        SystemError,
+    },
     field::AccessRequest,
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
@@ -277,6 +280,26 @@ impl Scene {
             .ok_or(SceneError::NoComponentType)
     }
 
+    /// Returns the primitive type hint for a component field type.
+    pub fn get_field_type(
+        &self,
+        plugin_id: PluginID,
+        component_type_id: ComponentTypeID,
+        field_type_id: FieldTypeID,
+    ) -> Result<TypeHint, SceneError> {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let component = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_component(component_type_id))
+            .ok_or(SceneError::NoComponentType)?;
+
+        component
+            .fields
+            .get(field_type_id)
+            .map(|field| field.type_hint)
+            .ok_or_else(|| SceneError::from(ComponentError::FieldNotFound))
+    }
+
     /// Resolves an asset type name within a plugin manifest.
     pub fn resolve_asset_type_id(
         &self,
@@ -323,6 +346,26 @@ impl Scene {
             .get(plugin_id)
             .and_then(|plugin| plugin.resolve_asset_field_type_id(asset_type_id, name))
             .ok_or(SceneError::AssetNotFound)
+    }
+
+    /// Returns the primitive type hint for an asset field type.
+    pub fn get_asset_field_type(
+        &self,
+        plugin_id: PluginID,
+        asset_type_id: AssetTypeID,
+        field_type_id: AssetFieldTypeID,
+    ) -> Result<TypeHint, SceneError> {
+        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+        let asset = plugins
+            .get(plugin_id)
+            .and_then(|plugin| plugin.get_asset(asset_type_id))
+            .ok_or(SceneError::AssetNotFound)?;
+
+        asset
+            .fields
+            .get(field_type_id)
+            .map(|field| field.type_hint)
+            .ok_or_else(|| SceneError::from(AssetError::FieldNotFound))
     }
 
     /// Resolves a system type name within a plugin manifest.
