@@ -5,7 +5,7 @@ use wasserxr::definitions::{
     Definition,
     assets::AssetDefinition,
     error::{AssetDefinitionError, AssetFieldDefinitionError},
-    fields::AssetFieldDefinition,
+    fields::{AssetFieldDefinition, TypeHint},
 };
 
 unsafe extern "C" fn creator() -> *mut c_void {
@@ -67,6 +67,7 @@ fn rejects_invalid_field(mut asset: AssetDefinition) {
     static FIELD_NAME: &[u8] = b"vertices\0";
     let field = AssetFieldDefinition {
         name: FIELD_NAME.as_ptr().cast(),
+        type_hint: TypeHint::Usize as u32,
         getter: None,
     };
     asset.fields = &field;

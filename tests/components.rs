@@ -8,7 +8,8 @@ use std::{
 use rstest::{fixture, rstest};
 use wasserxr::{
     definitions::{
-        components::ComponentDefinition, fields::ComponentFieldDefinition,
+        components::ComponentDefinition,
+        fields::{ComponentFieldDefinition, TypeHint},
         plugins::PluginDefinition,
     },
     errors::{ComponentError, EntityError, FieldError, SceneError},
@@ -71,6 +72,7 @@ const COMPATIBLE_ENGINE_VERSION: Version = Version {
 
 const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
     name: c"MyField".as_ptr(),
+    type_hint: TypeHint::Usize as u32,
     getter: Some(simple_getter),
     mutable: 1,
     serializer: None,
@@ -79,6 +81,7 @@ const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition
 
 const IMMUTABLE_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
     name: c"ImmutableField".as_ptr(),
+    type_hint: TypeHint::Usize as u32,
     getter: Some(immutable_getter),
     mutable: 0,
     serializer: None,
@@ -90,6 +93,7 @@ const VALID_COMPONENT_FIELDS: [ComponentFieldDefinition; 3] = [
     IMMUTABLE_COMPONENT_FIELD,
     ComponentFieldDefinition {
         name: c"HiddenField".as_ptr(),
+        type_hint: TypeHint::Usize as u32,
         getter: None,
         mutable: 0,
         serializer: None,
@@ -151,6 +155,26 @@ fn scene() -> Scene {
     unsafe { scene.load_static_plugin(VALID_COMPONENT_FIELD_PLUGIN) }
         .expect("Failed to load valid plugin");
     scene
+}
+
+#[rstest]
+fn resolves_component_field_type_hint(scene: Scene) {
+    let plugin = scene.resolve_plugin_id("MyPlugin").unwrap();
+    let component = scene
+        .resolve_component_type_id(plugin, "MyComponent")
+        .unwrap();
+    let field = scene
+        .resolve_field_type_id(plugin, component, "MyField")
+        .unwrap();
+
+    assert_eq!(
+        scene.get_field_type(plugin, component, field).unwrap(),
+        TypeHint::Usize
+    );
+    assert!(matches!(
+        scene.get_field_type(plugin, component, FieldTypeID::default()),
+        Err(SceneError::ComponentError(ComponentError::FieldNotFound))
+    ));
 }
 
 #[rstest]

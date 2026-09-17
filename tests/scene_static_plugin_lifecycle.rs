@@ -3,7 +3,8 @@ use std::{ffi::c_void, ptr::null_mut};
 use rstest::rstest;
 use wasserxr::{
     definitions::{
-        components::ComponentDefinition, fields::ComponentFieldDefinition,
+        components::ComponentDefinition,
+        fields::{ComponentFieldDefinition, TypeHint},
         plugins::PluginDefinition,
     },
     errors::{PluginCompatibilityError, SceneError},
@@ -59,6 +60,7 @@ const VALID_EMPTY_COMPONENT_PLUGIN: PluginDefinition = PluginDefinition {
 
 const VALID_COMPONENT_FIELD: ComponentFieldDefinition = ComponentFieldDefinition {
     name: c"MyField".as_ptr(),
+    type_hint: TypeHint::Usize as u32,
     getter: Some(simple_getter),
     mutable: 1,
     serializer: None,

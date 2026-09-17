@@ -2,7 +2,9 @@ use std::ffi::c_void;
 
 use rstest::{fixture, rstest};
 use wasserxr::definitions::{
-    Definition, error::ComponentFieldDefinitionError, fields::ComponentFieldDefinition,
+    Definition,
+    error::ComponentFieldDefinitionError,
+    fields::{ComponentFieldDefinition, TypeHint},
 };
 
 unsafe extern "C" fn getter(_: *const c_void) -> *mut c_void {
@@ -19,6 +21,7 @@ fn field() -> ComponentFieldDefinition {
 
     ComponentFieldDefinition {
         name: NAME.as_ptr().cast(),
+        type_hint: TypeHint::F32 as u32,
         getter: Some(getter),
         mutable: 0,
         serializer: Some(serializer),
@@ -41,6 +44,16 @@ fn rejects_mutable_field_without_getter(mut field: ComponentFieldDefinition) {
         Err(ComponentFieldDefinitionError::MutableButNoGetter(
             "position".to_owned()
         ))
+    );
+}
+
+#[rstest]
+fn rejects_invalid_type_hint(mut field: ComponentFieldDefinition) {
+    field.type_hint = u32::MAX;
+
+    assert_eq!(
+        unsafe { field.validate() },
+        Err(ComponentFieldDefinitionError::InvalidTypeHint(u32::MAX))
     );
 }
 

@@ -6,7 +6,8 @@ use std::{
 
 use wasserxr::{
     definitions::{
-        components::ComponentDefinition, fields::ComponentFieldDefinition,
+        components::ComponentDefinition,
+        fields::{ComponentFieldDefinition, TypeHint},
         plugins::PluginDefinition,
     },
     field::AccessRequest,
@@ -51,6 +52,7 @@ unsafe extern "C" fn second(data: *const c_void) -> *mut c_void {
 const FIELDS: [ComponentFieldDefinition; 2] = [
     ComponentFieldDefinition {
         name: c"First".as_ptr(),
+        type_hint: TypeHint::Usize as u32,
         getter: Some(first),
         mutable: 1,
         serializer: None,
@@ -58,6 +60,7 @@ const FIELDS: [ComponentFieldDefinition; 2] = [
     },
     ComponentFieldDefinition {
         name: c"Second".as_ptr(),
+        type_hint: TypeHint::Usize as u32,
         getter: Some(second),
         mutable: 1,
         serializer: None,

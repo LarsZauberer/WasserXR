@@ -7,6 +7,7 @@ void simple_destroyer(void *ptr) {}
 static const ComponentFieldDefinition fields[] = {
     {
         .name = "MyField",
+        .type_hint = TypeHint_Usize,
         .getter = NULL,
         .mutable_ = 1,
         .serializer = NULL,

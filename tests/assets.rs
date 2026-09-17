@@ -12,7 +12,9 @@ use std::{
 
 use wasserxr::{
     definitions::{
-        assets::AssetDefinition, fields::AssetFieldDefinition, plugins::PluginDefinition,
+        assets::AssetDefinition,
+        fields::{AssetFieldDefinition, TypeHint},
+        plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
     ids::{AssetFieldTypeID, AssetTypeID, PluginID},
@@ -56,6 +58,7 @@ unsafe extern "C" fn get_value(data: *const c_void) -> *mut c_void {
 
 const VALUE_FIELD: AssetFieldDefinition = AssetFieldDefinition {
     name: c"value".as_ptr(),
+    type_hint: TypeHint::Usize as u32,
     getter: Some(get_value),
 };
 
@@ -107,6 +110,24 @@ fn asset_type(scene: &Scene, name: &str) -> Result<(PluginID, AssetTypeID), Scen
 fn reset_counts() {
     CREATE_COUNT.store(0, Ordering::Relaxed);
     DESTROY_COUNT.store(0, Ordering::Relaxed);
+}
+
+#[test]
+fn resolves_asset_field_type_hint() {
+    let scene = scene();
+    let (plugin, asset) = asset_type(&scene, "TestAsset").unwrap();
+    let field = scene
+        .resolve_asset_field_type_id(plugin, asset, "value")
+        .unwrap();
+
+    assert_eq!(
+        scene.get_asset_field_type(plugin, asset, field).unwrap(),
+        TypeHint::Usize
+    );
+    assert!(matches!(
+        scene.get_asset_field_type(plugin, asset, AssetFieldTypeID::default()),
+        Err(SceneError::AssetError(AssetError::FieldNotFound))
+    ));
 }
 
 #[test]
