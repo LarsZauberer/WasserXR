@@ -3,6 +3,9 @@
 /// Foreign-function interface helpers.
 pub mod ffi;
 
+/// Rendering and parsing helpers for primitive field data.
+pub mod field_render;
+
 /// Filesystem path resolution helpers for enhanced asset loading
 pub mod paths;
 
