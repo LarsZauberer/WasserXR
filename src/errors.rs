@@ -2,6 +2,20 @@ use std::{error::Error, fmt::Display};
 
 use crate::definitions::error::PluginDefinitionError;
 
+/// Error returned when text cannot be parsed as a field's declared type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldParseError {
+    InvalidInput,
+}
+
+impl Display for FieldParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("input does not match the field type")
+    }
+}
+
+impl Error for FieldParseError {}
+
 /// Errors that a plugin might throw
 #[derive(Debug)]
 pub enum PluginError {
@@ -37,6 +51,7 @@ pub enum SceneError {
     PluginError(PluginError),
     PluginCompatibilityError(PluginCompatibilityError),
     EntityError(EntityError),
+    ComponentError(ComponentError),
     NoComponentType,
     AssetNotFound,
     AssetError(AssetError),
@@ -54,6 +69,7 @@ impl Display for SceneError {
                 write!(f, "plugin compatibility error: {error}")
             }
             Self::EntityError(error) => write!(f, "entity error: {error}"),
+            Self::ComponentError(error) => write!(f, "component error: {error}"),
             Self::NoComponentType => f.write_str("component type not found"),
             Self::AssetNotFound => f.write_str("asset not found"),
             Self::AssetError(error) => write!(f, "asset error: {error}"),
@@ -140,6 +156,12 @@ impl Error for ComponentError {}
 impl From<ComponentError> for EntityError {
     fn from(value: ComponentError) -> Self {
         EntityError::ComponentError(value)
+    }
+}
+
+impl From<ComponentError> for SceneError {
+    fn from(value: ComponentError) -> Self {
+        Self::ComponentError(value)
     }
 }
 

@@ -8,6 +8,60 @@ use crate::definitions::{
 };
 use crate::utils::ffi::validate_string;
 
+/// Primitive type used to render and parse field data across the C ABI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum TypeHint {
+    I8 = 0,
+    I16 = 1,
+    I32 = 2,
+    I64 = 3,
+    I128 = 4,
+    Isize = 5,
+    U8 = 6,
+    U16 = 7,
+    U32 = 8,
+    U64 = 9,
+    U128 = 10,
+    Usize = 11,
+    F32 = 12,
+    F64 = 13,
+    Char = 14,
+    Boolean = 15,
+}
+
+impl TryFrom<u32> for TypeHint {
+    type Error = u32;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::I8),
+            1 => Ok(Self::I16),
+            2 => Ok(Self::I32),
+            3 => Ok(Self::I64),
+            4 => Ok(Self::I128),
+            5 => Ok(Self::Isize),
+            6 => Ok(Self::U8),
+            7 => Ok(Self::U16),
+            8 => Ok(Self::U32),
+            9 => Ok(Self::U64),
+            10 => Ok(Self::U128),
+            11 => Ok(Self::Usize),
+            12 => Ok(Self::F32),
+            13 => Ok(Self::F64),
+            14 => Ok(Self::Char),
+            15 => Ok(Self::Boolean),
+            value => Err(value),
+        }
+    }
+}
+
+impl From<TypeHint> for u32 {
+    fn from(value: TypeHint) -> Self {
+        value as Self
+    }
+}
+
 /// Function to get from a component or asset a pointer to the actual field
 /// data. This is the way wasserxr provides access a field.
 ///
@@ -53,6 +107,8 @@ pub type Deserializer = unsafe extern "C" fn(ptr: *const c_void);
 #[repr(C)]
 pub struct ComponentFieldDefinition {
     pub name: *const c_char,
+    /// A [`TypeHint`] discriminant, validated when the definition is loaded.
+    pub type_hint: u32,
 
     // Access
     pub getter: Option<unsafe extern "C" fn(ptr: *const c_void) -> *mut c_void>,
@@ -72,6 +128,9 @@ impl Definition for ComponentFieldDefinition {
     /// duration of the call.
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         let name = unsafe { self.name()? };
+
+        TypeHint::try_from(self.type_hint)
+            .map_err(ComponentFieldDefinitionError::InvalidTypeHint)?;
 
         if self.mutable != 0 && self.getter.is_none() {
             return Err(ComponentFieldDefinitionError::MutableButNoGetter(name));
@@ -103,6 +162,8 @@ impl ComponentFieldDefinition {
 #[repr(C)]
 pub struct AssetFieldDefinition {
     pub name: *const c_char,
+    /// A [`TypeHint`] discriminant, validated when the definition is loaded.
+    pub type_hint: u32,
     pub getter: Option<unsafe extern "C" fn(ptr: *const c_void) -> *mut c_void>,
 }
 
@@ -115,6 +176,7 @@ impl Definition for AssetFieldDefinition {
     /// of [`Definition::validate`].
     unsafe fn validate(&self) -> Result<(), Self::Error> {
         let name = unsafe { self.name()? };
+        TypeHint::try_from(self.type_hint).map_err(AssetFieldDefinitionError::InvalidTypeHint)?;
         if self.getter.is_none() {
             return Err(AssetFieldDefinitionError::GetterIsNull(name));
         }

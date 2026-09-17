@@ -36,6 +36,10 @@ pub enum ComponentFieldDefinitionError {
     NameIsNull,
     NameIsNotUtf8,
     NameIsEmpty,
+    /// The contained `u32` is the unrecognized
+    /// [`TypeHint`](super::fields::TypeHint) discriminant received through the
+    /// C ABI.
+    InvalidTypeHint(u32),
     MutableButNoGetter(String),
 }
 
@@ -44,6 +48,10 @@ pub enum AssetFieldDefinitionError {
     NameIsNull,
     NameIsNotUtf8,
     NameIsEmpty,
+    /// The contained `u32` is the unrecognized
+    /// [`TypeHint`](super::fields::TypeHint) discriminant received through the
+    /// C ABI.
+    InvalidTypeHint(u32),
     GetterIsNull(String),
 }
 
@@ -258,6 +266,7 @@ impl Display for ComponentFieldDefinitionError {
             Self::NameIsNull => f.write_str("component field name is null"),
             Self::NameIsNotUtf8 => f.write_str("component field name is not valid UTF-8"),
             Self::NameIsEmpty => f.write_str("component field name is empty"),
+            Self::InvalidTypeHint(value) => write!(f, "invalid field type hint {value}"),
             Self::MutableButNoGetter(name) => {
                 write!(f, "mutable component field '{name}' has no getter")
             }
@@ -273,6 +282,7 @@ impl Display for AssetFieldDefinitionError {
             Self::NameIsNull => f.write_str("asset field name is null"),
             Self::NameIsNotUtf8 => f.write_str("asset field name is not valid UTF-8"),
             Self::NameIsEmpty => f.write_str("asset field name is empty"),
+            Self::InvalidTypeHint(value) => write!(f, "invalid field type hint {value}"),
             Self::GetterIsNull(name) => write!(f, "asset field '{name}' has no getter"),
         }
     }
