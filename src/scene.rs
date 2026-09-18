@@ -24,6 +24,7 @@ use crate::{
         id_store::IDStore,
         manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
+        system::System,
         system_storage::SystemStorage,
         system_storage_snapshot::SystemStorageSnapshot,
         thread_pool::ThreadPool,
@@ -124,7 +125,14 @@ impl Scene {
             .drain()
             .collect::<Vec<_>>();
         for system in systems {
-            system.detach(self);
+            self.run_detacher(system);
+        }
+    }
+
+    /// Runs a system's detacher after the system has been removed from storage.
+    fn run_detacher(&self, system: System) {
+        if let Some((detacher, type_ids)) = system.detacher() {
+            unsafe { detacher(self, type_ids.as_ptr(), type_ids.len()) };
         }
     }
 
@@ -944,7 +952,7 @@ impl Scene {
             .write()
             .expect("scene system lock poisoned")
             .remove(system_id)?;
-        system.detach(self);
+        self.run_detacher(system);
         Ok(())
     }
 
@@ -1000,7 +1008,7 @@ impl Drop for Scene {
             .drain()
             .collect::<Vec<_>>();
         for system in systems {
-            system.detach(self);
+            self.run_detacher(system);
         }
     }
 }
