@@ -1,9 +1,11 @@
 use crate::{
-    definitions::systems::{Detacher, Runner},
+    definitions::systems::{Attacher, Detacher, Runner},
     ids::{SystemTypeID, TypeID},
     private::manifests::systems::SystemManifest,
     scene::Scene,
 };
+
+pub(crate) type AttacherData = (Attacher, Vec<TypeID>);
 
 /// A concrete system created from a plugin's system manifest.
 #[derive(Debug)]
@@ -12,27 +14,25 @@ pub(crate) struct System {
     requires: Vec<SystemTypeID>,
     wanted_by: Vec<SystemTypeID>,
     runner: Runner,
+    attacher: Option<Attacher>,
     detacher: Option<Detacher>,
     type_ids: Vec<TypeID>,
 }
 
 impl System {
     pub(crate) fn new(
-        scene: &Scene,
         system_type_id: SystemTypeID,
         manifest: &SystemManifest,
         type_ids: Vec<TypeID>,
         requires: Vec<SystemTypeID>,
         wanted_by: Vec<SystemTypeID>,
     ) -> Self {
-        if let Some(attacher) = manifest.attacher {
-            unsafe { attacher(scene, type_ids.as_ptr(), type_ids.len()) };
-        }
         Self {
             system_type_id,
             requires,
             wanted_by,
             runner: manifest.runner,
+            attacher: manifest.attacher,
             detacher: manifest.detacher,
             type_ids,
         }
@@ -52,6 +52,11 @@ impl System {
 
     pub(crate) fn execution(&self) -> (Runner, &[TypeID]) {
         (self.runner, &self.type_ids)
+    }
+
+    pub(crate) fn attacher(&self) -> Option<AttacherData> {
+        self.attacher
+            .map(|attacher| (attacher, self.type_ids.clone()))
     }
 
     pub(crate) fn detach(self, scene: &Scene) {

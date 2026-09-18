@@ -3,8 +3,11 @@ use petgraph::{algo::is_cyclic_directed, graphmap::DiGraphMap};
 use crate::{
     errors::{SceneError, SystemError},
     ids::{SystemID, SystemSlot, SystemTypeID, TypeID},
-    private::{id_store::IDStore, manifests::systems::SystemManifest, system::System},
-    scene::Scene,
+    private::{
+        id_store::IDStore,
+        manifests::systems::SystemManifest,
+        system::{AttacherData, System},
+    },
 };
 
 /// Concrete systems and their validated dependency relationships.
@@ -22,13 +25,12 @@ impl SystemStorage {
 
     pub(crate) fn add_system(
         &mut self,
-        scene: &Scene,
         key: SystemTypeID,
         manifest: &SystemManifest,
         type_ids: Vec<TypeID>,
         requires: Vec<SystemTypeID>,
         wanted_by: Vec<SystemTypeID>,
-    ) -> Result<SystemID, SceneError> {
+    ) -> Result<(SystemID, Option<AttacherData>), SceneError> {
         // The candidate has no concrete SystemID until validation succeeds, so
         // graph nodes use its already-stable plugin and system-type key instead.
         // It shouldn't make too much of a performance impact since both are ID's
@@ -60,12 +62,10 @@ impl SystemStorage {
             return Err(SystemError::DependencyCycle.into());
         }
 
-        let system = System::new(scene, key, manifest, type_ids, requires, wanted_by);
-        Ok(SystemID(
-            key.0,
-            key.1,
-            self.systems.insert_named(key, system),
-        ))
+        let system = System::new(key, manifest, type_ids, requires, wanted_by);
+        let attachment = system.attacher();
+        let system_id = SystemID(key.0, key.1, self.systems.insert_named(key, system));
+        Ok((system_id, attachment))
     }
 
     pub(crate) fn remove(&mut self, id: SystemID) -> Result<System, SceneError> {

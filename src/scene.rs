@@ -888,41 +888,51 @@ impl Scene {
 
         // Resolve every requested type ID before creating or attaching the system.
         let type_ids = self.resolve_requested_type_ids(system_type_id)?;
-        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let plugin = plugins
-            .get(system_type_id.0)
-            .ok_or(SceneError::SystemNotFound)?;
-        let manifest = plugin
-            .get_system(system_type_id.1)
-            .ok_or(SceneError::SystemNotFound)?;
-        // Resolve dependency names to stable keys so storage can check presence
-        // and build the dependency graph without string lookups.
-        let requires = manifest
-            .requires
-            .iter()
-            .map(|name| {
-                plugin
-                    .resolve_system_type_slot(name)
-                    .map(|system| SystemTypeID(system_type_id.0, system))
-                    .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let wanted_by = manifest
-            .wanted_by
-            .iter()
-            .map(|name| {
-                plugin
-                    .resolve_system_type_slot(name)
-                    .map(|system| SystemTypeID(system_type_id.0, system))
-                    .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let (system_id, attacher) = {
+            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+            let plugin = plugins
+                .get(system_type_id.0)
+                .ok_or(SceneError::SystemNotFound)?;
+            let manifest = plugin
+                .get_system(system_type_id.1)
+                .ok_or(SceneError::SystemNotFound)?;
+            // Resolve dependency names to stable keys so storage can check presence
+            // and build the dependency graph without string lookups.
+            let requires = manifest
+                .requires
+                .iter()
+                .map(|name| {
+                    plugin
+                        .resolve_system_type_slot(name)
+                        .map(|system| SystemTypeID(system_type_id.0, system))
+                        .ok_or_else(|| {
+                            SceneError::from(SystemError::DependencyNotFound(name.clone()))
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let wanted_by = manifest
+                .wanted_by
+                .iter()
+                .map(|name| {
+                    plugin
+                        .resolve_system_type_slot(name)
+                        .map(|system| SystemTypeID(system_type_id.0, system))
+                        .ok_or_else(|| {
+                            SceneError::from(SystemError::DependencyNotFound(name.clone()))
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut systems = self.systems.write().expect("scene system lock poisoned");
+            if systems.resolve_id(&key).is_some() {
+                return Err(SystemError::AlreadyExists.into());
+            }
+            systems.add_system(key, manifest, type_ids, requires, wanted_by)?
+        };
 
-        let mut systems = self.systems.write().expect("scene system lock poisoned");
-        if systems.resolve_id(&key).is_some() {
-            return Err(SystemError::AlreadyExists.into());
+        if let Some((attacher, type_ids)) = attacher {
+            unsafe { attacher(self, type_ids.as_ptr(), type_ids.len()) };
         }
-        systems.add_system(self, key, manifest, type_ids, requires, wanted_by)
+        Ok(system_id)
     }
 
     /// Removes a concrete system and runs its detacher.

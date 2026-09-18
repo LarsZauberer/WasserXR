@@ -12,7 +12,7 @@ use wasserxr::{
         type_id_requests::TypeIDRequests,
     },
     errors::{SceneError, SystemError},
-    ids::TypeID,
+    ids::{SystemTypeID, TypeID},
     scene::Scene,
     utils::version::Version,
 };
@@ -20,6 +20,7 @@ use wasserxr::{
 static ATTACH_COUNT: AtomicUsize = AtomicUsize::new(0);
 static DETACH_COUNT: AtomicUsize = AtomicUsize::new(0);
 static RECEIVED_IDS: Mutex<Vec<TypeID>> = Mutex::new(Vec::new());
+static ATTACH_SYSTEM_TYPE_ID: Mutex<Option<SystemTypeID>> = Mutex::new(None);
 
 unsafe extern "C" fn create_component() -> *mut std::ffi::c_void {
     std::ptr::dangling_mut()
@@ -30,6 +31,14 @@ unsafe extern "C" fn destroy_component(_: *mut std::ffi::c_void) {}
 unsafe extern "C" fn attach(_: *const Scene, ids: *const TypeID, count: usize) {
     ATTACH_COUNT.fetch_add(1, Ordering::Relaxed);
     *RECEIVED_IDS.lock().unwrap() = unsafe { std::slice::from_raw_parts(ids, count) }.to_vec();
+}
+
+unsafe extern "C" fn attach_and_query_system(scene: *const Scene, _: *const TypeID, _: usize) {
+    let system_type_id = ATTACH_SYSTEM_TYPE_ID
+        .lock()
+        .unwrap()
+        .expect("system type ID should be set before attaching");
+    assert!(unsafe { &*scene }.get_system_id(system_type_id).is_ok());
 }
 
 unsafe extern "C" fn run(_: *const Scene, _: *const TypeID, _: usize) {}
@@ -156,6 +165,30 @@ fn concrete_system_lifecycle_uses_resolved_type_ids() {
     scene.add_system(system_type).unwrap();
     drop(scene);
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 3);
+}
+
+#[test]
+fn attacher_can_use_scene_system_api() {
+    let system = SystemDefinition {
+        name: c"querying".as_ptr(),
+        attacher: Some(attach_and_query_system),
+        runner: Some(run),
+        detacher: None,
+        requires: std::ptr::null(),
+        requires_count: 0,
+        wanted_by: std::ptr::null(),
+        wanted_by_count: 0,
+        type_id_requests: std::ptr::null(),
+        type_id_request_count: 0,
+    };
+    let scene = Scene::new();
+    let plugin = load_systems(&scene, &[system]);
+    let system_type_id = scene.resolve_system_type_id(plugin, "querying").unwrap();
+    *ATTACH_SYSTEM_TYPE_ID.lock().unwrap() = Some(system_type_id);
+
+    scene.add_system(system_type_id).unwrap();
+
+    *ATTACH_SYSTEM_TYPE_ID.lock().unwrap() = None;
 }
 
 #[test]
