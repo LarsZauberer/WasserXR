@@ -1,7 +1,7 @@
 use crate::utils::version::Version;
 use crate::{
     definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
-    ids::{AssetTypeID, ComponentTypeID, SystemTypeID},
+    ids::{AssetTypeSlot, ComponentTypeSlot, SystemTypeSlot},
     private::{
         id_store::IDStore,
         manifests::{
@@ -29,9 +29,9 @@ pub(crate) struct PluginManifest {
     pub name: String,
     pub engine_version: Version,
 
-    pub components: IDStore<String, ComponentTypeID, ComponentManifest>,
-    pub assets: IDStore<String, AssetTypeID, AssetManifest>,
-    pub systems: IDStore<String, SystemTypeID, SystemManifest>,
+    pub components: IDStore<String, ComponentTypeSlot, ComponentManifest>,
+    pub assets: IDStore<String, AssetTypeSlot, AssetManifest>,
+    pub systems: IDStore<String, SystemTypeSlot, SystemManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {

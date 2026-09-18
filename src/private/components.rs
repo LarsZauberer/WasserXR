@@ -7,20 +7,17 @@ use crate::{
     definitions::components::Destroyer,
     errors::ComponentError,
     field::AccessRequest,
-    ids::{FieldID, FieldTypeID, PluginID},
+    ids::{ComponentTypeID, FieldSlot, FieldTypeID},
     private::{
         fields::ComponentField, id_store::IDStore, manifests::components::ComponentManifest,
     },
 };
 
-/// The component is the concrete data record of a component. It carries the
-/// information about which plugin it belongs to, stores it's component manifest
-/// and the actual data.
+/// Concrete component data and its fields.
 #[derive(Debug)]
 pub(crate) struct Component {
-    plugin_id: PluginID,
     name: String,
-    fields: IDStore<FieldTypeID, FieldID, ComponentField>,
+    fields: IDStore<FieldTypeID, FieldSlot, ComponentField>,
     destroyer: Destroyer,
     data: *mut c_void,
 }
@@ -43,14 +40,16 @@ impl Component {
     ///
     /// This **requires** that the destroyer code is still loaded by the plugin
     /// at the time the component is dropped.
-    pub(crate) fn new(manifest: &ComponentManifest, plugin_id: PluginID) -> Self {
+    pub(crate) fn new(manifest: &ComponentManifest, component_type: ComponentTypeID) -> Self {
         let data = unsafe { (manifest.creator)() };
         let mut fields = IDStore::default();
-        for (field_type_id, field) in manifest.fields.iter() {
-            fields.insert_named(field_type_id, ComponentField::from(field));
+        for (field_slot, field) in manifest.fields.iter() {
+            fields.insert_named(
+                FieldTypeID(component_type.0, component_type.1, field_slot),
+                ComponentField::from(field),
+            );
         }
         Self {
-            plugin_id,
             name: manifest.name.clone(),
             fields,
             destroyer: manifest.destroyer,
@@ -64,7 +63,7 @@ impl Component {
     }
 
     /// Get the name of a field
-    pub(crate) fn get_field_name(&self, id: FieldID) -> Result<String, ComponentError> {
+    pub(crate) fn get_field_name(&self, id: FieldSlot) -> Result<String, ComponentError> {
         Ok(self
             .fields
             .get(id)
@@ -73,11 +72,11 @@ impl Component {
             .to_owned())
     }
 
-    /// Get a field ID from its field type ID.
-    pub(crate) fn resolve_field_id(
+    /// Get a component-local field slot from its field type ID.
+    pub(crate) fn resolve_field_slot(
         &self,
         field_type_id: FieldTypeID,
-    ) -> Result<FieldID, ComponentError> {
+    ) -> Result<FieldSlot, ComponentError> {
         self.fields
             .resolve_id(&field_type_id)
             .ok_or(ComponentError::FieldNotFound)
@@ -95,8 +94,11 @@ impl Component {
         field_type: FieldTypeID,
         access: AccessRequest,
     ) -> Result<*mut c_void, ComponentError> {
-        let id = self.resolve_field_id(field_type)?;
-        let field = self.fields.get(id).ok_or(ComponentError::FieldNotFound)?;
+        let field = self
+            .fields
+            .resolve_id(&field_type)
+            .and_then(|field| self.fields.get(field))
+            .ok_or(ComponentError::FieldNotFound)?;
         match access {
             AccessRequest::Read => Ok(field.get(self.data)?.cast_mut()),
             AccessRequest::Write => Ok(field.get_mut(self.data)?),

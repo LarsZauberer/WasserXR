@@ -11,7 +11,7 @@ use wasserxr::{
         plugins::PluginDefinition,
     },
     field::AccessRequest,
-    ids::{ComponentTypeID, FieldTypeID, PluginID},
+    ids::{ComponentTypeID, FieldTypeID},
     scene::Scene,
     utils::version::Version,
 };
@@ -91,29 +91,25 @@ const PLUGIN: PluginDefinition = PluginDefinition {
     system_count: 0,
 };
 
-fn scene() -> (Scene, PluginID, ComponentTypeID, [FieldTypeID; 2]) {
+fn scene() -> (Scene, ComponentTypeID, [FieldTypeID; 2]) {
     let scene = Scene::new();
     let plugin = unsafe { scene.load_static_plugin(PLUGIN) }.unwrap();
     let component = scene
         .resolve_component_type_id(plugin, "Singleton")
         .unwrap();
     let fields = [
-        scene
-            .resolve_field_type_id(plugin, component, "First")
-            .unwrap(),
-        scene
-            .resolve_field_type_id(plugin, component, "Second")
-            .unwrap(),
+        scene.resolve_field_type_id(component, "First").unwrap(),
+        scene.resolve_field_type_id(component, "Second").unwrap(),
     ];
-    (scene, plugin, component, fields)
+    (scene, component, fields)
 }
 
 #[test]
 fn ensure_singleton_creates_and_reuses_one_entity() {
-    let (scene, plugin, component, _) = scene();
+    let (scene, component, _) = scene();
 
-    let created = scene.ensure_singleton(plugin, component).unwrap();
-    let reused = scene.ensure_singleton(plugin, component).unwrap();
+    let created = scene.ensure_singleton(component).unwrap();
+    let reused = scene.ensure_singleton(component).unwrap();
 
     assert_eq!(reused, created);
     assert_eq!(scene.get_entities(), vec![created]);
@@ -122,18 +118,17 @@ fn ensure_singleton_creates_and_reuses_one_entity() {
 
 #[test]
 fn ensure_singleton_leaves_existing_duplicates_untouched() {
-    let (scene, plugin, component, fields) = scene();
+    let (scene, component, fields) = scene();
     let first = scene.add_entity();
     let second = scene.add_entity();
-    scene.add_component(first, plugin, component).unwrap();
-    scene.add_component(second, plugin, component).unwrap();
+    scene.add_component(first, component).unwrap();
+    scene.add_component(second, component).unwrap();
 
-    let singleton = scene.ensure_singleton(plugin, component).unwrap();
+    let singleton = scene.ensure_singleton(component).unwrap();
     scene
-        .query_singleton(
-            (plugin, component, AccessRequest::Read, &fields[..1]),
-            |pointers| assert_eq!(pointers.len(), 1),
-        )
+        .query_singleton((component, AccessRequest::Read, &fields[..1]), |pointers| {
+            assert_eq!(pointers.len(), 1)
+        })
         .unwrap();
 
     assert!([first, second].contains(&singleton));
@@ -142,7 +137,7 @@ fn ensure_singleton_leaves_existing_duplicates_untouched() {
 
 #[test]
 fn concurrent_ensure_singleton_calls_create_one_entity() {
-    let (scene, plugin, component, _) = scene();
+    let (scene, component, _) = scene();
     let scene = Arc::new(scene);
     let barrier = Arc::new(Barrier::new(8));
     let threads = (0..8)
@@ -151,7 +146,7 @@ fn concurrent_ensure_singleton_calls_create_one_entity() {
             let barrier = Arc::clone(&barrier);
             thread::spawn(move || {
                 barrier.wait();
-                scene.ensure_singleton(plugin, component).unwrap()
+                scene.ensure_singleton(component).unwrap()
             })
         })
         .collect::<Vec<_>>();
@@ -166,23 +161,19 @@ fn concurrent_ensure_singleton_calls_create_one_entity() {
 
 #[test]
 fn query_singleton_ensures_and_queries_one_component() {
-    let (scene, plugin, component, fields) = scene();
+    let (scene, component, fields) = scene();
 
     scene
-        .query_singleton(
-            (plugin, component, AccessRequest::Write, &fields),
-            |pointers| {
-                assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 1);
-                assert_eq!(unsafe { *pointers[1].cast::<usize>() }, 2);
-                unsafe { *pointers[0].cast::<usize>() = 3 };
-            },
-        )
+        .query_singleton((component, AccessRequest::Write, &fields), |pointers| {
+            assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 1);
+            assert_eq!(unsafe { *pointers[1].cast::<usize>() }, 2);
+            unsafe { *pointers[0].cast::<usize>() = 3 };
+        })
         .unwrap();
     scene
-        .query_singleton(
-            (plugin, component, AccessRequest::Read, &fields[..1]),
-            |pointers| assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 3),
-        )
+        .query_singleton((component, AccessRequest::Read, &fields[..1]), |pointers| {
+            assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 3)
+        })
         .unwrap();
 
     assert_eq!(scene.get_entities().len(), 1);

@@ -2,32 +2,32 @@ use petgraph::{algo::is_cyclic_directed, graphmap::DiGraphMap};
 
 use crate::{
     errors::{SceneError, SystemError},
-    ids::{PluginID, SystemID, SystemTypeID, TypeID},
+    ids::{SystemID, SystemSlot, SystemTypeID, TypeID},
     private::{id_store::IDStore, manifests::systems::SystemManifest, system::System},
     scene::Scene,
 };
 
-type SystemKey = (PluginID, SystemTypeID);
-
 /// Concrete systems and their validated dependency relationships.
 #[derive(Debug, Default)]
 pub(crate) struct SystemStorage {
-    pub(super) systems: IDStore<SystemKey, SystemID, System>,
+    pub(super) systems: IDStore<SystemTypeID, SystemSlot, System>,
 }
 
 impl SystemStorage {
-    pub(crate) fn resolve_id(&self, key: &SystemKey) -> Option<SystemID> {
-        self.systems.resolve_id(key)
+    pub(crate) fn resolve_id(&self, key: &SystemTypeID) -> Option<SystemID> {
+        self.systems
+            .resolve_id(key)
+            .map(|slot| SystemID(key.0, key.1, slot))
     }
 
     pub(crate) fn add_system(
         &mut self,
         scene: &Scene,
-        key: SystemKey,
+        key: SystemTypeID,
         manifest: &SystemManifest,
         type_ids: Vec<TypeID>,
-        requires: Vec<SystemKey>,
-        wanted_by: Vec<SystemKey>,
+        requires: Vec<SystemTypeID>,
+        wanted_by: Vec<SystemTypeID>,
     ) -> Result<SystemID, SceneError> {
         // The candidate has no concrete SystemID until validation succeeds, so
         // graph nodes use its already-stable plugin and system-type key instead.
@@ -38,9 +38,9 @@ impl SystemStorage {
             }
         }
 
-        let mut graph: DiGraphMap<SystemKey, ()> = DiGraphMap::new();
+        let mut graph: DiGraphMap<SystemTypeID, ()> = DiGraphMap::new();
         for system in self.systems.values() {
-            let system_key = (system.get_plugin_id(), system.get_system_type_id());
+            let system_key = system.get_system_type_id();
             graph.add_node(system_key);
             for dependency in system.get_requires() {
                 graph.add_edge(*dependency, system_key, ());
@@ -60,13 +60,17 @@ impl SystemStorage {
             return Err(SystemError::DependencyCycle.into());
         }
 
-        let system = System::new(scene, key.0, key.1, manifest, type_ids, requires, wanted_by);
-        Ok(self.systems.insert_named(key, system))
+        let system = System::new(scene, key, manifest, type_ids, requires, wanted_by);
+        Ok(SystemID(
+            key.0,
+            key.1,
+            self.systems.insert_named(key, system),
+        ))
     }
 
     pub(crate) fn remove(&mut self, id: SystemID) -> Result<System, SceneError> {
-        let system = self.systems.get(id).ok_or(SceneError::SystemNotFound)?;
-        let key = (system.get_plugin_id(), system.get_system_type_id());
+        let system = self.systems.get(id.2).ok_or(SceneError::SystemNotFound)?;
+        let key = system.get_system_type_id();
         if self
             .systems
             .values()
@@ -74,7 +78,7 @@ impl SystemStorage {
         {
             return Err(SystemError::DependencyInUse.into());
         }
-        Ok(self.systems.remove(id).expect("system was just resolved"))
+        Ok(self.systems.remove(id.2).expect("system was just resolved"))
     }
 
     pub(crate) fn into_values(self) -> impl Iterator<Item = System> {

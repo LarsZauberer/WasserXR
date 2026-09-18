@@ -16,7 +16,7 @@ use wasserxr::{
 };
 
 static TICK_ORDER: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
-static ADD_ON_TICK: Mutex<Option<(PluginID, SystemTypeID)>> = Mutex::new(None);
+static ADD_ON_TICK: Mutex<Option<SystemTypeID>> = Mutex::new(None);
 static REMOVE_ON_TICK: Mutex<Option<SystemID>> = Mutex::new(None);
 static ADDED_RUNS: AtomicUsize = AtomicUsize::new(0);
 static REMOVED_RUNS: AtomicUsize = AtomicUsize::new(0);
@@ -46,8 +46,8 @@ unsafe extern "C" fn run_e(_: *const Scene, _: *const TypeID, _: usize) {
 }
 
 unsafe extern "C" fn add_on_tick(scene: *const Scene, _: *const TypeID, _: usize) {
-    if let Some((plugin, system_type)) = ADD_ON_TICK.lock().unwrap().take() {
-        unsafe { &*scene }.add_system(plugin, system_type).unwrap();
+    if let Some(system_type) = ADD_ON_TICK.lock().unwrap().take() {
+        unsafe { &*scene }.add_system(system_type).unwrap();
     }
 }
 
@@ -135,7 +135,7 @@ fn tick_honors_requires_and_wanted_by() {
     let plugin = load_systems(&scene, &systems);
     for name in ["d", "c", "a", "b", "e"] {
         let system_type = scene.resolve_system_type_id(plugin, name).unwrap();
-        scene.add_system(plugin, system_type).unwrap();
+        scene.add_system(system_type).unwrap();
     }
 
     scene.tick();
@@ -162,8 +162,8 @@ fn systems_added_during_tick_run_on_the_next_tick() {
     let plugin = load_systems(&scene, &systems);
     let adder = scene.resolve_system_type_id(plugin, "adder").unwrap();
     let added = scene.resolve_system_type_id(plugin, "added").unwrap();
-    scene.add_system(plugin, adder).unwrap();
-    *ADD_ON_TICK.lock().unwrap() = Some((plugin, added));
+    scene.add_system(adder).unwrap();
+    *ADD_ON_TICK.lock().unwrap() = Some(added);
 
     scene.tick();
     assert_eq!(ADDED_RUNS.load(Ordering::Relaxed), 0);
@@ -187,8 +187,8 @@ fn systems_removed_during_tick_finish_the_current_tick() {
     let plugin = load_systems(&scene, &systems);
     let remover = scene.resolve_system_type_id(plugin, "remover").unwrap();
     let removed = scene.resolve_system_type_id(plugin, "removed").unwrap();
-    scene.add_system(plugin, remover).unwrap();
-    let removed = scene.add_system(plugin, removed).unwrap();
+    scene.add_system(remover).unwrap();
+    let removed = scene.add_system(removed).unwrap();
     *REMOVE_ON_TICK.lock().unwrap() = Some(removed);
 
     scene.tick();
@@ -219,7 +219,7 @@ fn tick_runs_ready_systems_without_waiting_for_unrelated_systems() {
     let plugin = load_systems(&scene, &systems);
     for name in ["slow", "fast", "after_fast"] {
         let system_type = scene.resolve_system_type_id(plugin, name).unwrap();
-        scene.add_system(plugin, system_type).unwrap();
+        scene.add_system(system_type).unwrap();
     }
 
     scene.tick();

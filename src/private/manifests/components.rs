@@ -4,7 +4,7 @@ use crate::{
         components::{ComponentDefinition, Creator, Destroyer},
         error::ComponentDefinitionError,
     },
-    ids::FieldTypeID,
+    ids::FieldTypeSlot,
     private::{
         id_store::IDStore,
         manifests::{Manifest, fields::ComponentFieldManifest},
@@ -18,7 +18,7 @@ pub(crate) struct ComponentManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: IDStore<String, FieldTypeID, ComponentFieldManifest>,
+    pub fields: IDStore<String, FieldTypeSlot, ComponentFieldManifest>,
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {

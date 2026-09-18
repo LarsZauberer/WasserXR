@@ -13,8 +13,9 @@ use crate::{
     },
     field::AccessRequest,
     ids::{
-        AssetFieldID, AssetFieldTypeID, AssetID, AssetTypeID, ComponentID, ComponentTypeID,
-        EntityID, FieldID, FieldTypeID, PluginID, SystemID, SystemTypeID, TypeID,
+        AssetFieldID, AssetFieldTypeID, AssetID, AssetSlot, AssetTypeID, ComponentID,
+        ComponentTypeID, EntityID, EntitySlot, FieldID, FieldTypeID, PluginID, PluginSlot,
+        SystemID, SystemTypeID, TypeID,
     },
     private::{
         assets::Asset,
@@ -29,26 +30,26 @@ use crate::{
     },
 };
 
-pub(crate) type EntityStorage = IDStore<String, EntityID, Entity>;
+pub(crate) type EntityStorage = IDStore<String, EntitySlot, Entity>;
 
 /// # Design Decision
 ///
 /// A plugin doesn't require an RwLock since it is a read-only object. There are
 /// no operations that require exclusive access to it.
-type PluginStorage = IDStore<String, PluginID, Plugin>;
+type PluginStorage = IDStore<String, PluginSlot, Plugin>;
 
 /// # Design Decision
 ///
 /// An asset doesn't require an RwLock since it is a read-only object. There are
 /// no operations that require exclusive access to it.
-pub(crate) type AssetStorage = IDStore<(PluginID, AssetTypeID, String), AssetID, Asset>;
+pub(crate) type AssetStorage = IDStore<(AssetTypeID, String), AssetSlot, Asset>;
 
 /// One component requirement: plugin, component type, lock mode, and ordered
 /// field types. An empty field slice still requires and locks the component.
-pub type ComponentQuery<'a> = (PluginID, ComponentTypeID, AccessRequest, &'a [FieldTypeID]);
+pub type ComponentQuery<'a> = (ComponentTypeID, AccessRequest, &'a [FieldTypeID]);
 
 /// One complete asset requested by plugin, asset type, and cache data string.
-pub type AssetQuery<'a> = (PluginID, AssetTypeID, &'a str);
+pub type AssetQuery<'a> = (AssetTypeID, &'a str);
 
 /// The scene is the core object in WasserXR. It contains the main public API to
 /// access and maintain all ECS objects.
@@ -80,11 +81,12 @@ impl Scene {
     /// Creates a new entity and returns it's handle. The handle will be unique
     /// to every other entity ever created within this scene.
     pub fn add_entity(&self) -> EntityID {
-        let entity = Entity::new();
-        self.entities
-            .write()
-            .expect("scene entity lock poisoned")
-            .insert(entity)
+        EntityID(
+            self.entities
+                .write()
+                .expect("scene entity lock poisoned")
+                .insert(Entity::new()),
+        )
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -97,7 +99,7 @@ impl Scene {
             .entities
             .write()
             .expect("scene entity lock poisoned")
-            .remove(id)
+            .remove(id.0)
             .ok_or(SceneError::EntityNotFound)?;
         Ok(())
     }
@@ -109,6 +111,7 @@ impl Scene {
             .read()
             .expect("scene entity lock poisoned")
             .keys()
+            .map(EntityID)
             .collect()
     }
 
@@ -160,14 +163,14 @@ impl Scene {
         }
 
         let name = new_plugin.get_name().to_owned();
-        Ok(plugins.insert_named(name, new_plugin))
+        Ok(PluginID(plugins.insert_named(name, new_plugin)))
     }
 
     /// Runs an action with an entity while holding the entity collection's
     /// read lock, preventing the entity from being removed during the action.
     fn with_entity<T>(
         &self,
-        id: EntityID,
+        id: EntitySlot,
         action: impl FnOnce(&Entity) -> Result<T, SceneError>,
     ) -> Result<T, SceneError> {
         let entities = self.entities.read().expect("scene entity lock poisoned");
@@ -209,9 +212,7 @@ impl Scene {
     ) -> Result<PluginID, SceneError> {
         let manifest: PluginManifest = unsafe { Manifest::checked_convert(definition) }
             .map_err(|err| SceneError::from(PluginError::from(err)))?;
-        let plugin = Plugin::load_static(manifest);
-
-        self.add_plugin(plugin)
+        self.add_plugin(Plugin::load_static(manifest))
     }
 
     /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a
@@ -221,6 +222,7 @@ impl Scene {
             .read()
             .expect("scene plugin lock poisoned")
             .resolve_id(name)
+            .map(PluginID)
     }
 
     /// Returns the name of the plugin identified by `id`.
@@ -231,7 +233,7 @@ impl Scene {
     pub fn get_plugin_name(&self, id: PluginID) -> &str {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let name = plugins
-            .get(id)
+            .get(id.0)
             .expect("plugin ID does not identify a loaded plugin")
             .get_name() as *const str;
 
@@ -248,6 +250,7 @@ impl Scene {
             .read()
             .expect("scene plugin lock poisoned")
             .keys()
+            .map(PluginID)
             .collect()
     }
 
@@ -260,42 +263,38 @@ impl Scene {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .get(plugin_id)
-            .and_then(|plugin| plugin.resolve_component_type_id(name))
+            .get(plugin_id.0)
+            .and_then(|plugin| plugin.resolve_component_type_slot(name))
+            .map(|component| ComponentTypeID(plugin_id.0, component))
             .ok_or(SceneError::NoComponentType)
     }
 
     /// Resolves a component field type name within a component type manifest.
     pub fn resolve_field_type_id(
         &self,
-        plugin_id: PluginID,
         component_type_id: ComponentTypeID,
         name: &str,
     ) -> Result<FieldTypeID, SceneError> {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .get(plugin_id)
-            .and_then(|plugin| plugin.resolve_field_type_id(component_type_id, name))
+            .get(component_type_id.0)
+            .and_then(|plugin| plugin.resolve_field_type_slot(component_type_id.1, name))
+            .map(|field| FieldTypeID(component_type_id.0, component_type_id.1, field))
             .ok_or(SceneError::NoComponentType)
     }
 
     /// Returns the primitive type hint for a component field type.
-    pub fn get_field_type(
-        &self,
-        plugin_id: PluginID,
-        component_type_id: ComponentTypeID,
-        field_type_id: FieldTypeID,
-    ) -> Result<TypeHint, SceneError> {
+    pub fn get_field_type(&self, field_type_id: FieldTypeID) -> Result<TypeHint, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let component = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_component(component_type_id))
+            .get(field_type_id.0)
+            .and_then(|plugin| plugin.get_component(field_type_id.1))
             .ok_or(SceneError::NoComponentType)?;
 
         component
             .fields
-            .get(field_type_id)
+            .get(field_type_id.2)
             .map(|field| field.type_hint)
             .ok_or_else(|| SceneError::from(ComponentError::FieldNotFound))
     }
@@ -309,8 +308,9 @@ impl Scene {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .get(plugin_id)
-            .and_then(|plugin| plugin.resolve_asset_type_id(name))
+            .get(plugin_id.0)
+            .and_then(|plugin| plugin.resolve_asset_type_slot(name))
+            .map(|asset| AssetTypeID(plugin_id.0, asset))
             .ok_or(SceneError::AssetNotFound)
     }
 
@@ -320,11 +320,11 @@ impl Scene {
     ///
     /// Panics if either ID does not identify a loaded plugin or one of its
     /// asset types.
-    pub fn get_asset_name(&self, plugin_id: PluginID, id: AssetTypeID) -> &str {
+    pub fn get_asset_name(&self, id: AssetTypeID) -> &str {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let name = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_asset_name(id))
+            .get(id.0)
+            .and_then(|plugin| plugin.get_asset_name(id.1))
             .expect("IDs do not identify a loaded asset type") as *const str;
 
         // SAFETY: Plugin manifests are never removed from a Scene and their
@@ -336,34 +336,32 @@ impl Scene {
     /// Resolves an asset field type name within an asset type manifest.
     pub fn resolve_asset_field_type_id(
         &self,
-        plugin_id: PluginID,
         asset_type_id: AssetTypeID,
         name: &str,
     ) -> Result<AssetFieldTypeID, SceneError> {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .get(plugin_id)
-            .and_then(|plugin| plugin.resolve_asset_field_type_id(asset_type_id, name))
+            .get(asset_type_id.0)
+            .and_then(|plugin| plugin.resolve_asset_field_type_slot(asset_type_id.1, name))
+            .map(|field| AssetFieldTypeID(asset_type_id.0, asset_type_id.1, field))
             .ok_or(SceneError::AssetNotFound)
     }
 
     /// Returns the primitive type hint for an asset field type.
     pub fn get_asset_field_type(
         &self,
-        plugin_id: PluginID,
-        asset_type_id: AssetTypeID,
         field_type_id: AssetFieldTypeID,
     ) -> Result<TypeHint, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let asset = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_asset(asset_type_id))
+            .get(field_type_id.0)
+            .and_then(|plugin| plugin.get_asset(field_type_id.1))
             .ok_or(SceneError::AssetNotFound)?;
 
         asset
             .fields
-            .get(field_type_id)
+            .get(field_type_id.2)
             .map(|field| field.type_hint)
             .ok_or_else(|| SceneError::from(AssetError::FieldNotFound))
     }
@@ -377,8 +375,9 @@ impl Scene {
         self.plugins
             .read()
             .expect("scene plugin lock poisoned")
-            .get(plugin_id)
-            .and_then(|plugin| plugin.resolve_system_type_id(name))
+            .get(plugin_id.0)
+            .and_then(|plugin| plugin.resolve_system_type_slot(name))
+            .map(|system| SystemTypeID(plugin_id.0, system))
             .ok_or(SceneError::SystemNotFound)
     }
 
@@ -388,11 +387,11 @@ impl Scene {
     ///
     /// Panics if either ID does not identify a loaded plugin or one of its
     /// system types.
-    pub fn get_system_name(&self, plugin_id: PluginID, id: SystemTypeID) -> &str {
+    pub fn get_system_name(&self, id: SystemTypeID) -> &str {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let name = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_system_name(id))
+            .get(id.0)
+            .and_then(|plugin| plugin.get_system_name(id.1))
             .expect("IDs do not identify a loaded system type") as *const str;
 
         // SAFETY: Plugin manifests are never removed from a Scene and their
@@ -404,13 +403,14 @@ impl Scene {
     /// Resolves the type IDs requested by a system manifest.
     pub fn resolve_requested_type_ids(
         &self,
-        plugin_id: PluginID,
         system_type_id: SystemTypeID,
     ) -> Result<Vec<TypeID>, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let plugin = plugins.get(plugin_id).ok_or(SceneError::SystemNotFound)?;
+        let plugin = plugins
+            .get(system_type_id.0)
+            .ok_or(SceneError::SystemNotFound)?;
         let manifest = plugin
-            .get_system(system_type_id)
+            .get_system(system_type_id.1)
             .ok_or(SceneError::SystemNotFound)?;
 
         manifest
@@ -419,19 +419,29 @@ impl Scene {
             .map(|request| {
                 let type_id = match request {
                     TypeIDRequestManifest::ComponentTypeID { component } => plugin
-                        .resolve_component_type_id(component)
-                        .map(TypeID::from),
+                        .resolve_component_type_slot(component)
+                        .map(|component| ComponentTypeID(system_type_id.0, component).into()),
                     TypeIDRequestManifest::FieldTypeID { component, field } => plugin
-                        .resolve_component_type_id(component)
-                        .and_then(|component| plugin.resolve_field_type_id(component, field))
-                        .map(TypeID::from),
-                    TypeIDRequestManifest::AssetTypeID { asset } => {
-                        plugin.resolve_asset_type_id(asset).map(TypeID::from)
+                        .resolve_component_type_slot(component)
+                        .and_then(|component| {
+                            plugin
+                                .resolve_field_type_slot(component, field)
+                                .map(|field| {
+                                    TypeID::from(FieldTypeID(system_type_id.0, component, field))
+                                })
+                        }),
+                    TypeIDRequestManifest::AssetTypeID { asset } => plugin
+                        .resolve_asset_type_slot(asset)
+                        .map(|asset| AssetTypeID(system_type_id.0, asset).into()),
+                    TypeIDRequestManifest::AssetFieldTypeID { asset, field } => {
+                        plugin.resolve_asset_type_slot(asset).and_then(|asset| {
+                            plugin
+                                .resolve_asset_field_type_slot(asset, field)
+                                .map(|field| {
+                                    TypeID::from(AssetFieldTypeID(system_type_id.0, asset, field))
+                                })
+                        })
                     }
-                    TypeIDRequestManifest::AssetFieldTypeID { asset, field } => plugin
-                        .resolve_asset_type_id(asset)
-                        .and_then(|asset| plugin.resolve_asset_field_type_id(asset, field))
-                        .map(TypeID::from),
                 };
                 type_id.ok_or(SceneError::RequestedTypeIDNotFound)
             })
@@ -445,18 +455,18 @@ impl Scene {
     pub fn add_component(
         &self,
         entity_id: EntityID,
-        plugin_id: PluginID,
         component_type_id: ComponentTypeID,
     ) -> Result<ComponentID, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let manifest = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_component(component_type_id))
+            .get(component_type_id.0)
+            .and_then(|plugin| plugin.get_component(component_type_id.1))
             .ok_or(SceneError::NoComponentType)?;
 
-        self.with_entity(entity_id, |entity| {
+        self.with_entity(entity_id.0, |entity| {
             entity
-                .add_component(plugin_id, component_type_id, manifest)
+                .add_component(component_type_id, manifest)
+                .map(|component| ComponentID(entity_id.0, component))
                 .map_err(SceneError::EntityError)
         })
     }
@@ -468,58 +478,58 @@ impl Scene {
     /// this function cannot create duplicates.
     pub fn ensure_singleton(
         &self,
-        plugin_id: PluginID,
         component_type_id: ComponentTypeID,
     ) -> Result<EntityID, SceneError> {
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let manifest = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_component(component_type_id))
+            .get(component_type_id.0)
+            .and_then(|plugin| plugin.get_component(component_type_id.1))
             .ok_or(SceneError::NoComponentType)?;
         let mut entities = self.entities.write().expect("scene entity lock poisoned");
 
-        if let Some((id, _)) = entities.iter().find(|(_, entity)| {
-            entity
-                .resolve_component_id(plugin_id, component_type_id)
-                .is_ok()
-        }) {
-            return Ok(id);
+        if let Some((id, _)) = entities
+            .iter()
+            .find(|(_, entity)| entity.resolve_component_slot(component_type_id).is_ok())
+        {
+            return Ok(EntityID(id));
         }
 
-        let entity = Entity::new();
-        entity
-            .add_component(plugin_id, component_type_id, manifest)
+        let entity_slot = entities.insert(Entity::new());
+        entities
+            .get(entity_slot)
+            .expect("entity was just inserted")
+            .add_component(component_type_id, manifest)
             .map_err(SceneError::from)?;
-        Ok(entities.insert(entity))
+        Ok(EntityID(entity_slot))
     }
 
     /// Remove a component type from an entity
     ///
     /// The function may fail, if the [`EntityID`] cannot be found in the scene.
-    pub fn remove_component(
-        &self,
-        entity_id: EntityID,
-        component: ComponentID,
-    ) -> Result<(), SceneError> {
-        self.with_entity(entity_id, |entity| {
-            entity.remove_component(component).map_err(SceneError::from)
+    pub fn remove_component(&self, component: ComponentID) -> Result<(), SceneError> {
+        self.with_entity(component.0, |entity| {
+            entity
+                .remove_component(component.1)
+                .map_err(SceneError::from)
         })
     }
 
     /// Returns all the component names of the given [`EntityID`]
     pub fn get_components(&self, entity_id: EntityID) -> Result<Vec<ComponentID>, SceneError> {
-        self.with_entity(entity_id, |entity| Ok(entity.get_components()))
+        self.with_entity(entity_id.0, |entity| {
+            Ok(entity
+                .get_component_slots()
+                .into_iter()
+                .map(|component| ComponentID(entity_id.0, component))
+                .collect())
+        })
     }
 
     /// Return the name of some component handle
-    pub fn get_component_name(
-        &self,
-        entity_id: EntityID,
-        component_id: ComponentID,
-    ) -> Result<String, SceneError> {
-        self.with_entity(entity_id, |entity| {
+    pub fn get_component_name(&self, component_id: ComponentID) -> Result<String, SceneError> {
+        self.with_entity(component_id.0, |entity| {
             entity
-                .get_component_name(component_id)
+                .get_component_name(component_id.1)
                 .map_err(SceneError::from)
         })
     }
@@ -528,12 +538,12 @@ impl Scene {
     pub fn resolve_component_id(
         &self,
         entity_id: EntityID,
-        plugin_id: PluginID,
         component_type_id: ComponentTypeID,
     ) -> Result<ComponentID, SceneError> {
-        self.with_entity(entity_id, |entity| {
+        self.with_entity(entity_id.0, |entity| {
             entity
-                .resolve_component_id(plugin_id, component_type_id)
+                .resolve_component_slot(component_type_id)
+                .map(|component| ComponentID(entity_id.0, component))
                 .map_err(SceneError::from)
         })
     }
@@ -541,13 +551,13 @@ impl Scene {
     /// Resolves a field type within a component to its [`FieldID`].
     pub fn resolve_field_id(
         &self,
-        entity_id: EntityID,
         component_id: ComponentID,
         field_type_id: FieldTypeID,
     ) -> Result<FieldID, SceneError> {
-        self.with_entity(entity_id, |entity| {
+        self.with_entity(component_id.0, |entity| {
             entity
-                .resolve_field_id(component_id, field_type_id)
+                .resolve_field_slot(component_id.1, field_type_id)
+                .map(|field| FieldID(component_id.0, component_id.1, field))
                 .map_err(SceneError::from)
         })
     }
@@ -571,8 +581,8 @@ impl Scene {
         query: ComponentQuery<'_>,
         action: impl FnOnce(&[*mut c_void]),
     ) -> Result<(), SceneError> {
-        let (plugin_id, component_type_id, _, fields) = query;
-        self.ensure_singleton(plugin_id, component_type_id)?;
+        let (component_type_id, _, fields) = query;
+        self.ensure_singleton(component_type_id)?;
         let mut queried = false;
         self.query_components(std::slice::from_ref(&query), |pointers| {
             // Component queries flatten the fields from every match. Expose only the
@@ -630,17 +640,14 @@ impl Scene {
     ///
     /// ```no_run
     /// # use wasserxr::{scene::Scene, field::AccessRequest, ids::*, errors::SceneError};
-    /// # fn update(scene: &Scene, plugin: PluginID, component: ComponentTypeID,
+    /// # fn update(scene: &Scene, component: ComponentTypeID,
     /// #           counter: FieldTypeID) -> Result<(), SceneError> {
-    /// scene.query_components(
-    ///     &[(plugin, component, AccessRequest::Write, &[counter])],
-    ///     |fields| {
-    ///         for &field in fields {
-    ///             // SAFETY: This plugin defines `counter` as a mutable u32.
-    ///             unsafe { *field.cast::<u32>() += 1 };
-    ///         }
-    ///     },
-    /// )?;
+    /// scene.query_components(&[(component, AccessRequest::Write, &[counter])], |fields| {
+    ///     for &field in fields {
+    ///         // SAFETY: This plugin defines `counter` as a mutable u32.
+    ///         unsafe { *field.cast::<u32>() += 1 };
+    ///     }
+    /// })?;
     /// # Ok(())
     /// # }
     /// ```
@@ -679,9 +686,7 @@ impl Scene {
             // queried components, return a list of the ComponentIDs
             let ids: Option<Vec<_>> = query
                 .iter()
-                .map(|(plugin, component_type, _, _)| {
-                    components.resolve_id(&(*plugin, *component_type))
-                })
+                .map(|(component_type, _, _)| components.resolve_id(component_type))
                 .collect();
             let Some(ids) = ids else { continue };
 
@@ -690,9 +695,10 @@ impl Scene {
             //
             // This zip works since the ComponentID is directly mapped to the requested
             // component
-            for (id, &(_, _, access, fields)) in ids.into_iter().zip(query) {
-                let key = (*entity_id, id);
-                let component = components.get(id).expect("resolved component exists");
+            for (slot, &(_, access, fields)) in ids.into_iter().zip(query) {
+                let id = ComponentID(*entity_id, slot);
+                let key = id;
+                let component = components.get(slot).expect("resolved component exists");
                 let (_, lock_access) = locks.entry(key).or_insert((component, access));
                 if access == AccessRequest::Write {
                     *lock_access = AccessRequest::Write;
@@ -755,8 +761,8 @@ impl Scene {
     /// ```no_run
     /// # use wasserxr::{scene::Scene, ids::*, errors::SceneError};
     /// # struct Settings { scale: f32 }
-    /// # fn read(scene: &Scene, plugin: PluginID, settings: AssetTypeID) -> Result<(), SceneError> {
-    /// scene.query_assets(&[(plugin, settings, "default")], |assets| {
+    /// # fn read(scene: &Scene, settings: AssetTypeID) -> Result<(), SceneError> {
+    /// scene.query_assets(&[(settings, "default")], |assets| {
     ///     // SAFETY: This plugin's settings asset uses the `Settings` layout.
     ///     let settings = unsafe { &*assets[0].cast::<Settings>() };
     ///     println!("{}", settings.scale);
@@ -771,14 +777,14 @@ impl Scene {
     ) -> Result<(), SceneError> {
         let ids = query
             .iter()
-            .map(|&(plugin, asset_type, data)| self.get_asset_id(plugin, asset_type, data))
+            .map(|&(asset_type, data)| self.get_asset_id(asset_type, data))
             .collect::<Result<Vec<_>, _>>()?;
         let assets = self.assets.read().expect("scene asset lock poisoned");
         let pointers = ids
             .into_iter()
             .map(|id| {
                 assets
-                    .get(id)
+                    .get(id.2)
                     .map(Asset::data)
                     .ok_or(SceneError::AssetNotFound)
             })
@@ -792,14 +798,14 @@ impl Scene {
     /// This function will **not** load a new asset if the asset doesn't exist.
     pub fn resolve_asset_id(
         &self,
-        plugin_id: PluginID,
         asset_type_id: AssetTypeID,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .resolve_id(&(plugin_id, asset_type_id, data_string.to_owned()))
+            .resolve_id(&(asset_type_id, data_string.to_owned()))
+            .map(|asset| AssetID(asset_type_id.0, asset_type_id.1, asset))
             .ok_or(SceneError::AssetNotFound)
     }
 
@@ -814,9 +820,10 @@ impl Scene {
         self.assets
             .read()
             .expect("scene asset lock poisoned")
-            .get(asset_id)
+            .get(asset_id.2)
             .ok_or(SceneError::AssetNotFound)?
-            .resolve_field_id(field_type_id)
+            .resolve_field_slot(field_type_id)
+            .map(|field| AssetFieldID(asset_id.0, asset_id.1, asset_id.2, field))
             .map_err(SceneError::from)
     }
 
@@ -824,54 +831,46 @@ impl Scene {
     /// asset
     pub fn get_asset_id(
         &self,
-        plugin_id: PluginID,
         asset_type_id: AssetTypeID,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
-        let key = (plugin_id, asset_type_id, data_string.to_owned());
+        let key = (asset_type_id, data_string.to_owned());
         if let Some(id) = self
             .assets
             .read()
             .expect("scene asset lock poisoned")
             .resolve_id(&key)
         {
-            return Ok(id);
+            return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
         }
 
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
         let manifest = plugins
-            .get(plugin_id)
-            .and_then(|plugin| plugin.get_asset(asset_type_id))
+            .get(asset_type_id.0)
+            .and_then(|plugin| plugin.get_asset(asset_type_id.1))
             .ok_or(SceneError::AssetNotFound)?;
 
         let mut assets = self.assets.write().expect("scene asset lock poisoned");
         if let Some(id) = assets.resolve_id(&key) {
-            return Ok(id);
+            return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
         }
-        let asset = Asset::new(manifest).map_err(SceneError::from)?;
-        Ok(assets.insert_named(key, asset))
+        let asset = Asset::new(manifest, asset_type_id).map_err(SceneError::from)?;
+        let asset = assets.insert_named(key, asset);
+        Ok(AssetID(asset_type_id.0, asset_type_id.1, asset))
     }
 
     /// Gets an existing concrete system ID from its plugin and system type.
-    pub fn get_system_id(
-        &self,
-        plugin_id: PluginID,
-        system_type_id: SystemTypeID,
-    ) -> Result<SystemID, SceneError> {
+    pub fn get_system_id(&self, system_type_id: SystemTypeID) -> Result<SystemID, SceneError> {
         self.systems
             .read()
             .expect("scene system lock poisoned")
-            .resolve_id(&(plugin_id, system_type_id))
+            .resolve_id(&system_type_id)
             .ok_or(SceneError::SystemNotFound)
     }
 
     /// Adds a system to the scene and returns its concrete ID.
-    pub fn add_system(
-        &self,
-        plugin_id: PluginID,
-        system_type_id: SystemTypeID,
-    ) -> Result<SystemID, SceneError> {
-        let key = (plugin_id, system_type_id);
+    pub fn add_system(&self, system_type_id: SystemTypeID) -> Result<SystemID, SceneError> {
+        let key = system_type_id;
         if self
             .systems
             .read()
@@ -883,11 +882,13 @@ impl Scene {
         }
 
         // Resolve every requested type ID before creating or attaching the system.
-        let type_ids = self.resolve_requested_type_ids(plugin_id, system_type_id)?;
+        let type_ids = self.resolve_requested_type_ids(system_type_id)?;
         let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let plugin = plugins.get(plugin_id).ok_or(SceneError::SystemNotFound)?;
+        let plugin = plugins
+            .get(system_type_id.0)
+            .ok_or(SceneError::SystemNotFound)?;
         let manifest = plugin
-            .get_system(system_type_id)
+            .get_system(system_type_id.1)
             .ok_or(SceneError::SystemNotFound)?;
         // Resolve dependency names to stable keys so storage can check presence
         // and build the dependency graph without string lookups.
@@ -896,8 +897,8 @@ impl Scene {
             .iter()
             .map(|name| {
                 plugin
-                    .resolve_system_type_id(name)
-                    .map(|system_type_id| (plugin_id, system_type_id))
+                    .resolve_system_type_slot(name)
+                    .map(|system| SystemTypeID(system_type_id.0, system))
                     .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -906,8 +907,8 @@ impl Scene {
             .iter()
             .map(|name| {
                 plugin
-                    .resolve_system_type_id(name)
-                    .map(|system_type_id| (plugin_id, system_type_id))
+                    .resolve_system_type_slot(name)
+                    .map(|system| SystemTypeID(system_type_id.0, system))
                     .ok_or_else(|| SceneError::from(SystemError::DependencyNotFound(name.clone())))
             })
             .collect::<Result<Vec<_>, _>>()?;

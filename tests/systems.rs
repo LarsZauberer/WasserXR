@@ -126,19 +126,17 @@ fn concrete_system_lifecycle_uses_resolved_type_ids() {
         .unwrap();
 
     assert!(matches!(
-        scene.get_system_id(plugin, system_type),
+        scene.get_system_id(system_type),
         Err(SceneError::SystemNotFound)
     ));
-    let system = scene.add_system(plugin, system_type).unwrap();
-    assert_eq!(scene.get_system_id(plugin, system_type).unwrap(), system);
+    let system = scene.add_system(system_type).unwrap();
+    assert_eq!(scene.get_system_id(system_type).unwrap(), system);
     assert!(matches!(
-        scene.add_system(plugin, system_type),
+        scene.add_system(system_type),
         Err(SceneError::SystemError(SystemError::AlreadyExists))
     ));
     assert_eq!(
-        scene
-            .resolve_requested_type_ids(plugin, system_type)
-            .unwrap(),
+        scene.resolve_requested_type_ids(system_type).unwrap(),
         &[component_type.into()]
     );
     assert_eq!(
@@ -150,12 +148,12 @@ fn concrete_system_lifecycle_uses_resolved_type_ids() {
     scene.remove_system(system).unwrap();
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 1);
 
-    scene.add_system(plugin, system_type).unwrap();
+    scene.add_system(system_type).unwrap();
     scene.reset().unwrap();
     assert_eq!(ATTACH_COUNT.load(Ordering::Relaxed), 2);
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 2);
 
-    scene.add_system(plugin, system_type).unwrap();
+    scene.add_system(system_type).unwrap();
     drop(scene);
     assert_eq!(DETACH_COUNT.load(Ordering::Relaxed), 3);
 }
@@ -173,18 +171,18 @@ fn required_system_must_already_be_in_the_scene() {
     let dependent_type = scene.resolve_system_type_id(plugin, "dependent").unwrap();
 
     assert!(matches!(
-        scene.add_system(plugin, dependent_type),
+        scene.add_system(dependent_type),
         Err(SceneError::SystemError(SystemError::DependencyNotFound(name)))
             if name == "base"
     ));
-    let base = scene.add_system(plugin, base_type).unwrap();
-    let dependent = scene.add_system(plugin, dependent_type).unwrap();
+    let base = scene.add_system(base_type).unwrap();
+    let dependent = scene.add_system(dependent_type).unwrap();
 
     assert!(matches!(
         scene.remove_system(base),
         Err(SceneError::SystemError(SystemError::DependencyInUse))
     ));
-    assert_eq!(scene.get_system_id(plugin, base_type).unwrap(), base);
+    assert_eq!(scene.get_system_id(base_type).unwrap(), base);
 
     scene.remove_system(dependent).unwrap();
     scene.remove_system(base).unwrap();
@@ -203,13 +201,13 @@ fn cyclic_system_dependencies_are_rejected() {
     let a = scene.resolve_system_type_id(plugin, "a").unwrap();
     let b = scene.resolve_system_type_id(plugin, "b").unwrap();
 
-    scene.add_system(plugin, a).unwrap();
+    scene.add_system(a).unwrap();
     assert!(matches!(
-        scene.add_system(plugin, b),
+        scene.add_system(b),
         Err(SceneError::SystemError(SystemError::DependencyCycle))
     ));
     assert!(matches!(
-        scene.get_system_id(plugin, b),
+        scene.get_system_id(b),
         Err(SceneError::SystemNotFound)
     ));
 }
@@ -225,11 +223,11 @@ fn unresolved_requested_type_ids_reject_the_system() {
     let invalid = scene.resolve_system_type_id(plugin, "invalid").unwrap();
 
     assert!(matches!(
-        scene.add_system(plugin, invalid),
+        scene.add_system(invalid),
         Err(SceneError::RequestedTypeIDNotFound)
     ));
     assert!(matches!(
-        scene.get_system_id(plugin, invalid),
+        scene.get_system_id(invalid),
         Err(SceneError::SystemNotFound)
     ));
 }

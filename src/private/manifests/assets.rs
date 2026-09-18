@@ -5,7 +5,7 @@ use crate::{
         components::{Creator, Destroyer},
         error::AssetDefinitionError,
     },
-    ids::AssetFieldTypeID,
+    ids::AssetFieldTypeSlot,
     private::{
         id_store::IDStore,
         manifests::{Manifest, fields::AssetFieldManifest},
@@ -19,7 +19,7 @@ pub(crate) struct AssetManifest {
     pub creator: Creator,
     pub destroyer: Destroyer,
 
-    pub fields: IDStore<String, AssetFieldTypeID, AssetFieldManifest>,
+    pub fields: IDStore<String, AssetFieldTypeSlot, AssetFieldManifest>,
 }
 
 impl Manifest<AssetDefinition> for AssetManifest {

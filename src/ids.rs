@@ -3,93 +3,144 @@
 use slotmap::{Key, KeyData, new_key_type};
 
 new_key_type! {
-/// EntityID is a cheap copyable handle for entities. It uniquely identifies an entity
-/// within a Scene. It is not a globally unique identifier across multiple scenes (if you are
-/// maintaining multiple scenes)
-pub struct EntityID;
-
-/// Handle for a loaded plugin. It describes a plugin uniquely to the scene and cannot like the [`EntityID`] be used
-/// in different scenes. This behavior is not supported.
-pub struct PluginID;
-
-/// Handle that is cheap to copy and address a component. It is only unique within a
-/// single entity and cannot be used across multiple entity.
-pub struct ComponentID;
-
-/// Handle that is cheap to copy and address a field in a component. It is only unique within a
-/// single entity and component. It is not unique across multiple components.
-pub struct FieldID;
-
-/// Handle that is cheap to copy to address assets. An AssetID is unique to an asset type and it's
-/// data string. Meaning two assets of the same type but have different data strings will have
-/// different ID's
-pub struct AssetID;
-
-/// Handle that is cheap to copy and uniquely identifies a field inside of an asset. It is only
-/// unique inside of a single Asset and it's data string.
-pub struct AssetFieldID;
-
-/// Handle for a component type. It is unique within its plugin manifest, but
-/// cannot be used across different plugin manifests.
-pub struct ComponentTypeID;
-
-/// Handle for a component field type. It is unique within its component type
-/// manifest, but cannot be used across different component type manifests.
-pub struct FieldTypeID;
-
-/// Handle for an asset field type. It is unique within its asset type manifest,
-/// but cannot be used across different asset type manifests.
-pub struct AssetFieldTypeID;
-
-/// Handle for an asset type. It is unique within its plugin manifest, but
-/// cannot be used across different plugin manifests.
-pub struct AssetTypeID;
-
-/// Handle for a concrete system. It is unique within its scene, but cannot be
-/// used across different scenes.
-pub struct SystemID;
-
-/// Handle for a system type. It is unique within its plugin manifest, but
-/// cannot be used across different plugin manifests.
-pub struct SystemTypeID;
+    /// Storage slot for an entity within a scene.
+    pub(crate) struct EntitySlot;
+    /// Storage slot for a loaded plugin within a scene.
+    pub(crate) struct PluginSlot;
+    /// Storage slot for a component within an entity.
+    pub(crate) struct ComponentSlot;
+    /// Storage slot for a field within a concrete component.
+    pub(crate) struct FieldSlot;
+    /// Storage slot for a loaded asset within a scene.
+    pub(crate) struct AssetSlot;
+    /// Storage slot for a field within a loaded asset.
+    pub(crate) struct AssetFieldSlot;
+    /// Storage slot for a component type within a plugin manifest.
+    pub(crate) struct ComponentTypeSlot;
+    /// Storage slot for a field type within a component manifest.
+    pub(crate) struct FieldTypeSlot;
+    /// Storage slot for an asset type within a plugin manifest.
+    pub(crate) struct AssetTypeSlot;
+    /// Storage slot for a field type within an asset manifest.
+    pub(crate) struct AssetFieldTypeSlot;
+    /// Storage slot for a concrete system within a scene.
+    pub(crate) struct SystemSlot;
+    /// Storage slot for a system type within a plugin manifest.
+    pub(crate) struct SystemTypeSlot;
 }
 
+/// Handle for an entity within a scene.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EntityID(pub(crate) EntitySlot);
+
+/// Handle for a loaded plugin within a scene.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PluginID(pub(crate) PluginSlot);
+
+/// Handle for a component type within a plugin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ComponentTypeID(pub(crate) PluginSlot, pub(crate) ComponentTypeSlot);
+
+/// Handle for a field type within a component type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FieldTypeID(
+    pub(crate) PluginSlot,
+    pub(crate) ComponentTypeSlot,
+    pub(crate) FieldTypeSlot,
+);
+
+/// Handle for an asset type within a plugin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AssetTypeID(pub(crate) PluginSlot, pub(crate) AssetTypeSlot);
+
+/// Handle for a field type within an asset type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AssetFieldTypeID(
+    pub(crate) PluginSlot,
+    pub(crate) AssetTypeSlot,
+    pub(crate) AssetFieldTypeSlot,
+);
+
+/// Handle for a system type within a plugin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SystemTypeID(pub(crate) PluginSlot, pub(crate) SystemTypeSlot);
+
+/// Handle for a component attached to an entity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ComponentID(pub(crate) EntitySlot, pub(crate) ComponentSlot);
+
+/// Handle for a field within a concrete component.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FieldID(
+    pub(crate) EntitySlot,
+    pub(crate) ComponentSlot,
+    pub(crate) FieldSlot,
+);
+
+/// Handle for a loaded asset of a particular type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AssetID(
+    pub(crate) PluginSlot,
+    pub(crate) AssetTypeSlot,
+    pub(crate) AssetSlot,
+);
+
+/// Handle for a field within a loaded asset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AssetFieldID(
+    pub(crate) PluginSlot,
+    pub(crate) AssetTypeSlot,
+    pub(crate) AssetSlot,
+    pub(crate) AssetFieldSlot,
+);
+
+/// Handle for a concrete system of a particular type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SystemID(
+    pub(crate) PluginSlot,
+    pub(crate) SystemTypeSlot,
+    pub(crate) SystemSlot,
+);
+
 /// A resolved type ID passed to a system callback.
-///
-/// The variant matches the corresponding
-/// [`crate::definitions::type_id_requests::TypeIDRequests`] entry. The inner
-/// value uses SlotMap's stable FFI representation rather than exposing a
-/// Rust-specific key layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub enum TypeID {
-    ComponentTypeID(u64),
-    FieldTypeID(u64),
-    AssetTypeID(u64),
-    AssetFieldTypeID(u64),
+    ComponentTypeID(u64, u64),
+    FieldTypeID(u64, u64, u64),
+    AssetTypeID(u64, u64),
+    AssetFieldTypeID(u64, u64, u64),
+}
+
+fn ffi(key: impl Key) -> u64 {
+    key.data().as_ffi()
+}
+
+fn key<T: From<KeyData>>(value: u64) -> T {
+    KeyData::from_ffi(value).into()
 }
 
 impl From<ComponentTypeID> for TypeID {
-    fn from(id: ComponentTypeID) -> Self {
-        Self::ComponentTypeID(id.data().as_ffi())
+    fn from(ComponentTypeID(plugin, component): ComponentTypeID) -> Self {
+        Self::ComponentTypeID(ffi(plugin), ffi(component))
     }
 }
 
 impl From<FieldTypeID> for TypeID {
-    fn from(id: FieldTypeID) -> Self {
-        Self::FieldTypeID(id.data().as_ffi())
+    fn from(FieldTypeID(plugin, component, field): FieldTypeID) -> Self {
+        Self::FieldTypeID(ffi(plugin), ffi(component), ffi(field))
     }
 }
 
 impl From<AssetTypeID> for TypeID {
-    fn from(id: AssetTypeID) -> Self {
-        Self::AssetTypeID(id.data().as_ffi())
+    fn from(AssetTypeID(plugin, asset): AssetTypeID) -> Self {
+        Self::AssetTypeID(ffi(plugin), ffi(asset))
     }
 }
 
 impl From<AssetFieldTypeID> for TypeID {
-    fn from(id: AssetFieldTypeID) -> Self {
-        Self::AssetFieldTypeID(id.data().as_ffi())
+    fn from(AssetFieldTypeID(plugin, asset, field): AssetFieldTypeID) -> Self {
+        Self::AssetFieldTypeID(ffi(plugin), ffi(asset), ffi(field))
     }
 }
 
@@ -98,7 +149,7 @@ impl TryFrom<TypeID> for ComponentTypeID {
 
     fn try_from(id: TypeID) -> Result<Self, Self::Error> {
         match id {
-            TypeID::ComponentTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            TypeID::ComponentTypeID(plugin, component) => Ok(Self(key(plugin), key(component))),
             other => Err(other),
         }
     }
@@ -109,7 +160,9 @@ impl TryFrom<TypeID> for FieldTypeID {
 
     fn try_from(id: TypeID) -> Result<Self, Self::Error> {
         match id {
-            TypeID::FieldTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            TypeID::FieldTypeID(plugin, component, field) => {
+                Ok(Self(key(plugin), key(component), key(field)))
+            }
             other => Err(other),
         }
     }
@@ -120,7 +173,7 @@ impl TryFrom<TypeID> for AssetTypeID {
 
     fn try_from(id: TypeID) -> Result<Self, Self::Error> {
         match id {
-            TypeID::AssetTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            TypeID::AssetTypeID(plugin, asset) => Ok(Self(key(plugin), key(asset))),
             other => Err(other),
         }
     }
@@ -131,7 +184,9 @@ impl TryFrom<TypeID> for AssetFieldTypeID {
 
     fn try_from(id: TypeID) -> Result<Self, Self::Error> {
         match id {
-            TypeID::AssetFieldTypeID(value) => Ok(KeyData::from_ffi(value).into()),
+            TypeID::AssetFieldTypeID(plugin, asset, field) => {
+                Ok(Self(key(plugin), key(asset), key(field)))
+            }
             other => Err(other),
         }
     }

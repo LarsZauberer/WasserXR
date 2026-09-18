@@ -17,7 +17,7 @@ use wasserxr::{
         plugins::PluginDefinition,
     },
     errors::{AssetError, SceneError},
-    ids::{AssetFieldTypeID, AssetTypeID, PluginID},
+    ids::{AssetFieldTypeID, AssetTypeID, TypeID},
     scene::Scene,
     utils::version::Version,
 };
@@ -100,11 +100,11 @@ fn scene() -> Scene {
     scene
 }
 
-fn asset_type(scene: &Scene, name: &str) -> Result<(PluginID, AssetTypeID), SceneError> {
+fn asset_type(scene: &Scene, name: &str) -> Result<AssetTypeID, SceneError> {
     let plugin = scene
         .resolve_plugin_id("AssetPlugin")
         .ok_or(SceneError::AssetNotFound)?;
-    Ok((plugin, scene.resolve_asset_type_id(plugin, name)?))
+    scene.resolve_asset_type_id(plugin, name)
 }
 
 fn reset_counts() {
@@ -115,17 +115,17 @@ fn reset_counts() {
 #[test]
 fn resolves_asset_field_type_hint() {
     let scene = scene();
-    let (plugin, asset) = asset_type(&scene, "TestAsset").unwrap();
-    let field = scene
-        .resolve_asset_field_type_id(plugin, asset, "value")
-        .unwrap();
+    let asset = asset_type(&scene, "TestAsset").unwrap();
+    let field = scene.resolve_asset_field_type_id(asset, "value").unwrap();
 
-    assert_eq!(
-        scene.get_asset_field_type(plugin, asset, field).unwrap(),
-        TypeHint::Usize
-    );
+    assert_eq!(scene.get_asset_field_type(field).unwrap(), TypeHint::Usize);
+    let TypeID::AssetTypeID(plugin, asset_slot) = TypeID::from(asset) else {
+        unreachable!()
+    };
+    let missing =
+        AssetFieldTypeID::try_from(TypeID::AssetFieldTypeID(plugin, asset_slot, u64::MAX)).unwrap();
     assert!(matches!(
-        scene.get_asset_field_type(plugin, asset, AssetFieldTypeID::default()),
+        scene.get_asset_field_type(missing),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
 }
@@ -135,19 +135,16 @@ fn asset_is_created_on_demand_and_cached() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
 
     assert!(matches!(
-        scene.resolve_asset_id(plugin, asset_type, "first"),
+        scene.resolve_asset_id(asset_type, "first"),
         Err(SceneError::AssetNotFound)
     ));
 
-    let id = scene.get_asset_id(plugin, asset_type, "first").unwrap();
-    assert_eq!(
-        scene.resolve_asset_id(plugin, asset_type, "first").unwrap(),
-        id
-    );
-    assert_eq!(scene.get_asset_id(plugin, asset_type, "first").unwrap(), id);
+    let id = scene.get_asset_id(asset_type, "first").unwrap();
+    assert_eq!(scene.resolve_asset_id(asset_type, "first").unwrap(), id);
+    assert_eq!(scene.get_asset_id(asset_type, "first").unwrap(), id);
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 1);
 }
 
@@ -156,10 +153,10 @@ fn different_data_strings_create_distinct_assets() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
 
-    let first = scene.get_asset_id(plugin, asset_type, "first").unwrap();
-    let second = scene.get_asset_id(plugin, asset_type, "second").unwrap();
+    let first = scene.get_asset_id(asset_type, "first").unwrap();
+    let second = scene.get_asset_id(asset_type, "second").unwrap();
     assert_ne!(first, second);
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }
@@ -170,23 +167,23 @@ fn asset_query_returns_complete_assets_in_request_order() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
     let field_type = scene
-        .resolve_asset_field_type_id(plugin, asset_type, "value")
+        .resolve_asset_field_type_id(asset_type, "value")
         .unwrap();
-    let first_asset = scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    let first_asset = scene.get_asset_id(asset_type, "first").unwrap();
     scene
         .resolve_asset_field_id(first_asset, field_type)
         .unwrap();
     let requests = [
-        (plugin, asset_type, "second"),
-        (plugin, asset_type, "first"),
-        (plugin, asset_type, "second"),
+        (asset_type, "second"),
+        (asset_type, "first"),
+        (asset_type, "second"),
     ];
 
     let mut first_pointer = std::ptr::null();
     scene
-        .query_assets(&[(plugin, asset_type, "first")], |pointers| {
+        .query_assets(&[(asset_type, "first")], |pointers| {
             first_pointer = pointers[0];
         })
         .unwrap();
@@ -212,11 +209,16 @@ fn missing_asset_field_is_rejected() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
-    let asset = scene.get_asset_id(plugin, asset_type, "field").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
+    let asset = scene.get_asset_id(asset_type, "field").unwrap();
+    let TypeID::AssetTypeID(plugin, asset_slot) = TypeID::from(asset_type) else {
+        unreachable!()
+    };
+    let missing =
+        AssetFieldTypeID::try_from(TypeID::AssetFieldTypeID(plugin, asset_slot, u64::MAX)).unwrap();
 
     assert!(matches!(
-        scene.resolve_asset_field_id(asset, AssetFieldTypeID::default()),
+        scene.resolve_asset_field_id(asset, missing),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
 }
@@ -227,8 +229,8 @@ fn asset_query_empty_and_failure_behavior() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, valid) = asset_type(&scene, "TestAsset").unwrap();
-    let (_, failing) = asset_type(&scene, "FailingAsset").unwrap();
+    let valid = asset_type(&scene, "TestAsset").unwrap();
+    let failing = asset_type(&scene, "FailingAsset").unwrap();
     let mut calls = 0;
     scene
         .query_assets(&[], |pointers| {
@@ -238,14 +240,18 @@ fn asset_query_empty_and_failure_behavior() {
         .unwrap();
     assert_eq!(calls, 1);
     assert!(matches!(
-        scene.query_assets(&[(plugin, valid, "ok"), (plugin, failing, "bad")], |_| {
+        scene.query_assets(&[(valid, "ok"), (failing, "bad")], |_| {
             panic!("failed query called callback");
         }),
         Err(SceneError::AssetError(AssetError::CreationFailure))
     ));
-    assert!(scene.resolve_asset_id(plugin, valid, "ok").is_ok());
+    assert!(scene.resolve_asset_id(valid, "ok").is_ok());
+    let TypeID::AssetTypeID(plugin, _) = TypeID::from(valid) else {
+        unreachable!()
+    };
+    let missing = AssetTypeID::try_from(TypeID::AssetTypeID(plugin, u64::MAX)).unwrap();
     assert!(matches!(
-        scene.query_assets(&[(plugin, AssetTypeID::default(), "missing")], |_| {
+        scene.query_assets(&[(missing, "missing")], |_| {
             panic!("invalid query called callback");
         }),
         Err(SceneError::AssetNotFound)
@@ -260,13 +266,13 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = Arc::new(scene());
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
     let (locked, locked_rx) = mpsc::channel();
     let (release, release_rx) = mpsc::channel();
     let reader_scene = Arc::clone(&scene);
     let reader = thread::spawn(move || {
         reader_scene
-            .query_assets(&[(plugin, asset_type, "first")], |pointers| {
+            .query_assets(&[(asset_type, "first")], |pointers| {
                 locked.send(()).unwrap();
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 assert_eq!(unsafe { (*pointers[0].cast::<TestAsset>()).value }, 42);
@@ -293,9 +299,7 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
 
     let panic = std::panic::catch_unwind(|| {
         scene
-            .query_assets(&[(plugin, asset_type, "again")], |_| {
-                panic!("callback panic")
-            })
+            .query_assets(&[(asset_type, "again")], |_| panic!("callback panic"))
             .unwrap();
     });
     assert!(panic.is_err());
@@ -308,11 +312,11 @@ fn concurrent_lookup_creates_one_cached_asset() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
 
     let ids = std::thread::scope(|scope| {
         let threads: Vec<_> = (0..8)
-            .map(|_| scope.spawn(|| scene.get_asset_id(plugin, asset_type, "shared").unwrap()))
+            .map(|_| scope.spawn(|| scene.get_asset_id(asset_type, "shared").unwrap()))
             .collect();
         threads
             .into_iter()
@@ -329,18 +333,18 @@ fn failed_creation_is_not_cached() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "FailingAsset").unwrap();
+    let asset_type = asset_type(&scene, "FailingAsset").unwrap();
 
     for _ in 0..2 {
         assert!(matches!(
-            scene.get_asset_id(plugin, asset_type, "bad"),
+            scene.get_asset_id(asset_type, "bad"),
             Err(SceneError::AssetError(AssetError::CreationFailure))
         ));
     }
 
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
     assert!(matches!(
-        scene.resolve_asset_id(plugin, asset_type, "bad"),
+        scene.resolve_asset_id(asset_type, "bad"),
         Err(SceneError::AssetNotFound)
     ));
 }
@@ -362,9 +366,9 @@ fn cached_assets_are_destroyed_with_the_scene() {
 
     {
         let scene = scene();
-        let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
-        scene.get_asset_id(plugin, asset_type, "first").unwrap();
-        scene.get_asset_id(plugin, asset_type, "second").unwrap();
+        let asset_type = asset_type(&scene, "TestAsset").unwrap();
+        scene.get_asset_id(asset_type, "first").unwrap();
+        scene.get_asset_id(asset_type, "second").unwrap();
     }
 
     assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 2);
@@ -375,16 +379,16 @@ fn reset_destroys_cached_assets() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
-    let (plugin, asset_type) = asset_type(&scene, "TestAsset").unwrap();
+    let asset_type = asset_type(&scene, "TestAsset").unwrap();
 
-    scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    scene.get_asset_id(asset_type, "first").unwrap();
     scene.reset().unwrap();
 
     assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 1);
     assert!(matches!(
-        scene.resolve_asset_id(plugin, asset_type, "first"),
+        scene.resolve_asset_id(asset_type, "first"),
         Err(SceneError::AssetNotFound)
     ));
-    scene.get_asset_id(plugin, asset_type, "first").unwrap();
+    scene.get_asset_id(asset_type, "first").unwrap();
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }

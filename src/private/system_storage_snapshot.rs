@@ -19,20 +19,21 @@ impl SystemStorageSnapshot {
     pub(crate) fn new(storage: &SystemStorage) -> Self {
         let mut executions = HashMap::new();
         let mut edges = HashSet::new();
-        for (id, system) in storage.systems.iter() {
+        for (slot, system) in storage.systems.iter() {
+            let system_type = system.get_system_type_id();
+            let id = SystemID(system_type.0, system_type.1, slot);
             let (runner, type_ids) = system.execution();
             executions.insert(id, (runner, type_ids.to_vec()));
             for dependency in system.get_requires() {
                 edges.insert((
                     storage
-                        .systems
                         .resolve_id(dependency)
                         .expect("required system missing"),
                     id,
                 ));
             }
             for dependent in system.get_wanted_by() {
-                if let Some(dependent) = storage.systems.resolve_id(dependent) {
+                if let Some(dependent) = storage.resolve_id(dependent) {
                     edges.insert((id, dependent));
                 }
             }

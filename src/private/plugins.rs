@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::PluginError,
-    ids::{AssetFieldTypeID, AssetTypeID, ComponentTypeID, FieldTypeID, SystemTypeID},
+    ids::{AssetFieldTypeSlot, AssetTypeSlot, ComponentTypeSlot, FieldTypeSlot, SystemTypeSlot},
     private::manifests::{
         Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
         systems::SystemManifest,
@@ -90,8 +90,7 @@ impl Plugin {
         Ok(Self::load_static(manifest))
     }
 
-    /// Loads a given [`PluginManifest`] directly and turns it into an active
-    /// plugin.
+    /// Loads a given manifest as an active plugin.
     pub(crate) fn load_static(manifest: PluginManifest) -> Self {
         Self { manifest }
     }
@@ -101,61 +100,61 @@ impl Plugin {
         &self.manifest.name
     }
 
-    /// Resolves a component type name to its ID.
-    pub(crate) fn resolve_component_type_id(&self, name: &str) -> Option<ComponentTypeID> {
+    /// Resolves a component type name to its plugin-local slot.
+    pub(crate) fn resolve_component_type_slot(&self, name: &str) -> Option<ComponentTypeSlot> {
         self.manifest.components.resolve_id(name)
     }
 
-    /// Resolves a component field type name to its ID.
-    pub(crate) fn resolve_field_type_id(
+    /// Resolves a component field type name to its component-local slot.
+    pub(crate) fn resolve_field_type_slot(
         &self,
-        component: ComponentTypeID,
+        component: ComponentTypeSlot,
         name: &str,
-    ) -> Option<FieldTypeID> {
+    ) -> Option<FieldTypeSlot> {
         self.get_component(component)?.fields.resolve_id(name)
     }
 
     /// Returns the component manifest identified by `id`.
-    pub(crate) fn get_component(&self, id: ComponentTypeID) -> Option<&ComponentManifest> {
+    pub(crate) fn get_component(&self, id: ComponentTypeSlot) -> Option<&ComponentManifest> {
         self.manifest.components.get(id)
     }
 
-    /// Resolves an asset type name to its ID.
-    pub(crate) fn resolve_asset_type_id(&self, name: &str) -> Option<AssetTypeID> {
+    /// Resolves an asset type name to its plugin-local slot.
+    pub(crate) fn resolve_asset_type_slot(&self, name: &str) -> Option<AssetTypeSlot> {
         self.manifest.assets.resolve_id(name)
     }
 
-    /// Resolves an asset field type name to its ID.
-    pub(crate) fn resolve_asset_field_type_id(
+    /// Resolves an asset field type name to its asset-type-local slot.
+    pub(crate) fn resolve_asset_field_type_slot(
         &self,
-        asset: AssetTypeID,
+        asset: AssetTypeSlot,
         name: &str,
-    ) -> Option<AssetFieldTypeID> {
-        self.manifest.assets.get(asset)?.fields.resolve_id(name)
+    ) -> Option<AssetFieldTypeSlot> {
+        self.get_asset(asset)?.fields.resolve_id(name)
     }
 
     /// Returns the asset manifest identified by `id`.
-    pub(crate) fn get_asset(&self, id: AssetTypeID) -> Option<&AssetManifest> {
+    pub(crate) fn get_asset(&self, id: AssetTypeSlot) -> Option<&AssetManifest> {
         self.manifest.assets.get(id)
     }
 
     /// Returns the name of the asset type identified by `id`.
-    pub(crate) fn get_asset_name(&self, id: AssetTypeID) -> Option<&str> {
+    pub(crate) fn get_asset_name(&self, id: AssetTypeSlot) -> Option<&str> {
         self.get_asset(id).map(|asset| asset.name.as_str())
     }
 
-    /// Resolves a system name to its ID.
-    pub(crate) fn resolve_system_type_id(&self, name: &str) -> Option<SystemTypeID> {
+    /// Resolves a system name to its plugin-local slot.
+    pub(crate) fn resolve_system_type_slot(&self, name: &str) -> Option<SystemTypeSlot> {
         self.manifest.systems.resolve_id(name)
     }
 
     /// Returns the system manifest identified by `id`.
-    pub(crate) fn get_system(&self, id: SystemTypeID) -> Option<&SystemManifest> {
+    pub(crate) fn get_system(&self, id: SystemTypeSlot) -> Option<&SystemManifest> {
         self.manifest.systems.get(id)
     }
 
     /// Returns the name of the system type identified by `id`.
-    pub(crate) fn get_system_name(&self, id: SystemTypeID) -> Option<&str> {
+    pub(crate) fn get_system_name(&self, id: SystemTypeSlot) -> Option<&str> {
         self.get_system(id).map(|system| system.name.as_str())
     }
 }

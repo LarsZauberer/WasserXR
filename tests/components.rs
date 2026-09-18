@@ -14,7 +14,7 @@ use wasserxr::{
     },
     errors::{ComponentError, EntityError, FieldError, SceneError},
     field::AccessRequest,
-    ids::{ComponentID, ComponentTypeID, EntityID, FieldTypeID, PluginID},
+    ids::{ComponentID, ComponentTypeID, EntityID, FieldTypeID, PluginID, TypeID},
     scene::Scene,
     utils::version::Version,
 };
@@ -145,7 +145,7 @@ fn add_test_component(
         .ok_or(SceneError::NoComponentType)?;
     let component_type = scene.resolve_component_type_id(plugin, "MyComponent")?;
     scene
-        .add_component(entity, plugin, component_type)
+        .add_component(entity, component_type)
         .map(|component| (plugin, component_type, component))
 }
 
@@ -163,16 +163,16 @@ fn resolves_component_field_type_hint(scene: Scene) {
     let component = scene
         .resolve_component_type_id(plugin, "MyComponent")
         .unwrap();
-    let field = scene
-        .resolve_field_type_id(plugin, component, "MyField")
-        .unwrap();
+    let field = scene.resolve_field_type_id(component, "MyField").unwrap();
 
-    assert_eq!(
-        scene.get_field_type(plugin, component, field).unwrap(),
-        TypeHint::Usize
-    );
+    assert_eq!(scene.get_field_type(field).unwrap(), TypeHint::Usize);
+    let TypeID::ComponentTypeID(plugin, component_slot) = TypeID::from(component) else {
+        unreachable!()
+    };
+    let missing =
+        FieldTypeID::try_from(TypeID::FieldTypeID(plugin, component_slot, u64::MAX)).unwrap();
     assert!(matches!(
-        scene.get_field_type(plugin, component, FieldTypeID::default()),
+        scene.get_field_type(missing),
         Err(SceneError::ComponentError(ComponentError::FieldNotFound))
     ));
 }
@@ -203,47 +203,29 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     let other_type = scene
         .resolve_component_type_id(plugin, "OtherComponent")
         .unwrap();
-    scene
-        .add_component(first_entity, plugin, other_type)
-        .unwrap();
+    scene.add_component(first_entity, other_type).unwrap();
 
     let mutable_field = scene
-        .resolve_field_type_id(plugin, component_type, "MyField")
+        .resolve_field_type_id(component_type, "MyField")
         .unwrap();
     let immutable_field = scene
-        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .resolve_field_type_id(component_type, "ImmutableField")
         .unwrap();
     let other_field = scene
-        .resolve_field_type_id(plugin, other_type, "ImmutableField")
+        .resolve_field_type_id(other_type, "ImmutableField")
         .unwrap();
     let requested_fields = [immutable_field, mutable_field];
     let read_fields = [mutable_field];
     let other_fields = [other_field];
     let all_with_component = [(
-        plugin,
         component_type,
         AccessRequest::Read,
         requested_fields.as_slice(),
     )];
     let only_first_entity = [
-        (
-            plugin,
-            component_type,
-            AccessRequest::Read,
-            read_fields.as_slice(),
-        ),
-        (
-            plugin,
-            other_type,
-            AccessRequest::Read,
-            other_fields.as_slice(),
-        ),
-        (
-            plugin,
-            component_type,
-            AccessRequest::Write,
-            read_fields.as_slice(),
-        ),
+        (component_type, AccessRequest::Read, read_fields.as_slice()),
+        (other_type, AccessRequest::Read, other_fields.as_slice()),
+        (component_type, AccessRequest::Write, read_fields.as_slice()),
     ];
     let calls = Cell::new(0);
 
@@ -277,13 +259,11 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     let immutable_fields = [immutable_field];
     let component = [
         (
-            plugin,
             component_type,
             AccessRequest::Read,
             immutable_fields.as_slice(),
         ),
         (
-            plugin,
             component_type,
             AccessRequest::Write,
             immutable_fields.as_slice(),
@@ -310,23 +290,17 @@ fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_globals();
     let entity = scene.add_entity();
-    let (plugin, component_type, _) = add_test_component(&scene, entity).unwrap();
+    let (_, component_type, _) = add_test_component(&scene, entity).unwrap();
     let mutable_field = scene
-        .resolve_field_type_id(plugin, component_type, "MyField")
+        .resolve_field_type_id(component_type, "MyField")
         .unwrap();
     let immutable_field = scene
-        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .resolve_field_type_id(component_type, "ImmutableField")
         .unwrap();
     let read_fields = [immutable_field];
     let write_fields = [mutable_field];
-    let read_request = [(
-        plugin,
-        component_type,
-        AccessRequest::Read,
-        read_fields.as_slice(),
-    )];
+    let read_request = [(component_type, AccessRequest::Read, read_fields.as_slice())];
     let write_request = [(
-        plugin,
         component_type,
         AccessRequest::Write,
         write_fields.as_slice(),
@@ -379,13 +353,13 @@ fn component_query_edge_cases(scene: Scene) {
     let entity = scene.add_entity();
     let (plugin, component_type, _) = add_test_component(&scene, entity).unwrap();
     let mutable = scene
-        .resolve_field_type_id(plugin, component_type, "MyField")
+        .resolve_field_type_id(component_type, "MyField")
         .unwrap();
     let immutable = scene
-        .resolve_field_type_id(plugin, component_type, "ImmutableField")
+        .resolve_field_type_id(component_type, "ImmutableField")
         .unwrap();
     let hidden = scene
-        .resolve_field_type_id(plugin, component_type, "HiddenField")
+        .resolve_field_type_id(component_type, "HiddenField")
         .unwrap();
     let other = scene
         .resolve_component_type_id(plugin, "OtherComponent")
@@ -393,8 +367,8 @@ fn component_query_edge_cases(scene: Scene) {
     let mut calls = 0;
     for query in [
         vec![],
-        vec![(plugin, other, AccessRequest::Read, &[][..])],
-        vec![(plugin, component_type, AccessRequest::Write, &[][..])],
+        vec![(other, AccessRequest::Read, &[][..])],
+        vec![(component_type, AccessRequest::Write, &[][..])],
     ] {
         scene
             .query_components(&query, |pointers| {
@@ -404,26 +378,24 @@ fn component_query_edge_cases(scene: Scene) {
             .unwrap();
     }
     assert_eq!(calls, 3);
+    let TypeID::ComponentTypeID(plugin, component_slot) = TypeID::from(component_type) else {
+        unreachable!()
+    };
+    let missing =
+        FieldTypeID::try_from(TypeID::FieldTypeID(plugin, component_slot, u64::MAX)).unwrap();
     let error = scene
-        .query_components(
-            &[(
-                plugin,
-                component_type,
-                AccessRequest::Read,
-                &[FieldTypeID::default()],
-            )],
-            |_| panic!("missing field called callback"),
-        )
+        .query_components(&[(component_type, AccessRequest::Read, &[missing])], |_| {
+            panic!("missing field called callback")
+        })
         .unwrap_err();
     assert!(matches!(
         error,
         SceneError::EntityError(EntityError::ComponentError(ComponentError::FieldNotFound))
     ));
     let error = scene
-        .query_components(
-            &[(plugin, component_type, AccessRequest::Read, &[hidden])],
-            |_| panic!("hidden field called callback"),
-        )
+        .query_components(&[(component_type, AccessRequest::Read, &[hidden])], |_| {
+            panic!("hidden field called callback")
+        })
         .unwrap_err();
     assert!(matches!(
         error,
@@ -434,13 +406,8 @@ fn component_query_edge_cases(scene: Scene) {
     scene
         .query_components(
             &[
-                (plugin, component_type, AccessRequest::Read, &[immutable]),
-                (
-                    plugin,
-                    component_type,
-                    AccessRequest::Write,
-                    &[mutable, mutable],
-                ),
+                (component_type, AccessRequest::Read, &[immutable]),
+                (component_type, AccessRequest::Write, &[mutable, mutable]),
             ],
             |pointers| {
                 assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 101);
@@ -463,17 +430,15 @@ fn reversed_component_queries_do_not_deadlock(scene: Scene) {
     let other = scene
         .resolve_component_type_id(plugin, "OtherComponent")
         .unwrap();
-    scene.add_component(first, plugin, other).unwrap();
+    scene.add_component(first, other).unwrap();
     let second = scene.add_entity();
     // Reverse concrete component IDs on the second entity as well.
-    scene.add_component(second, plugin, other).unwrap();
+    scene.add_component(second, other).unwrap();
     add_test_component(&scene, second).unwrap();
     let field = scene
-        .resolve_field_type_id(plugin, component_type, "MyField")
+        .resolve_field_type_id(component_type, "MyField")
         .unwrap();
-    let other_field = scene
-        .resolve_field_type_id(plugin, other, "MyField")
-        .unwrap();
+    let other_field = scene.resolve_field_type_id(other, "MyField").unwrap();
     let scene = Arc::new(scene);
     let start = Arc::new(Barrier::new(2));
     let (done, finished) = mpsc::channel();
@@ -485,8 +450,8 @@ fn reversed_component_queries_do_not_deadlock(scene: Scene) {
             let done = done.clone();
             thread::spawn(move || {
                 let mut query = [
-                    (plugin, component_type, AccessRequest::Write, &[field][..]),
-                    (plugin, other, AccessRequest::Write, &[other_field][..]),
+                    (component_type, AccessRequest::Write, &[field][..]),
+                    (other, AccessRequest::Write, &[other_field][..]),
                 ];
                 if reverse {
                     query.reverse();
@@ -516,8 +481,8 @@ fn reversed_component_queries_do_not_deadlock(scene: Scene) {
     scene
         .query_components(
             &[
-                (plugin, component_type, AccessRequest::Read, &[field]),
-                (plugin, other, AccessRequest::Read, &[other_field]),
+                (component_type, AccessRequest::Read, &[field]),
+                (other, AccessRequest::Read, &[other_field]),
             ],
             |pointers| {
                 let values: Vec<_> = pointers
@@ -540,9 +505,9 @@ fn component_queries_keep_owners_alive(scene: Scene) {
     let scene = Arc::new(scene);
     for remove_entity in [false, true] {
         let entity = scene.add_entity();
-        let (plugin, component_type, component) = add_test_component(&scene, entity).unwrap();
+        let (_, component_type, component) = add_test_component(&scene, entity).unwrap();
         let field = scene
-            .resolve_field_type_id(plugin, component_type, "MyField")
+            .resolve_field_type_id(component_type, "MyField")
             .unwrap();
         let (locked, locked_rx) = mpsc::channel();
         let (release, release_rx) = mpsc::channel();
@@ -550,7 +515,7 @@ fn component_queries_keep_owners_alive(scene: Scene) {
         let reader = thread::spawn(move || {
             reader_scene
                 .query_components(
-                    &[(plugin, component_type, AccessRequest::Read, &[field])],
+                    &[(component_type, AccessRequest::Read, &[field])],
                     |pointers| {
                         locked.send(()).unwrap();
                         release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -561,10 +526,7 @@ fn component_queries_keep_owners_alive(scene: Scene) {
         });
         locked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         scene
-            .query_components(
-                &[(plugin, component_type, AccessRequest::Read, &[field])],
-                |_| (),
-            )
+            .query_components(&[(component_type, AccessRequest::Read, &[field])], |_| ())
             .unwrap();
         let (started, started_rx) = mpsc::channel();
         let (removed, removed_rx) = mpsc::channel();
@@ -574,7 +536,7 @@ fn component_queries_keep_owners_alive(scene: Scene) {
             if remove_entity {
                 remover_scene.remove_entity(entity).unwrap();
             } else {
-                remover_scene.remove_component(entity, component).unwrap();
+                remover_scene.remove_component(component).unwrap();
             }
             removed.send(()).unwrap();
         });
@@ -613,7 +575,7 @@ fn get_vec_of_component_names(scene: &Scene, entity_id: EntityID) -> Vec<String>
         .iter()
         .map(|c| {
             scene
-                .get_component_name(entity_id, *c)
+                .get_component_name(*c)
                 .expect("Component exists")
                 .to_owned()
         })
@@ -641,7 +603,7 @@ fn component_lifecycle(scene: Scene) {
 
     // Remove components
     scene
-        .remove_component(entity1, my_component_id)
+        .remove_component(my_component_id)
         .expect("Failed to remove the component from entity1");
 
     // Check component status
@@ -662,11 +624,11 @@ fn component_is_scoped_to_entity(scene: Scene) {
     let entity2 = scene.add_entity();
 
     // Add component
-    let (plugin, component_type, my_component_id) =
+    let (_, component_type, my_component_id) =
         add_test_component(&scene, entity1).expect("Failed to add component to entity1");
 
     let err = scene
-        .resolve_component_id(entity2, plugin, component_type)
+        .resolve_component_id(entity2, component_type)
         .expect_err("Got a component that shouldn't exist");
     assert!(matches!(
         err,
@@ -674,7 +636,7 @@ fn component_is_scoped_to_entity(scene: Scene) {
     ));
 
     scene
-        .remove_component(entity1, my_component_id)
+        .remove_component(my_component_id)
         .expect("Failed to remove the component from entity1");
 }
 
@@ -685,12 +647,12 @@ fn component_cannot_be_removed_twice(scene: Scene) {
     let entity = scene.add_entity();
     let (_, _, component) = add_test_component(&scene, entity).expect("Failed to add component");
     scene
-        .remove_component(entity, component)
+        .remove_component(component)
         .expect("Failed to remove component");
 
     // Check double remove
     let err = scene
-        .remove_component(entity, component)
+        .remove_component(component)
         .expect_err("Removed the same component twice");
     assert!(matches!(
         err,

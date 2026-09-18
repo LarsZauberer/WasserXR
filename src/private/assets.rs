@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use crate::{
     definitions::components::Destroyer,
     errors::AssetError,
-    ids::{AssetFieldID, AssetFieldTypeID},
+    ids::{AssetFieldSlot, AssetFieldTypeID, AssetTypeID},
     private::{fields::AssetField, id_store::IDStore, manifests::assets::AssetManifest},
 };
 
@@ -15,7 +15,7 @@ pub(crate) struct Asset {
     ///
     /// The [`AssetField`] record doesn't require an [`RwLock`] since all fields
     /// are read-only by design. Hence, they don't need exclusive access
-    fields: IDStore<AssetFieldTypeID, AssetFieldID, AssetField>,
+    fields: IDStore<AssetFieldTypeID, AssetFieldSlot, AssetField>,
     data: *mut c_void,
 }
 
@@ -27,16 +27,22 @@ unsafe impl Sync for Asset {}
 
 impl Asset {
     /// Create a new asset from a data string and the asset type manifest
-    pub(crate) fn new(manifest: &AssetManifest) -> Result<Self, AssetError> {
+    pub(crate) fn new(
+        manifest: &AssetManifest,
+        asset_type: AssetTypeID,
+    ) -> Result<Self, AssetError> {
         let data = unsafe { (manifest.creator)() };
         if data.is_null() {
             return Err(AssetError::CreationFailure);
         }
 
         let mut fields = IDStore::default();
-        for (field_type_id, field) in manifest.fields.iter() {
+        for (field_slot, field) in manifest.fields.iter() {
             let field = AssetField::from(field);
-            fields.insert_named(field_type_id, field);
+            fields.insert_named(
+                AssetFieldTypeID(asset_type.0, asset_type.1, field_slot),
+                field,
+            );
         }
 
         Ok(Self {
@@ -46,11 +52,11 @@ impl Asset {
         })
     }
 
-    /// Get the [`AssetFieldID`] from its field type ID.
-    pub(crate) fn resolve_field_id(
+    /// Get an asset-local field slot from its field type ID.
+    pub(crate) fn resolve_field_slot(
         &self,
         field_type_id: AssetFieldTypeID,
-    ) -> Result<AssetFieldID, AssetError> {
+    ) -> Result<AssetFieldSlot, AssetError> {
         self.fields
             .resolve_id(&field_type_id)
             .ok_or(AssetError::FieldNotFound)
@@ -66,8 +72,8 @@ impl Asset {
         self.data.cast_const()
     }
 
-    /// Get the field pointer from a given [`FieldID`]
-    pub(crate) fn get_field(&self, id: AssetFieldID) -> Result<*const c_void, AssetError> {
+    /// Get the field pointer from an asset-local field slot.
+    pub(crate) fn get_field(&self, id: AssetFieldSlot) -> Result<*const c_void, AssetError> {
         self.fields
             .get(id)
             .map(|field| field.get(self.data))

@@ -16,10 +16,10 @@ unsafe extern "C" fn callback(_: *const Scene, _: *const TypeID, _: usize) {}
 
 #[test]
 fn type_ids_keep_their_requested_type() {
-    let component = ComponentTypeID::default();
-    let field = FieldTypeID::default();
-    let asset = AssetTypeID::default();
-    let asset_field = AssetFieldTypeID::default();
+    let component = ComponentTypeID::try_from(TypeID::ComponentTypeID(1, 2)).unwrap();
+    let field = FieldTypeID::try_from(TypeID::FieldTypeID(1, 2, 3)).unwrap();
+    let asset = AssetTypeID::try_from(TypeID::AssetTypeID(1, 2)).unwrap();
+    let asset_field = AssetFieldTypeID::try_from(TypeID::AssetFieldTypeID(1, 2, 3)).unwrap();
 
     assert_eq!(
         ComponentTypeID::try_from(TypeID::from(component)),
