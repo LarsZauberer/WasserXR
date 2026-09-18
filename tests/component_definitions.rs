@@ -2,7 +2,10 @@ use std::ffi::c_void;
 
 use rstest::{fixture, rstest};
 use wasserxr::definitions::{
-    Definition, components::ComponentDefinition, error::ComponentDefinitionError,
+    Definition,
+    components::ComponentDefinition,
+    error::ComponentDefinitionError,
+    fields::{ComponentFieldDefinition, TypeHint},
 };
 
 unsafe extern "C" fn creator() -> *mut c_void {
@@ -10,6 +13,10 @@ unsafe extern "C" fn creator() -> *mut c_void {
 }
 
 unsafe extern "C" fn destroyer(_: *mut c_void) {}
+
+unsafe extern "C" fn getter(_: *const c_void) -> *mut c_void {
+    std::ptr::null_mut()
+}
 
 #[fixture]
 fn component() -> ComponentDefinition {
@@ -87,6 +94,37 @@ fn rejects_missing_fields(mut component: ComponentDefinition) {
         unsafe { component.validate() },
         Err(ComponentDefinitionError::FieldsIsNull(
             "Transform".to_owned()
+        ))
+    );
+}
+
+#[rstest]
+fn rejects_duplicate_field_names(mut component: ComponentDefinition) {
+    let fields = [
+        ComponentFieldDefinition {
+            name: c"position".as_ptr(),
+            type_hint: TypeHint::U32 as u32,
+            getter: Some(getter),
+            mutable: 0,
+            serializer: None,
+            deserializer: None,
+        },
+        ComponentFieldDefinition {
+            name: c"position".as_ptr(),
+            type_hint: TypeHint::U32 as u32,
+            getter: Some(getter),
+            mutable: 0,
+            serializer: None,
+            deserializer: None,
+        },
+    ];
+    component.fields = fields.as_ptr();
+    component.field_count = fields.len();
+
+    assert_eq!(
+        unsafe { component.validate() },
+        Err(ComponentDefinitionError::DuplicateFieldName(
+            "position".to_owned()
         ))
     );
 }

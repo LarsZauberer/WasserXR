@@ -1,4 +1,7 @@
-use std::ffi::{c_char, c_void};
+use std::{
+    collections::HashSet,
+    ffi::{c_char, c_void},
+};
 
 use crate::{
     definitions::{Definition, error::AssetDefinitionError, fields::AssetFieldDefinition},
@@ -46,9 +49,15 @@ impl Definition for AssetDefinition {
             unsafe { std::slice::from_raw_parts(self.fields, self.field_count) }
         };
 
+        let mut field_names = HashSet::new();
         for field in fields {
             if let Err(violation) = unsafe { field.validate() } {
-                return Err((name, violation).into());
+                return Err((name.clone(), violation).into());
+            }
+            let field_name =
+                unsafe { field.name() }.expect("validated asset fields have valid names");
+            if !field_names.insert(field_name.clone()) {
+                return Err(AssetDefinitionError::DuplicateFieldName(field_name));
             }
         }
 

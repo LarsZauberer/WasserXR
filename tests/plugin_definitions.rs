@@ -5,6 +5,7 @@ use wasserxr::{
     definitions::{
         Definition,
         assets::AssetDefinition,
+        components::ComponentDefinition,
         error::{AssetDefinitionError, PluginDefinitionError, SystemDefinitionError},
         plugins::PluginDefinition,
         systems::SystemDefinition,
@@ -13,6 +14,17 @@ use wasserxr::{
 };
 
 unsafe extern "C" fn destroyer(_: *mut c_void) {}
+
+unsafe extern "C" fn creator() -> *mut c_void {
+    std::ptr::null_mut()
+}
+
+unsafe extern "C" fn runner(
+    _: *const wasserxr::scene::Scene,
+    _: *const wasserxr::ids::TypeID,
+    _: usize,
+) {
+}
 
 fn compatible_version() -> Version {
     Version {
@@ -41,6 +53,95 @@ fn plugin() -> PluginDefinition {
 #[rstest]
 fn validates_plugin(plugin: PluginDefinition) {
     assert!(unsafe { plugin.validate() }.is_ok());
+}
+
+#[test]
+fn rejects_duplicate_plugin_definition_names() {
+    let components = [
+        ComponentDefinition {
+            name: c"Transform".as_ptr(),
+            creator: Some(creator),
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        },
+        ComponentDefinition {
+            name: c"Transform".as_ptr(),
+            creator: Some(creator),
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        },
+    ];
+    let mut definition = plugin();
+    definition.components = components.as_ptr();
+    definition.component_count = components.len();
+    assert_eq!(
+        unsafe { definition.validate() },
+        Err(PluginDefinitionError::DuplicateComponentName(
+            "Transform".to_owned()
+        ))
+    );
+
+    let assets = [
+        AssetDefinition {
+            name: c"Mesh".as_ptr(),
+            creator: Some(creator),
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        },
+        AssetDefinition {
+            name: c"Mesh".as_ptr(),
+            creator: Some(creator),
+            destroyer: Some(destroyer),
+            fields: std::ptr::null(),
+            field_count: 0,
+        },
+    ];
+    let mut definition = plugin();
+    definition.assets = assets.as_ptr();
+    definition.asset_count = assets.len();
+    assert_eq!(
+        unsafe { definition.validate() },
+        Err(PluginDefinitionError::DuplicateAssetName("Mesh".to_owned()))
+    );
+
+    let systems = [
+        SystemDefinition {
+            name: c"render".as_ptr(),
+            attacher: None,
+            runner: Some(runner),
+            detacher: None,
+            requires: std::ptr::null(),
+            requires_count: 0,
+            wanted_by: std::ptr::null(),
+            wanted_by_count: 0,
+            type_id_requests: std::ptr::null(),
+            type_id_request_count: 0,
+        },
+        SystemDefinition {
+            name: c"render".as_ptr(),
+            attacher: None,
+            runner: Some(runner),
+            detacher: None,
+            requires: std::ptr::null(),
+            requires_count: 0,
+            wanted_by: std::ptr::null(),
+            wanted_by_count: 0,
+            type_id_requests: std::ptr::null(),
+            type_id_request_count: 0,
+        },
+    ];
+    let mut definition = plugin();
+    definition.systems = systems.as_ptr();
+    definition.system_count = systems.len();
+    assert_eq!(
+        unsafe { definition.validate() },
+        Err(PluginDefinitionError::DuplicateSystemName(
+            "render".to_owned()
+        ))
+    );
 }
 
 #[rstest]

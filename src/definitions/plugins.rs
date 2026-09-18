@@ -1,6 +1,6 @@
 //! This is the standard definition of a plugin.
 
-use std::ffi::c_char;
+use std::{collections::HashSet, ffi::c_char};
 
 use crate::{
     definitions::{
@@ -31,6 +31,8 @@ use crate::{
 /// remain valid for the lifetime of the plugin definition.
 /// The asset array follows the same convention.
 /// The system array follows the same convention.
+/// Component, asset, and system names must be unique within the plugin, and
+/// field names must be unique within their component or asset.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {
@@ -90,9 +92,17 @@ impl Definition for PluginDefinition {
             unsafe { std::slice::from_raw_parts(self.components, self.component_count) }
         };
 
+        let mut component_names = HashSet::new();
         for component in components {
             if let Err(error) = unsafe { component.validate() } {
                 return Err((name.clone(), error).into());
+            }
+            let component_name = unsafe { component.name() }
+                .expect("validated component definitions have valid names");
+            if !component_names.insert(component_name.clone()) {
+                return Err(PluginDefinitionError::DuplicateComponentName(
+                    component_name,
+                ));
             }
         }
 
@@ -105,9 +115,15 @@ impl Definition for PluginDefinition {
             unsafe { std::slice::from_raw_parts(self.assets, self.asset_count) }
         };
 
+        let mut asset_names = HashSet::new();
         for asset in assets {
             if let Err(error) = unsafe { asset.validate() } {
                 return Err((name.clone(), error).into());
+            }
+            let asset_name =
+                unsafe { asset.name() }.expect("validated asset definitions have valid names");
+            if !asset_names.insert(asset_name.clone()) {
+                return Err(PluginDefinitionError::DuplicateAssetName(asset_name));
             }
         }
 
@@ -120,9 +136,15 @@ impl Definition for PluginDefinition {
             unsafe { std::slice::from_raw_parts(self.systems, self.system_count) }
         };
 
+        let mut system_names = HashSet::new();
         for system in systems {
             if let Err(error) = unsafe { system.validate() } {
                 return Err((name.clone(), error).into());
+            }
+            let system_name =
+                unsafe { system.name() }.expect("validated system definitions have valid names");
+            if !system_names.insert(system_name.clone()) {
+                return Err(PluginDefinitionError::DuplicateSystemName(system_name));
             }
         }
 

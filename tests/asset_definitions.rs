@@ -14,6 +14,10 @@ unsafe extern "C" fn creator() -> *mut c_void {
 
 unsafe extern "C" fn destroyer(_: *mut c_void) {}
 
+unsafe extern "C" fn getter(_: *const c_void) -> *mut c_void {
+    std::ptr::null_mut()
+}
+
 #[fixture]
 fn asset() -> AssetDefinition {
     static NAME: &[u8] = b"Mesh\0";
@@ -78,6 +82,31 @@ fn rejects_invalid_field(mut asset: AssetDefinition) {
         Err(AssetDefinitionError::FieldInvalid(
             "Mesh".to_owned(),
             AssetFieldDefinitionError::GetterIsNull("vertices".to_owned()),
+        ))
+    );
+}
+
+#[rstest]
+fn rejects_duplicate_field_names(mut asset: AssetDefinition) {
+    let fields = [
+        AssetFieldDefinition {
+            name: c"vertices".as_ptr(),
+            type_hint: TypeHint::Usize as u32,
+            getter: Some(getter),
+        },
+        AssetFieldDefinition {
+            name: c"vertices".as_ptr(),
+            type_hint: TypeHint::Usize as u32,
+            getter: Some(getter),
+        },
+    ];
+    asset.fields = fields.as_ptr();
+    asset.field_count = fields.len();
+
+    assert_eq!(
+        unsafe { asset.validate() },
+        Err(AssetDefinitionError::DuplicateFieldName(
+            "vertices".to_owned()
         ))
     );
 }

@@ -13,10 +13,13 @@ pub enum PluginDefinitionError {
         actual: Version,
     },
     ComponentsIsNull(String),
+    DuplicateComponentName(String),
     ComponentInvalid(String, ComponentDefinitionError),
     AssetsIsNull(String),
+    DuplicateAssetName(String),
     AssetInvalid(String, AssetDefinitionError),
     SystemsIsNull(String),
+    DuplicateSystemName(String),
     SystemInvalid(String, SystemDefinitionError),
 }
 
@@ -28,6 +31,7 @@ pub enum ComponentDefinitionError {
     CreatorIsNull(String),
     DestroyerIsNull(String),
     FieldsIsNull(String),
+    DuplicateFieldName(String),
     FieldInvalid(String, ComponentFieldDefinitionError),
 }
 
@@ -63,6 +67,7 @@ pub enum AssetDefinitionError {
     CreatorIsNull(String),
     DestroyerIsNull(String),
     FieldsIsNull(String),
+    DuplicateFieldName(String),
     FieldInvalid(String, AssetFieldDefinitionError),
 }
 
@@ -209,14 +214,23 @@ impl Display for PluginDefinitionError {
             Self::ComponentsIsNull(name) => {
                 write!(f, "plugin '{name}' component list is null")
             }
+            Self::DuplicateComponentName(name) => {
+                write!(f, "plugin contains duplicate component name '{name}'")
+            }
             Self::ComponentInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid component: {error}")
             }
             Self::AssetsIsNull(name) => write!(f, "plugin '{name}' asset list is null"),
+            Self::DuplicateAssetName(name) => {
+                write!(f, "plugin contains duplicate asset name '{name}'")
+            }
             Self::AssetInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid asset: {error}")
             }
             Self::SystemsIsNull(name) => write!(f, "plugin '{name}' system list is null"),
+            Self::DuplicateSystemName(name) => {
+                write!(f, "plugin contains duplicate system name '{name}'")
+            }
             Self::SystemInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid system: {error}")
             }
@@ -244,6 +258,9 @@ impl Display for ComponentDefinitionError {
             Self::CreatorIsNull(name) => write!(f, "component '{name}' creator is null"),
             Self::DestroyerIsNull(name) => write!(f, "component '{name}' destroyer is null"),
             Self::FieldsIsNull(name) => write!(f, "component '{name}' field list is null"),
+            Self::DuplicateFieldName(name) => {
+                write!(f, "component contains duplicate field name '{name}'")
+            }
             Self::FieldInvalid(name, error) => {
                 write!(f, "component '{name}' has an invalid field: {error}")
             }
@@ -299,6 +316,9 @@ impl Display for AssetDefinitionError {
             Self::CreatorIsNull(name) => write!(f, "asset '{name}' creator is null"),
             Self::DestroyerIsNull(name) => write!(f, "asset '{name}' destroyer is null"),
             Self::FieldsIsNull(name) => write!(f, "asset '{name}' field list is null"),
+            Self::DuplicateFieldName(name) => {
+                write!(f, "asset contains duplicate field name '{name}'")
+            }
             Self::FieldInvalid(name, error) => {
                 write!(f, "asset '{name}' has an invalid field: {error}")
             }
