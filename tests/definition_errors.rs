@@ -4,6 +4,7 @@ use wasserxr::definitions::error::{
     AssetDefinitionError, AssetFieldDefinitionError, ComponentDefinitionError,
     ComponentFieldDefinitionError, PluginDefinitionError,
 };
+use wasserxr::errors::PluginError;
 
 #[test]
 fn formats_nested_definition_errors() {
@@ -65,4 +66,27 @@ fn converts_component_errors_with_explicit_plugin_context() {
             ComponentDefinitionError::FieldsIsNull("Transform".to_owned()),
         )
     );
+}
+
+#[test]
+fn formats_plugin_errors() {
+    assert_eq!(
+        PluginError::FailedToOpenPlugin.to_string(),
+        "failed to open plugin"
+    );
+    assert_eq!(
+        PluginError::FailedToFindPluginDefinition.to_string(),
+        "failed to find plugin definition"
+    );
+    assert_eq!(
+        PluginError::IOError(std::io::Error::other("permission denied")).to_string(),
+        "I/O error: permission denied"
+    );
+
+    let error = PluginError::DefinitionValidationError(PluginDefinitionError::NameIsEmpty);
+    assert_eq!(
+        error.to_string(),
+        "plugin definition validation error: plugin name is empty"
+    );
+    assert!(error.source().is_some());
 }

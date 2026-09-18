@@ -27,11 +27,26 @@ pub enum PluginError {
 
 impl Display for PluginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::IOError(error) => write!(f, "I/O error: {error}"),
+            Self::FailedToOpenPlugin => f.write_str("failed to open plugin"),
+            Self::FailedToFindPluginDefinition => f.write_str("failed to find plugin definition"),
+            Self::DefinitionValidationError(error) => {
+                write!(f, "plugin definition validation error: {error}")
+            }
+        }
     }
 }
 
-impl Error for PluginError {}
+impl Error for PluginError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::IOError(error) => Some(error),
+            Self::DefinitionValidationError(error) => Some(error),
+            Self::FailedToOpenPlugin | Self::FailedToFindPluginDefinition => None,
+        }
+    }
+}
 
 impl From<std::io::Error> for PluginError {
     fn from(value: std::io::Error) -> Self {
