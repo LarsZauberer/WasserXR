@@ -117,26 +117,31 @@ impl Scene {
 
     /// Removes all systems from the scene and runs their detachers.
     pub fn reset_systems(&self) {
-        // Replace the old system ID store with a fresh, empty one before detaching
-        // its systems.
-        let systems =
-            std::mem::take(&mut *self.systems.write().expect("scene system lock poisoned"));
-        for system in systems.into_values() {
+        let systems = self
+            .systems
+            .write()
+            .expect("scene system lock poisoned")
+            .drain()
+            .collect::<Vec<_>>();
+        for system in systems {
             system.detach(self);
         }
     }
 
     /// Removes all entities and their components from the scene.
     pub fn reset_entities(&self) {
-        let entities =
-            std::mem::take(&mut *self.entities.write().expect("scene entity lock poisoned"));
-        drop(entities);
+        self.entities
+            .write()
+            .expect("scene entity lock poisoned")
+            .clear();
     }
 
     /// Removes all cached assets from the scene.
     pub fn reset_assets(&self) {
-        let assets = std::mem::take(&mut *self.assets.write().expect("scene asset lock poisoned"));
-        drop(assets);
+        self.assets
+            .write()
+            .expect("scene asset lock poisoned")
+            .clear();
     }
 
     /// This will reset the scene's main objects. Meaning it will remove all the
@@ -978,8 +983,13 @@ impl Scene {
 
 impl Drop for Scene {
     fn drop(&mut self) {
-        let systems = std::mem::take(self.systems.get_mut().expect("scene system lock poisoned"));
-        for system in systems.into_values() {
+        let systems = self
+            .systems
+            .get_mut()
+            .expect("scene system lock poisoned")
+            .drain()
+            .collect::<Vec<_>>();
+        for system in systems {
             system.detach(self);
         }
     }

@@ -43,6 +43,20 @@ impl<OriginalID: Clone + Eq + Hash, ID: Key, Record> IDStore<OriginalID, ID, Rec
         id
     }
 
+    /// Removes all records while preserving the slot generations for future
+    /// insertions.
+    pub(crate) fn clear(&mut self) {
+        self.ids.clear();
+        self.records.clear();
+    }
+
+    /// Removes all records and returns them while preserving the slot
+    /// generations for future insertions.
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = Record> + '_ {
+        self.ids.clear();
+        self.records.drain().map(|(_, record)| record)
+    }
+
     /// Removes and returns the record identified by `id`.
     pub(crate) fn remove(&mut self, id: ID) -> Option<Record> {
         let record = self.records.remove(id)?;
@@ -80,11 +94,6 @@ impl<OriginalID: Clone + Eq + Hash, ID: Key, Record> IDStore<OriginalID, ID, Rec
     /// Iterates over all stored records.
     pub(crate) fn values(&self) -> impl Iterator<Item = &Record> {
         self.records.values()
-    }
-
-    /// Consumes the store and iterates over all records.
-    pub(crate) fn into_values(self) -> impl Iterator<Item = Record> {
-        self.records.into_iter().map(|(_, record)| record)
     }
 
     /// Iterates over every ID and record pair.
@@ -132,5 +141,18 @@ mod tests {
         let id = store.insert_named(7, "record");
 
         assert_eq!(store.resolve_id(&7), Some(id));
+    }
+
+    #[test]
+    fn clearing_store_invalidates_previous_ids() {
+        let mut store: IDStore<String, TestId, i32> = IDStore::default();
+        let old_id = store.insert_named("old".to_owned(), 1);
+
+        store.clear();
+        let new_id = store.insert_named("new".to_owned(), 2);
+
+        assert_ne!(old_id, new_id);
+        assert_eq!(store.get(old_id), None);
+        assert_eq!(store.get(new_id), Some(&2));
     }
 }

@@ -40,9 +40,12 @@ fn reset_invalidates_existing_entity_ids() {
 
     scene.reset().unwrap();
 
-    assert!(scene.get_entities().is_empty());
+    let new_entity = scene.add_entity();
+
+    assert_ne!(entity, new_entity);
     assert!(matches!(
         scene.remove_entity(entity),
         Err(SceneError::EntityNotFound)
     ));
+    assert!(scene.remove_entity(new_entity).is_ok());
 }

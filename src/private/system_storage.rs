@@ -81,7 +81,7 @@ impl SystemStorage {
         Ok(self.systems.remove(id.2).expect("system was just resolved"))
     }
 
-    pub(crate) fn into_values(self) -> impl Iterator<Item = System> {
-        self.systems.into_values()
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = System> + '_ {
+        self.systems.drain()
     }
 }
