@@ -230,7 +230,7 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     let calls = Cell::new(0);
 
     scene
-        .query_components(&all_with_component, |results| {
+        .with_component_fields(&all_with_component, |results| {
             calls.set(calls.get() + 1);
             assert_eq!(
                 results
@@ -245,7 +245,7 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
     assert_eq!(calls.get(), 1);
 
     scene
-        .query_components(&only_first_entity, |results| {
+        .with_component_fields(&only_first_entity, |results| {
             calls.set(calls.get() + 1);
             assert_eq!(results.len(), 3);
             assert_eq!(results[0], results[2]);
@@ -270,14 +270,14 @@ fn component_query_matches_entities_preserves_order_and_calls_action_once(scene:
         ),
     ];
     assert!(matches!(
-        scene.query_components(&component, |_| panic!("invalid query called callback")),
+        scene.with_component_fields(&component, |_| panic!("invalid query called callback")),
         Err(SceneError::EntityError(EntityError::ComponentError(
             ComponentError::FieldError(FieldError::NotMutable)
         )))
     ));
     // The failed query released its locks, and the previous write is visible.
     scene
-        .query_components(&all_with_component, |results| {
+        .with_component_fields(&all_with_component, |results| {
             assert_eq!(unsafe { *results[1].cast::<usize>() }, 7);
         })
         .unwrap();
@@ -314,7 +314,7 @@ fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
         let scene = &scene;
         scope.spawn(move || {
             scene
-                .query_components(&read_request, |_| {
+                .with_component_fields(&read_request, |_| {
                     read_locked.send(()).unwrap();
                     release_read_rx.recv().unwrap();
                 })
@@ -325,7 +325,7 @@ fn component_write_query_conflicts_with_reads_of_other_fields(scene: Scene) {
         scope.spawn(move || {
             write_started.send(()).unwrap();
             scene
-                .query_components(&write_request, |_| write_locked.send(()).unwrap())
+                .with_component_fields(&write_request, |_| write_locked.send(()).unwrap())
                 .unwrap();
         });
         write_started_rx.recv().unwrap();
@@ -371,7 +371,7 @@ fn component_query_edge_cases(scene: Scene) {
         vec![(component_type, AccessRequest::Write, &[][..])],
     ] {
         scene
-            .query_components(&query, |pointers| {
+            .with_component_fields(&query, |pointers| {
                 calls += 1;
                 assert!(pointers.is_empty());
             })
@@ -384,7 +384,7 @@ fn component_query_edge_cases(scene: Scene) {
     let missing =
         FieldTypeID::try_from(TypeID::FieldTypeID(plugin, component_slot, u64::MAX)).unwrap();
     let error = scene
-        .query_components(&[(component_type, AccessRequest::Read, &[missing])], |_| {
+        .with_component_fields(&[(component_type, AccessRequest::Read, &[missing])], |_| {
             panic!("missing field called callback")
         })
         .unwrap_err();
@@ -393,7 +393,7 @@ fn component_query_edge_cases(scene: Scene) {
         SceneError::EntityError(EntityError::ComponentError(ComponentError::FieldNotFound))
     ));
     let error = scene
-        .query_components(&[(component_type, AccessRequest::Read, &[hidden])], |_| {
+        .with_component_fields(&[(component_type, AccessRequest::Read, &[hidden])], |_| {
             panic!("hidden field called callback")
         })
         .unwrap_err();
@@ -404,7 +404,7 @@ fn component_query_edge_cases(scene: Scene) {
         )))
     ));
     scene
-        .query_components(
+        .with_component_fields(
             &[
                 (component_type, AccessRequest::Read, &[immutable]),
                 (component_type, AccessRequest::Write, &[mutable, mutable]),
@@ -459,7 +459,7 @@ fn reversed_component_queries_do_not_deadlock(scene: Scene) {
                 for _ in 0..100 {
                     start.wait();
                     scene
-                        .query_components(&query, |pointers| {
+                        .with_component_fields(&query, |pointers| {
                             for &pointer in pointers {
                                 unsafe { *pointer.cast::<usize>() += 1 };
                             }
@@ -479,7 +479,7 @@ fn reversed_component_queries_do_not_deadlock(scene: Scene) {
         handle.join().unwrap();
     }
     scene
-        .query_components(
+        .with_component_fields(
             &[
                 (component_type, AccessRequest::Read, &[field]),
                 (other, AccessRequest::Read, &[other_field]),
@@ -514,7 +514,7 @@ fn component_queries_keep_owners_alive(scene: Scene) {
         let reader_scene = Arc::clone(&scene);
         let reader = thread::spawn(move || {
             reader_scene
-                .query_components(
+                .with_component_fields(
                     &[(component_type, AccessRequest::Read, &[field])],
                     |pointers| {
                         locked.send(()).unwrap();
@@ -526,7 +526,7 @@ fn component_queries_keep_owners_alive(scene: Scene) {
         });
         locked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         scene
-            .query_components(&[(component_type, AccessRequest::Read, &[field])], |_| ())
+            .with_component_fields(&[(component_type, AccessRequest::Read, &[field])], |_| ())
             .unwrap();
         let (started, started_rx) = mpsc::channel();
         let (removed, removed_rx) = mpsc::channel();

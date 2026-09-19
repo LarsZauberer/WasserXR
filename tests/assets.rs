@@ -183,13 +183,13 @@ fn asset_query_returns_complete_assets_in_request_order() {
 
     let mut first_pointer = std::ptr::null();
     scene
-        .query_assets(&[(asset_type, "first")], |pointers| {
+        .with_asset_fields(&[(asset_type, "first")], |pointers| {
             first_pointer = pointers[0];
         })
         .unwrap();
     let mut calls = 0;
     scene
-        .query_assets(&requests, |assets| {
+        .with_asset_fields(&requests, |assets| {
             calls += 1;
             assert_eq!(assets.len(), 3);
             assert_eq!(assets[0], assets[2]);
@@ -233,14 +233,14 @@ fn asset_query_empty_and_failure_behavior() {
     let failing = asset_type(&scene, "FailingAsset").unwrap();
     let mut calls = 0;
     scene
-        .query_assets(&[], |pointers| {
+        .with_asset_fields(&[], |pointers| {
             calls += 1;
             assert!(pointers.is_empty());
         })
         .unwrap();
     assert_eq!(calls, 1);
     assert!(matches!(
-        scene.query_assets(&[(valid, "ok"), (failing, "bad")], |_| {
+        scene.with_asset_fields(&[(valid, "ok"), (failing, "bad")], |_| {
             panic!("failed query called callback");
         }),
         Err(SceneError::AssetError(AssetError::CreationFailure))
@@ -251,7 +251,7 @@ fn asset_query_empty_and_failure_behavior() {
     };
     let missing = AssetTypeID::try_from(TypeID::AssetTypeID(plugin, u64::MAX)).unwrap();
     assert!(matches!(
-        scene.query_assets(&[(missing, "missing")], |_| {
+        scene.with_asset_fields(&[(missing, "missing")], |_| {
             panic!("invalid query called callback");
         }),
         Err(SceneError::AssetNotFound)
@@ -272,7 +272,7 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
     let reader_scene = Arc::clone(&scene);
     let reader = thread::spawn(move || {
         reader_scene
-            .query_assets(&[(asset_type, "first")], |pointers| {
+            .with_asset_fields(&[(asset_type, "first")], |pointers| {
                 locked.send(()).unwrap();
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 assert_eq!(unsafe { (*pointers[0].cast::<TestAsset>()).value }, 42);
@@ -299,7 +299,7 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
 
     let panic = std::panic::catch_unwind(|| {
         scene
-            .query_assets(&[(asset_type, "again")], |_| panic!("callback panic"))
+            .with_asset_fields(&[(asset_type, "again")], |_| panic!("callback panic"))
             .unwrap();
     });
     assert!(panic.is_err());

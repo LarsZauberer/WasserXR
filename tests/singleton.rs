@@ -126,7 +126,7 @@ fn ensure_singleton_leaves_existing_duplicates_untouched() {
 
     let singleton = scene.ensure_singleton(component).unwrap();
     scene
-        .query_singleton((component, AccessRequest::Read, &fields[..1]), |pointers| {
+        .with_singleton_fields((component, AccessRequest::Read, &fields[..1]), |pointers| {
             assert_eq!(pointers.len(), 1)
         })
         .unwrap();
@@ -160,18 +160,18 @@ fn concurrent_ensure_singleton_calls_create_one_entity() {
 }
 
 #[test]
-fn query_singleton_ensures_and_queries_one_component() {
+fn with_singleton_fields_ensures_and_queries_one_component() {
     let (scene, component, fields) = scene();
 
     scene
-        .query_singleton((component, AccessRequest::Write, &fields), |pointers| {
+        .with_singleton_fields((component, AccessRequest::Write, &fields), |pointers| {
             assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 1);
             assert_eq!(unsafe { *pointers[1].cast::<usize>() }, 2);
             unsafe { *pointers[0].cast::<usize>() = 3 };
         })
         .unwrap();
     scene
-        .query_singleton((component, AccessRequest::Read, &fields[..1]), |pointers| {
+        .with_singleton_fields((component, AccessRequest::Read, &fields[..1]), |pointers| {
             assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 3)
         })
         .unwrap();

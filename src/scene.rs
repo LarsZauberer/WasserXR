@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     ffi::c_void,
     path::Path,
     sync::{RwLock, mpsc},
@@ -8,8 +7,7 @@ use std::{
 use crate::{
     definitions::{fields::TypeHint, plugins::PluginDefinition},
     errors::{
-        AssetError, ComponentError, EntityError, PluginCompatibilityError, PluginError, SceneError,
-        SystemError,
+        AssetError, ComponentError, PluginCompatibilityError, PluginError, SceneError, SystemError,
     },
     field::AccessRequest,
     ids::{
@@ -20,8 +18,7 @@ use crate::{
     logging::{LogEntry, LogHandler, LogLevel, LogManager},
     private::{
         assets::Asset,
-        components::ComponentGuard,
-        entities::Entity,
+        entities::{self, Entity},
         id_store::IDStore,
         manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
@@ -625,8 +622,8 @@ impl Scene {
     ///
     /// If multiple entities have the component, an arbitrary one's fields are
     /// passed to `action`; all matches are locked in the global order used by
-    /// [`Self::query_components`]. Pointers follow the same access and lifetime
-    /// contract.
+    /// [`Self::with_component_fields`]. Pointers follow the same access and
+    /// lifetime contract.
     ///
     /// # Errors
     ///
@@ -634,7 +631,7 @@ impl Scene {
     /// matching entities or components are removed after ensuring the singleton
     /// but before the component query acquires its locks. In that case,
     /// `action` is not called.
-    pub fn query_singleton(
+    pub fn with_singleton_fields(
         &self,
         query: ComponentQuery<'_>,
         action: impl FnOnce(&[*mut c_void]),
@@ -642,7 +639,7 @@ impl Scene {
         let (component_type_id, _, fields) = query;
         self.ensure_singleton(component_type_id)?;
         let mut queried = false;
-        self.query_components(std::slice::from_ref(&query), |pointers| {
+        self.with_component_fields(std::slice::from_ref(&query), |pointers| {
             // Component queries flatten the fields from every match. Expose only the
             // first match, using `get` so concurrent removal returns an error instead
             // of panicking on an out-of-bounds slice.
@@ -700,7 +697,7 @@ impl Scene {
     /// # use wasserxr::{scene::Scene, field::AccessRequest, ids::*, errors::SceneError};
     /// # fn update(scene: &Scene, component: ComponentTypeID,
     /// #           counter: FieldTypeID) -> Result<(), SceneError> {
-    /// scene.query_components(&[(component, AccessRequest::Write, &[counter])], |fields| {
+    /// scene.with_component_fields(&[(component, AccessRequest::Write, &[counter])], |fields| {
     ///     for &field in fields {
     ///         // SAFETY: This plugin defines `counter` as a mutable u32.
     ///         unsafe { *field.cast::<u32>() += 1 };
@@ -709,7 +706,7 @@ impl Scene {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn query_components(
+    pub fn with_component_fields(
         &self,
         query: &[ComponentQuery<'_>],
         action: impl FnOnce(&[*mut c_void]),
@@ -720,73 +717,7 @@ impl Scene {
         }
 
         let entities = self.entities.read().expect("scene entity lock poisoned");
-        // Acquire every collection guard before any component data guard.
-
-        // Note that a BTreeMap automatically stores everything in a sorted way by
-        // design.
-        let ordered_entities: BTreeMap<_, _> = entities.iter().collect();
-        let collections: Vec<_> = ordered_entities
-            .iter()
-            .map(|(&id, entity)| (id, entity.lock_components()))
-            .collect();
-        // Keep lock acquisition separate from the callback's pointer order:
-        // - `locks` contains each component once, sorted by (EntityID, ComponentID) to
-        //   prevent order-induced deadlocks. Any Write request wins.
-        // - `requests` preserves query order, duplicates, fields, and each entry's
-        //   access mode. A Read of an immutable field remains valid even if another
-        //   entry requires a Write lock on the same component.
-        // For example, B/read, A/write, B/write locks A/write then B/write,
-        // but returns the requested fields in B, A, B order.
-        let mut locks = BTreeMap::new();
-        let mut requests = Vec::new();
-        for (entity_id, components) in &collections {
-            // Check which entities have all the queried components. If they have all the
-            // queried components, return a list of the ComponentIDs
-            let ids: Option<Vec<_>> = query
-                .iter()
-                .map(|(component_type, _, _)| components.resolve_id(component_type))
-                .collect();
-            let Some(ids) = ids else { continue };
-
-            // Building the request list and lock list of all the locks that should be
-            // aquired.
-            //
-            // This zip works since the ComponentID is directly mapped to the requested
-            // component
-            for (slot, &(_, access, fields)) in ids.into_iter().zip(query) {
-                let id = ComponentID(*entity_id, slot);
-                let key = id;
-                let component = components.get(slot).expect("resolved component exists");
-                let (_, lock_access) = locks.entry(key).or_insert((component, access));
-                if access == AccessRequest::Write {
-                    *lock_access = AccessRequest::Write;
-                }
-                requests.push((key, access, fields));
-            }
-        }
-
-        // Aquire all the locks
-        let guards: BTreeMap<_, _> = locks
-            .into_iter()
-            .map(|(key, (component, access))| (key, ComponentGuard::lock(component, access)))
-            .collect();
-
-        // Get from the locks of the components all the pointers in the other they were
-        // requested
-        let mut pointers = Vec::new();
-        for (key, access, fields) in requests {
-            for &field in fields {
-                pointers.push(
-                    guards[&key]
-                        .component()
-                        .query_field(field, access)
-                        .map_err(EntityError::from)?,
-                );
-            }
-        }
-        // All guards remain in scope through the one callback.
-        action(&pointers);
-        Ok(())
+        entities::with_component_fields(entities.iter(), query, action).map_err(SceneError::from)
     }
 
     /// Loads or reuses each requested asset, then calls `action` once with
@@ -820,7 +751,7 @@ impl Scene {
     /// # use wasserxr::{scene::Scene, ids::*, errors::SceneError};
     /// # struct Settings { scale: f32 }
     /// # fn read(scene: &Scene, settings: AssetTypeID) -> Result<(), SceneError> {
-    /// scene.query_assets(&[(settings, "default")], |assets| {
+    /// scene.with_asset_fields(&[(settings, "default")], |assets| {
     ///     // SAFETY: This plugin's settings asset uses the `Settings` layout.
     ///     let settings = unsafe { &*assets[0].cast::<Settings>() };
     ///     println!("{}", settings.scale);
@@ -828,7 +759,7 @@ impl Scene {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn query_assets(
+    pub fn with_asset_fields(
         &self,
         query: &[AssetQuery<'_>],
         action: impl FnOnce(&[*const c_void]),
