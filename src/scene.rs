@@ -17,6 +17,7 @@ use crate::{
         ComponentTypeID, EntityID, EntitySlot, FieldID, FieldTypeID, PluginID, PluginSlot,
         SystemID, SystemTypeID, TypeID,
     },
+    logging::{LogEntry, LogHandler, LogLevel, LogManager},
     private::{
         assets::Asset,
         components::ComponentGuard,
@@ -29,6 +30,7 @@ use crate::{
         system_storage_snapshot::SystemStorageSnapshot,
         thread_pool::ThreadPool,
     },
+    utils::ring::Ring,
 };
 
 pub(crate) type EntityStorage = IDStore<String, EntitySlot, Entity>;
@@ -62,6 +64,7 @@ pub type AssetQuery<'a> = (AssetTypeID, &'a str);
 /// threads.
 #[derive(Debug, Default)]
 pub struct Scene {
+    logging: LogManager,
     systems: RwLock<SystemStorage>,
     entities: RwLock<EntityStorage>,
     plugins: RwLock<PluginStorage>,
@@ -70,6 +73,48 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// Submits a message to this scene's asynchronous logger.
+    pub fn log(&self, level: LogLevel, message: impl Into<String>) {
+        self.logging.log(level, message.into());
+    }
+
+    /// Registers a callback for subsequently processed log entries.
+    ///
+    /// # Safety
+    ///
+    /// `handler.data` must remain valid and safe to access from the logger
+    /// thread until this scene has been dropped. The callback must not retain
+    /// `entry` or any pointer obtained from it after returning, and must not
+    /// unwind across the `extern "C"` boundary.
+    pub unsafe fn add_log_handler(&self, handler: LogHandler) {
+        self.logging.add_handler(handler);
+    }
+
+    /// Returns a snapshot of log entries processed before this request.
+    pub fn get_logs(&self) -> Ring<LogEntry> {
+        self.logging.get_logs()
+    }
+
+    /// Logs a detailed diagnostic message.
+    pub fn debug(&self, message: impl Into<String>) {
+        self.log(LogLevel::Debug, message);
+    }
+
+    /// Logs an informational message.
+    pub fn info(&self, message: impl Into<String>) {
+        self.log(LogLevel::Info, message);
+    }
+
+    /// Logs a warning message.
+    pub fn warning(&self, message: impl Into<String>) {
+        self.log(LogLevel::Warning, message);
+    }
+
+    /// Logs an error message.
+    pub fn error(&self, message: impl Into<String>) {
+        self.log(LogLevel::Error, message);
+    }
+
     /// Creates a new empty scene
     ///
     /// # Panics
