@@ -85,6 +85,7 @@ impl Scene {
     /// unwind across the `extern "C"` boundary.
     pub unsafe fn add_log_handler(&self, handler: LogHandler) {
         self.logging.add_handler(handler);
+        self.debug("Registered a log handler");
     }
 
     /// Returns a snapshot of log entries processed before this request.
@@ -118,18 +119,22 @@ impl Scene {
     ///
     /// Panics if one of the worker threads cannot be created.
     pub fn new() -> Self {
-        Self::default()
+        let scene = Self::default();
+        scene.debug("Created a new scene");
+        scene
     }
 
     /// Creates a new entity and returns it's handle. The handle will be unique
     /// to every other entity ever created within this scene.
     pub fn add_entity(&self) -> EntityID {
-        EntityID(
+        let id = EntityID(
             self.entities
                 .write()
                 .expect("scene entity lock poisoned")
                 .insert(Entity::new()),
-        )
+        );
+        self.debug(format!("Added entity {id:?}"));
+        id
     }
 
     /// Removes a previsouly created entity from the scene. This will also
@@ -138,13 +143,18 @@ impl Scene {
     /// If the entity couldn't be found with the handle, the function will
     /// return a [`SceneError::EntityNotFound`]
     pub fn remove_entity(&self, id: EntityID) -> Result<(), SceneError> {
-        let _ = self
+        let result = self
             .entities
             .write()
             .expect("scene entity lock poisoned")
             .remove(id.0)
-            .ok_or(SceneError::EntityNotFound)?;
-        Ok(())
+            .ok_or(SceneError::EntityNotFound)
+            .map(drop);
+        match &result {
+            Ok(()) => self.debug(format!("Removed entity {id:?}")),
+            Err(error) => self.warning(format!("Could not remove entity {id:?}: {error}")),
+        }
+        result
     }
 
     /// Returns a [`Vec<EntityID>`] of all the entity handles that are currently
@@ -166,9 +176,11 @@ impl Scene {
             .expect("scene system lock poisoned")
             .drain()
             .collect::<Vec<_>>();
+        let count = systems.len();
         for system in systems {
             self.run_detacher(system);
         }
+        self.debug(format!("Removed systems: {count}"));
     }
 
     /// Runs a system's detacher after the system has been removed from storage.
@@ -180,18 +192,20 @@ impl Scene {
 
     /// Removes all entities and their components from the scene.
     pub fn reset_entities(&self) {
-        self.entities
-            .write()
-            .expect("scene entity lock poisoned")
-            .clear();
+        let mut entities = self.entities.write().expect("scene entity lock poisoned");
+        let count = entities.keys().count();
+        entities.clear();
+        drop(entities);
+        self.debug(format!("Removed entities: {count}"));
     }
 
     /// Removes all cached assets from the scene.
     pub fn reset_assets(&self) {
-        self.assets
-            .write()
-            .expect("scene asset lock poisoned")
-            .clear();
+        let mut assets = self.assets.write().expect("scene asset lock poisoned");
+        let count = assets.keys().count();
+        assets.clear();
+        drop(assets);
+        self.debug(format!("Removed cached assets: {count}"));
     }
 
     /// This will reset the scene's main objects. Meaning it will remove all the
@@ -202,6 +216,7 @@ impl Scene {
         self.reset_systems();
         self.reset_entities();
         self.reset_assets();
+        self.debug("Reset the scene");
         Ok(())
     }
 
@@ -247,8 +262,14 @@ impl Scene {
     /// within it. Component data and callbacks supplied by the plugin must be
     /// safe to access from multiple threads.
     pub unsafe fn load_plugin(&self, path: &Path) -> Result<PluginID, SceneError> {
-        let plugin = unsafe { Plugin::load_shared(path) }.map_err(SceneError::from)?;
-        self.add_plugin(plugin)
+        let result = unsafe { Plugin::load_shared(path) }
+            .map_err(SceneError::from)
+            .and_then(|plugin| self.add_plugin(plugin));
+        match &result {
+            Ok(id) => self.debug(format!("Loaded plugin {id:?} from a shared library")),
+            Err(error) => self.warning(format!("Could not load plugin: {error}")),
+        }
+        result
     }
 
     /// Load a plugin from a statically linked and already [`PluginDefinition`]
@@ -265,9 +286,14 @@ impl Scene {
         &self,
         definition: PluginDefinition,
     ) -> Result<PluginID, SceneError> {
-        let manifest: PluginManifest = unsafe { Manifest::checked_convert(definition) }
-            .map_err(|err| SceneError::from(PluginError::from(err)))?;
-        self.add_plugin(Plugin::load_static(manifest))
+        let result = unsafe { Manifest::checked_convert(definition) }
+            .map_err(|error| SceneError::from(PluginError::from(error)))
+            .and_then(|manifest: PluginManifest| self.add_plugin(Plugin::load_static(manifest)));
+        match &result {
+            Ok(id) => self.debug(format!("Loaded statically linked plugin {id:?}")),
+            Err(error) => self.warning(format!("Could not load statically linked plugin: {error}")),
+        }
+        result
     }
 
     /// Get the handle of a plugin ([`PluginID`]) by searching for the name of a
@@ -512,18 +538,26 @@ impl Scene {
         entity_id: EntityID,
         component_type_id: ComponentTypeID,
     ) -> Result<ComponentID, SceneError> {
-        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let manifest = plugins
-            .get(component_type_id.0)
-            .and_then(|plugin| plugin.get_component(component_type_id.1))
-            .ok_or(SceneError::NoComponentType)?;
-
-        self.with_entity(entity_id.0, |entity| {
-            entity
-                .add_component(component_type_id, manifest)
-                .map(|component| ComponentID(entity_id.0, component))
-                .map_err(SceneError::EntityError)
-        })
+        let result = (|| {
+            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+            let manifest = plugins
+                .get(component_type_id.0)
+                .and_then(|plugin| plugin.get_component(component_type_id.1))
+                .ok_or(SceneError::NoComponentType)?;
+            self.with_entity(entity_id.0, |entity| {
+                entity
+                    .add_component(component_type_id, manifest)
+                    .map(|component| ComponentID(entity_id.0, component))
+                    .map_err(SceneError::EntityError)
+            })
+        })();
+        match &result {
+            Ok(id) => self.debug(format!("Added component {id:?} to entity {entity_id:?}")),
+            Err(error) => self.warning(format!(
+                "Could not add component type {component_type_id:?} to entity {entity_id:?}: {error}"
+            )),
+        }
+        result
     }
 
     /// Returns an arbitrary entity with the requested component, creating one
@@ -535,38 +569,56 @@ impl Scene {
         &self,
         component_type_id: ComponentTypeID,
     ) -> Result<EntityID, SceneError> {
-        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let manifest = plugins
-            .get(component_type_id.0)
-            .and_then(|plugin| plugin.get_component(component_type_id.1))
-            .ok_or(SceneError::NoComponentType)?;
-        let mut entities = self.entities.write().expect("scene entity lock poisoned");
+        let result = (|| {
+            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+            let manifest = plugins
+                .get(component_type_id.0)
+                .and_then(|plugin| plugin.get_component(component_type_id.1))
+                .ok_or(SceneError::NoComponentType)?;
+            let mut entities = self.entities.write().expect("scene entity lock poisoned");
 
-        if let Some((id, _)) = entities
-            .iter()
-            .find(|(_, entity)| entity.resolve_component_slot(component_type_id).is_ok())
-        {
-            return Ok(EntityID(id));
+            if let Some((id, _)) = entities
+                .iter()
+                .find(|(_, entity)| entity.resolve_component_slot(component_type_id).is_ok())
+            {
+                return Ok(EntityID(id));
+            }
+
+            let entity_slot = entities.insert(Entity::new());
+            entities
+                .get(entity_slot)
+                .expect("entity was just inserted")
+                .add_component(component_type_id, manifest)
+                .map_err(SceneError::from)?;
+            Ok(EntityID(entity_slot))
+        })();
+        match &result {
+            Ok(id) => self.debug(format!(
+                "Ensured entity {id:?} has singleton component type {component_type_id:?}"
+            )),
+            Err(error) => self.warning(format!(
+                "Could not ensure singleton component type {component_type_id:?}: {error}"
+            )),
         }
-
-        let entity_slot = entities.insert(Entity::new());
-        entities
-            .get(entity_slot)
-            .expect("entity was just inserted")
-            .add_component(component_type_id, manifest)
-            .map_err(SceneError::from)?;
-        Ok(EntityID(entity_slot))
+        result
     }
 
     /// Remove a component type from an entity
     ///
     /// The function may fail, if the [`EntityID`] cannot be found in the scene.
     pub fn remove_component(&self, component: ComponentID) -> Result<(), SceneError> {
-        self.with_entity(component.0, |entity| {
+        let result = self.with_entity(component.0, |entity| {
             entity
                 .remove_component(component.1)
                 .map_err(SceneError::from)
-        })
+        });
+        match &result {
+            Ok(()) => self.debug(format!("Removed component {component:?}")),
+            Err(error) => {
+                self.warning(format!("Could not remove component {component:?}: {error}"))
+            }
+        }
+        result
     }
 
     /// Returns all the component names of the given [`EntityID`]
@@ -636,19 +688,33 @@ impl Scene {
         query: ComponentQuery<'_>,
         action: impl FnOnce(&[*mut c_void]),
     ) -> Result<(), SceneError> {
-        let (component_type_id, _, fields) = query;
-        self.ensure_singleton(component_type_id)?;
-        let mut queried = false;
-        self.with_component_fields(std::slice::from_ref(&query), |pointers| {
-            // Component queries flatten the fields from every match. Expose only the
-            // first match, using `get` so concurrent removal returns an error instead
-            // of panicking on an out-of-bounds slice.
-            if let Some(pointers) = pointers.get(..fields.len()) {
-                queried = true;
-                action(pointers);
-            }
-        })?;
-        queried.then_some(()).ok_or(SceneError::EntityNotFound)
+        let result = (|| {
+            let (component_type_id, _, fields) = query;
+            self.ensure_singleton(component_type_id)?;
+            let mut queried = false;
+            self.with_component_fields(std::slice::from_ref(&query), |pointers| {
+                // Component queries flatten the fields from every match. Expose only the
+                // first match, using `get` so concurrent removal returns an error instead
+                // of panicking on an out-of-bounds slice.
+                if let Some(pointers) = pointers.get(..fields.len()) {
+                    queried = true;
+                    action(pointers);
+                }
+            })?;
+            queried.then_some(()).ok_or(SceneError::EntityNotFound)
+        })();
+        match &result {
+            Ok(()) => self.debug(format!(
+                "Queried singleton component type {:?} (fields: {})",
+                query.0,
+                query.2.len()
+            )),
+            Err(error) => self.warning(format!(
+                "Could not query singleton component type {:?}: {error}",
+                query.0
+            )),
+        }
+        result
     }
 
     /// Calls `action` once with fields from all entities matching every query
@@ -711,13 +777,27 @@ impl Scene {
         query: &[ComponentQuery<'_>],
         action: impl FnOnce(&[*mut c_void]),
     ) -> Result<(), SceneError> {
-        if query.is_empty() {
-            action(&[]);
-            return Ok(());
-        }
+        let result = (|| {
+            if query.is_empty() {
+                action(&[]);
+                return Ok(());
+            }
 
-        let entities = self.entities.read().expect("scene entity lock poisoned");
-        entities::with_component_fields(entities.iter(), query, action).map_err(SceneError::from)
+            let entities = self.entities.read().expect("scene entity lock poisoned");
+            entities::with_component_fields(entities.iter(), query, action)
+                .map_err(SceneError::from)
+        })();
+        match &result {
+            Ok(()) => self.debug(format!(
+                "Ran component query (requirements: {})",
+                query.len()
+            )),
+            Err(error) => self.warning(format!(
+                "Could not run component query (requirements: {}): {error}",
+                query.len()
+            )),
+        }
+        result
     }
 
     /// Loads or reuses each requested asset, then calls `action` once with
@@ -764,22 +844,29 @@ impl Scene {
         query: &[AssetQuery<'_>],
         action: impl FnOnce(&[*const c_void]),
     ) -> Result<(), SceneError> {
-        let ids = query
-            .iter()
-            .map(|&(asset_type, data)| self.get_asset_id(asset_type, data))
-            .collect::<Result<Vec<_>, _>>()?;
-        let assets = self.assets.read().expect("scene asset lock poisoned");
-        let pointers = ids
-            .into_iter()
-            .map(|id| {
-                assets
-                    .get(id.2)
-                    .map(Asset::data)
-                    .ok_or(SceneError::AssetNotFound)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        action(&pointers);
-        Ok(())
+        let result = (|| {
+            let ids = query
+                .iter()
+                .map(|&(asset_type, data)| self.get_asset_id(asset_type, data))
+                .collect::<Result<Vec<_>, _>>()?;
+            let assets = self.assets.read().expect("scene asset lock poisoned");
+            let pointers = ids
+                .into_iter()
+                .map(|id| {
+                    assets
+                        .get(id.2)
+                        .map(Asset::data)
+                        .ok_or(SceneError::AssetNotFound)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            action(&pointers);
+            Ok(())
+        })();
+        match &result {
+            Ok(()) => self.debug(format!("Queried assets: {}", query.len())),
+            Err(error) => self.warning(format!("Could not query assets: {error}")),
+        }
+        result
     }
 
     /// Resolve the [`AssetID`] from a given asset type and data string.
@@ -823,29 +910,38 @@ impl Scene {
         asset_type_id: AssetTypeID,
         data_string: &str,
     ) -> Result<AssetID, SceneError> {
-        let key = (asset_type_id, data_string.to_owned());
-        if let Some(id) = self
-            .assets
-            .read()
-            .expect("scene asset lock poisoned")
-            .resolve_id(&key)
-        {
-            return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
-        }
+        let result = (|| {
+            let key = (asset_type_id, data_string.to_owned());
+            if let Some(id) = self
+                .assets
+                .read()
+                .expect("scene asset lock poisoned")
+                .resolve_id(&key)
+            {
+                return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
+            }
 
-        let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-        let manifest = plugins
-            .get(asset_type_id.0)
-            .and_then(|plugin| plugin.get_asset(asset_type_id.1))
-            .ok_or(SceneError::AssetNotFound)?;
+            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+            let manifest = plugins
+                .get(asset_type_id.0)
+                .and_then(|plugin| plugin.get_asset(asset_type_id.1))
+                .ok_or(SceneError::AssetNotFound)?;
 
-        let mut assets = self.assets.write().expect("scene asset lock poisoned");
-        if let Some(id) = assets.resolve_id(&key) {
-            return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
+            let mut assets = self.assets.write().expect("scene asset lock poisoned");
+            if let Some(id) = assets.resolve_id(&key) {
+                return Ok(AssetID(asset_type_id.0, asset_type_id.1, id));
+            }
+            let asset = Asset::new(manifest, asset_type_id).map_err(SceneError::from)?;
+            let asset = assets.insert_named(key, asset);
+            Ok(AssetID(asset_type_id.0, asset_type_id.1, asset))
+        })();
+        match &result {
+            Ok(id) => self.debug(format!("Loaded or reused asset {id:?}")),
+            Err(error) => self.warning(format!(
+                "Could not load asset type {asset_type_id:?}: {error}"
+            )),
         }
-        let asset = Asset::new(manifest, asset_type_id).map_err(SceneError::from)?;
-        let asset = assets.insert_named(key, asset);
-        Ok(AssetID(asset_type_id.0, asset_type_id.1, asset))
+        result
     }
 
     /// Gets an existing concrete system ID from its plugin and system type.
@@ -859,77 +955,93 @@ impl Scene {
 
     /// Adds a system to the scene and returns its concrete ID.
     pub fn add_system(&self, system_type_id: SystemTypeID) -> Result<SystemID, SceneError> {
-        let key = system_type_id;
-        if self
-            .systems
-            .read()
-            .expect("scene system lock poisoned")
-            .resolve_id(&key)
-            .is_some()
-        {
-            return Err(SystemError::AlreadyExists.into());
-        }
-
-        // Resolve every requested type ID before creating or attaching the system.
-        let type_ids = self.resolve_requested_type_ids(system_type_id)?;
-        let (system_id, attacher) = {
-            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
-            let plugin = plugins
-                .get(system_type_id.0)
-                .ok_or(SceneError::SystemNotFound)?;
-            let manifest = plugin
-                .get_system(system_type_id.1)
-                .ok_or(SceneError::SystemNotFound)?;
-            // Resolve dependency names to stable keys so storage can check presence
-            // and build the dependency graph without string lookups.
-            let requires = manifest
-                .requires
-                .iter()
-                .map(|name| {
-                    plugin
-                        .resolve_system_type_slot(name)
-                        .map(|system| SystemTypeID(system_type_id.0, system))
-                        .ok_or_else(|| {
-                            SceneError::from(SystemError::DependencyNotFound(name.clone()))
-                        })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let wanted_by = manifest
-                .wanted_by
-                .iter()
-                .map(|name| {
-                    plugin
-                        .resolve_system_type_slot(name)
-                        .map(|system| SystemTypeID(system_type_id.0, system))
-                        .ok_or_else(|| {
-                            SceneError::from(SystemError::DependencyNotFound(name.clone()))
-                        })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let mut systems = self.systems.write().expect("scene system lock poisoned");
-            if systems.resolve_id(&key).is_some() {
+        let result = (|| {
+            let key = system_type_id;
+            if self
+                .systems
+                .read()
+                .expect("scene system lock poisoned")
+                .resolve_id(&key)
+                .is_some()
+            {
                 return Err(SystemError::AlreadyExists.into());
             }
-            systems.add_system(key, manifest, type_ids, requires, wanted_by)?
-        };
 
-        if let Some((attacher, type_ids)) = attacher {
-            unsafe { attacher(self, type_ids.as_ptr(), type_ids.len()) };
+            // Resolve every requested type ID before creating or attaching the system.
+            let type_ids = self.resolve_requested_type_ids(system_type_id)?;
+            let (system_id, attacher) = {
+                let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+                let plugin = plugins
+                    .get(system_type_id.0)
+                    .ok_or(SceneError::SystemNotFound)?;
+                let manifest = plugin
+                    .get_system(system_type_id.1)
+                    .ok_or(SceneError::SystemNotFound)?;
+                // Resolve dependency names to stable keys so storage can check presence
+                // and build the dependency graph without string lookups.
+                let requires = manifest
+                    .requires
+                    .iter()
+                    .map(|name| {
+                        plugin
+                            .resolve_system_type_slot(name)
+                            .map(|system| SystemTypeID(system_type_id.0, system))
+                            .ok_or_else(|| {
+                                SceneError::from(SystemError::DependencyNotFound(name.clone()))
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let wanted_by = manifest
+                    .wanted_by
+                    .iter()
+                    .map(|name| {
+                        plugin
+                            .resolve_system_type_slot(name)
+                            .map(|system| SystemTypeID(system_type_id.0, system))
+                            .ok_or_else(|| {
+                                SceneError::from(SystemError::DependencyNotFound(name.clone()))
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut systems = self.systems.write().expect("scene system lock poisoned");
+                if systems.resolve_id(&key).is_some() {
+                    return Err(SystemError::AlreadyExists.into());
+                }
+                systems.add_system(key, manifest, type_ids, requires, wanted_by)?
+            };
+
+            if let Some((attacher, type_ids)) = attacher {
+                unsafe { attacher(self, type_ids.as_ptr(), type_ids.len()) };
+            }
+            Ok(system_id)
+        })();
+        match &result {
+            Ok(id) => self.debug(format!("Added system {id:?}")),
+            Err(error) => self.warning(format!(
+                "Could not add system type {system_type_id:?}: {error}"
+            )),
         }
-        Ok(system_id)
+        result
     }
 
     /// Removes a concrete system and runs its detacher.
     ///
     /// Removal fails while another active system requires this system.
     pub fn remove_system(&self, system_id: SystemID) -> Result<(), SceneError> {
-        let system = self
-            .systems
-            .write()
-            .expect("scene system lock poisoned")
-            .remove(system_id)?;
-        self.run_detacher(system);
-        Ok(())
+        let result = (|| {
+            let system = self
+                .systems
+                .write()
+                .expect("scene system lock poisoned")
+                .remove(system_id)?;
+            self.run_detacher(system);
+            Ok(())
+        })();
+        match &result {
+            Ok(()) => self.debug(format!("Removed system {system_id:?}")),
+            Err(error) => self.warning(format!("Could not remove system {system_id:?}: {error}")),
+        }
+        result
     }
 
     /// Runs every system once, in parallel where dependencies allow it.
@@ -972,6 +1084,7 @@ impl Scene {
             }
         }
         self.thread_pool.wait_until_idle();
+        self.debug(format!("Ran systems: {system_count}"));
     }
 }
 
