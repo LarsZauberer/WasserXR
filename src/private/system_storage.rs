@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use petgraph::{algo::is_cyclic_directed, graphmap::DiGraphMap};
 
 use crate::{
@@ -7,6 +9,7 @@ use crate::{
         id_store::IDStore,
         manifests::systems::SystemManifest,
         system::{AttacherData, System},
+        system_storage_snapshot::{SystemSchedule, SystemStorageSnapshot},
     },
 };
 
@@ -14,9 +17,19 @@ use crate::{
 #[derive(Debug, Default)]
 pub(crate) struct SystemStorage {
     pub(super) systems: IDStore<SystemTypeID, SystemSlot, System>,
+    schedule: Option<Arc<SystemSchedule>>,
 }
 
 impl SystemStorage {
+    pub(crate) fn snapshot(&mut self) -> SystemStorageSnapshot {
+        if self.schedule.is_none() {
+            self.schedule = Some(Arc::new(SystemSchedule::new(self)));
+        }
+        SystemStorageSnapshot::new(Arc::clone(
+            self.schedule.as_ref().expect("schedule was just created"),
+        ))
+    }
+
     pub(crate) fn resolve_id(&self, key: &SystemTypeID) -> Option<SystemID> {
         self.systems
             .resolve_id(key)
@@ -65,6 +78,7 @@ impl SystemStorage {
         let system = System::new(key, manifest, type_ids, requires, wanted_by);
         let attachment = system.attacher();
         let system_id = SystemID(key.0, key.1, self.systems.insert_named(key, system));
+        self.schedule = None;
         Ok((system_id, attachment))
     }
 
@@ -78,10 +92,13 @@ impl SystemStorage {
         {
             return Err(SystemError::DependencyInUse.into());
         }
-        Ok(self.systems.remove(id.2).expect("system was just resolved"))
+        let system = self.systems.remove(id.2).expect("system was just resolved");
+        self.schedule = None;
+        Ok(system)
     }
 
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = System> + '_ {
+        self.schedule = None;
         self.systems.drain()
     }
 }

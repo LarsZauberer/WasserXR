@@ -1,11 +1,11 @@
 use std::{
     ffi::c_void,
     path::Path,
-    sync::{RwLock, mpsc},
+    sync::{Arc, RwLock, mpsc},
 };
 
 use crate::{
-    definitions::{fields::TypeHint, plugins::PluginDefinition},
+    definitions::{fields::TypeHint, plugins::PluginDefinition, systems::Runner},
     errors::{
         AssetError, ComponentError, PluginCompatibilityError, PluginError, SceneError, SystemError,
     },
@@ -24,7 +24,6 @@ use crate::{
         plugins::Plugin,
         system::System,
         system_storage::SystemStorage,
-        system_storage_snapshot::SystemStorageSnapshot,
         thread_pool::ThreadPool,
     },
     utils::ring::Ring,
@@ -1050,16 +1049,16 @@ impl Scene {
     /// Returns only after every scheduled system has finished and the scene's
     /// thread pool is idle.
     pub fn tick(&mut self) {
-        let mut snapshot =
-            SystemStorageSnapshot::new(&self.systems.read().expect("scene system lock poisoned"));
+        let mut snapshot = self
+            .systems
+            .write()
+            .expect("scene system lock poisoned")
+            .snapshot();
         let system_count = snapshot.len();
         let scene = self as *const Self as usize;
         let (completed, completions) = mpsc::channel();
 
-        let schedule = |(id, (runner, type_ids)): (
-            SystemID,
-            (crate::definitions::systems::Runner, Vec<TypeID>),
-        )| {
+        let schedule = |(id, (runner, type_ids)): (SystemID, (Runner, Arc<[TypeID]>))| {
             let completed = completed.clone();
             self.thread_pool.execute(move || {
                 // SAFETY: `tick` holds an exclusive borrow of the Scene and
