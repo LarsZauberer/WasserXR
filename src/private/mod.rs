@@ -8,6 +8,5 @@ pub(crate) mod manifests;
 pub(crate) mod plugins;
 pub(crate) mod system;
 pub(crate) mod system_storage;
-pub(crate) mod system_storage_snapshot;
 pub(crate) mod thread_pool;
 pub(crate) mod utils;
