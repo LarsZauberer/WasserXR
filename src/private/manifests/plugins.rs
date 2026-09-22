@@ -25,10 +25,10 @@ use crate::{
 /// # Design Decision
 ///
 /// Inside of the plugin everything has object type has it's own ID (see
-/// [`ComponentTypeID`], [`AssetTypeID`], ...). They are used to make allow
-/// cached resolution of the these types. For example, if a system want to
-/// always add a component, it can cache these TypeIDs and pass it to the system
-/// function.
+/// [`ComponentTypeID`](crate::ids::ComponentTypeID),
+/// [`AssetTypeID`](crate::ids::AssetTypeID), ...). They allow cached resolution
+/// of these types. For example, a system that always adds a component can cache
+/// these type IDs and pass them to the system function.
 #[derive(Debug)]
 pub(crate) struct PluginManifest {
     pub name: String,

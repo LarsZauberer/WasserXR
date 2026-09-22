@@ -7,9 +7,9 @@ use crate::{
 };
 
 /// A field is the concrete implementation of a field in a concrete
-/// [`Component`]. It contains the raw data structure that represents a field
-/// inside of a component. It groups together all the important information of a
-/// field
+/// [`Component`](crate::private::components::Component). It contains the raw
+/// data structure that represents a field inside of a component. It groups
+/// together all the important information of a field.
 ///
 /// It's responsibility is to create it from a [`ComponentFieldManifest`] and be
 /// concrete.

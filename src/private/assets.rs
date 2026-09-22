@@ -13,8 +13,9 @@ pub(crate) struct Asset {
     destroyer: Destroyer,
     /// # Design Decision
     ///
-    /// The [`AssetField`] record doesn't require an [`RwLock`] since all fields
-    /// are read-only by design. Hence, they don't need exclusive access
+    /// The [`AssetField`] record doesn't require an [`std::sync::RwLock`] since
+    /// all fields are read-only by design. Hence, they don't need exclusive
+    /// access.
     fields: IDStore<AssetFieldTypeID, AssetFieldSlot, AssetField>,
     data: *mut c_void,
 }
