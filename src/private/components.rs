@@ -82,22 +82,29 @@ impl Component {
             .ok_or(ComponentError::FieldNotFound)
     }
 
-    /// Resolves one field pointer under the caller's component lock.
-    ///
-    /// # Design decisions
-    ///
-    /// Access is checked per query entry, even if another entry upgraded the
-    /// component's lock to exclusive. This allows immutable fields to be read
-    /// alongside writes to other fields of the same component.
-    pub(crate) fn query_field(
+    /// Resolves and validates a field without invoking plugin code.
+    pub(crate) fn resolve_query_field_slot(
         &self,
-        field_type: FieldTypeID,
+        field_type_id: FieldTypeID,
+        access: AccessRequest,
+    ) -> Result<FieldSlot, ComponentError> {
+        let field = self.resolve_field_slot(field_type_id)?;
+        self.fields
+            .get(field)
+            .expect("resolved field exists")
+            .validate_access(access)?;
+        Ok(field)
+    }
+
+    /// Resolves one field pointer by its cached component-local slot.
+    pub(crate) fn query_field_slot(
+        &self,
+        field: FieldSlot,
         access: AccessRequest,
     ) -> Result<*mut c_void, ComponentError> {
         let field = self
             .fields
-            .resolve_id(&field_type)
-            .and_then(|field| self.fields.get(field))
+            .get(field)
             .ok_or(ComponentError::FieldNotFound)?;
         match access {
             AccessRequest::Read => Ok(field.get(self.data)?.cast_mut()),
