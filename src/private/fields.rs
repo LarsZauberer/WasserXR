@@ -3,6 +3,7 @@ use std::ffi::c_void;
 use crate::{
     definitions::fields::{Deserializer, Getter, Serializer},
     errors::FieldError,
+    field::AccessRequest,
     private::manifests::fields::{AssetFieldManifest, ComponentFieldManifest},
 };
 
@@ -23,6 +24,15 @@ pub(crate) struct ComponentField {
 }
 
 impl ComponentField {
+    /// Checks whether a query may access this field without invoking its
+    /// getter.
+    pub(crate) fn validate_access(&self, access: AccessRequest) -> Result<(), FieldError> {
+        if access == AccessRequest::Write && !self.mutable {
+            return Err(FieldError::NotMutable);
+        }
+        self.getter.map(drop).ok_or(FieldError::NoGetter)
+    }
+
     /// Get the field data from a component object
     pub(crate) fn get(&self, ptr: *const c_void) -> Result<*const c_void, FieldError> {
         match self.getter {
