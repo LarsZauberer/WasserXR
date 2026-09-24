@@ -172,6 +172,8 @@ const PLUGIN: PluginDefinition = PluginDefinition {
     asset_count: ASSETS.len(),
     systems: &SYSTEM,
     system_count: 1,
+    functions: std::ptr::null(),
+    function_count: 0,
 };
 
 fn load_test_plugin(

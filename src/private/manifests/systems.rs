@@ -25,6 +25,8 @@ pub(crate) struct SystemManifest {
 }
 
 impl Manifest<SystemDefinition> for SystemManifest {
+    type Error = SystemDefinitionError;
+
     unsafe fn checked_convert(value: SystemDefinition) -> Result<Self, SystemDefinitionError> {
         unsafe { value.validate()? };
         let name = unsafe { value.name() }.expect("validated system definitions have valid names");

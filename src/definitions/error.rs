@@ -21,6 +21,24 @@ pub enum PluginDefinitionError {
     SystemsIsNull(String),
     DuplicateSystemName(String),
     SystemInvalid(String, SystemDefinitionError),
+    FunctionsIsNull(String),
+    DuplicateFunctionName(String),
+    FunctionInvalid(String, FunctionDefinitionError),
+}
+
+/// Errors found while validating a raw global function definition.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FunctionDefinitionError {
+    NameIsNull,
+    NameIsNotUtf8,
+    NameIsEmpty,
+    FunctionIsNull(String),
+}
+
+/// Errors found while converting a function definition into a manifest.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FunctionManifestError {
+    DefinitionInvalid(FunctionDefinitionError),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -76,6 +94,26 @@ pub enum TypeIDRequestError {
     Component(StringError),
     Field(StringError),
     Asset(StringError),
+    Function(StringError),
+}
+
+impl From<StringError> for FunctionDefinitionError {
+    fn from(error: StringError) -> Self {
+        match error {
+            StringError::Null => Self::NameIsNull,
+            StringError::NotUtf8 => Self::NameIsNotUtf8,
+            StringError::Empty => Self::NameIsEmpty,
+        }
+    }
+}
+
+impl<N> From<(N, FunctionDefinitionError)> for PluginDefinitionError
+where
+    N: Into<String>,
+{
+    fn from((name, error): (N, FunctionDefinitionError)) -> Self {
+        Self::FunctionInvalid(name.into(), error)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -234,6 +272,13 @@ impl Display for PluginDefinitionError {
             Self::SystemInvalid(name, error) => {
                 write!(f, "plugin '{name}' has an invalid system: {error}")
             }
+            Self::FunctionsIsNull(name) => write!(f, "plugin '{name}' function list is null"),
+            Self::DuplicateFunctionName(name) => {
+                write!(f, "plugin contains duplicate function name '{name}'")
+            }
+            Self::FunctionInvalid(name, error) => {
+                write!(f, "plugin '{name}' has an invalid function: {error}")
+            }
         }
     }
 }
@@ -244,6 +289,7 @@ impl Error for PluginDefinitionError {
             Self::ComponentInvalid(_, error) => Some(error),
             Self::AssetInvalid(_, error) => Some(error),
             Self::SystemInvalid(_, error) => Some(error),
+            Self::FunctionInvalid(_, error) => Some(error),
             _ => None,
         }
     }
@@ -349,6 +395,7 @@ impl Display for TypeIDRequestError {
             Self::Component(error) => ("component", error),
             Self::Field(error) => ("field", error),
             Self::Asset(error) => ("asset", error),
+            Self::Function(error) => ("function", error),
         };
         write!(f, "{name} name {}", string_error(error))
     }
@@ -394,6 +441,35 @@ impl Error for SystemDefinitionError {
         match self {
             Self::TypeIDRequestInvalid(_, error) => Some(error),
             _ => None,
+        }
+    }
+}
+
+impl Display for FunctionDefinitionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NameIsNull => f.write_str("function name is null"),
+            Self::NameIsNotUtf8 => f.write_str("function name is not valid UTF-8"),
+            Self::NameIsEmpty => f.write_str("function name is empty"),
+            Self::FunctionIsNull(name) => write!(f, "function '{name}' callback is null"),
+        }
+    }
+}
+
+impl Error for FunctionDefinitionError {}
+
+impl Display for FunctionManifestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DefinitionInvalid(error) => write!(f, "invalid function definition: {error}"),
+        }
+    }
+}
+
+impl Error for FunctionManifestError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DefinitionInvalid(error) => Some(error),
         }
     }
 }

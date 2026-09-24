@@ -1,11 +1,16 @@
 use crate::utils::version::Version;
 use crate::{
-    definitions::{Definition, error::PluginDefinitionError, plugins::PluginDefinition},
-    ids::{AssetTypeSlot, ComponentTypeSlot, SystemTypeSlot},
+    definitions::{
+        Definition,
+        error::{FunctionManifestError, PluginDefinitionError},
+        plugins::PluginDefinition,
+    },
+    ids::{AssetTypeSlot, ComponentTypeSlot, FunctionTypeSlot, SystemTypeSlot},
     private::{
         id_store::IDStore,
         manifests::{
-            Manifest, assets::AssetManifest, components::ComponentManifest, systems::SystemManifest,
+            Manifest, assets::AssetManifest, components::ComponentManifest,
+            functions::FunctionManifest, systems::SystemManifest,
         },
     },
 };
@@ -32,9 +37,12 @@ pub(crate) struct PluginManifest {
     pub components: IDStore<String, ComponentTypeSlot, ComponentManifest>,
     pub assets: IDStore<String, AssetTypeSlot, AssetManifest>,
     pub systems: IDStore<String, SystemTypeSlot, SystemManifest>,
+    pub functions: IDStore<String, FunctionTypeSlot, FunctionManifest>,
 }
 
 impl Manifest<PluginDefinition> for PluginManifest {
+    type Error = PluginDefinitionError;
+
     unsafe fn checked_convert(value: PluginDefinition) -> Result<Self, PluginDefinitionError> {
         unsafe { value.validate()? };
         let name = unsafe { value.name() }.expect("validated definitions have valid names");
@@ -82,6 +90,23 @@ impl Manifest<PluginDefinition> for PluginManifest {
                     systems.insert_named(manifest.name.clone(), manifest);
                 }
                 systems
+            },
+            functions: {
+                let mut functions = IDStore::default();
+                let definitions = if value.function_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.functions, value.function_count) }
+                };
+                for function in definitions {
+                    let manifest = unsafe { FunctionManifest::checked_convert(*function) }
+                        .map_err(|error| {
+                            let FunctionManifestError::DefinitionInvalid(error) = error;
+                            PluginDefinitionError::FunctionInvalid(name.clone(), error)
+                        })?;
+                    functions.insert_named(manifest.name.clone(), manifest);
+                }
+                functions
             },
         })
     }

@@ -47,6 +47,8 @@ fn plugin() -> PluginDefinition {
         asset_count: 0,
         systems: std::ptr::null(),
         system_count: 0,
+        functions: std::ptr::null(),
+        function_count: 0,
     }
 }
 

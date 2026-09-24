@@ -27,6 +27,8 @@ new_key_type! {
     pub(crate) struct SystemSlot;
     /// Storage slot for a system type within a plugin manifest.
     pub(crate) struct SystemTypeSlot;
+    /// Storage slot for a function type within a plugin manifest.
+    pub(crate) struct FunctionTypeSlot;
 }
 
 /// Handle for an entity within a scene.
@@ -64,6 +66,10 @@ pub struct AssetFieldTypeID(
 /// Handle for a system type within a plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SystemTypeID(pub(crate) PluginSlot, pub(crate) SystemTypeSlot);
+
+/// Handle for a global function within a plugin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FunctionTypeID(pub(crate) PluginSlot, pub(crate) FunctionTypeSlot);
 
 /// Handle for a component attached to an entity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -110,6 +116,7 @@ pub enum TypeID {
     FieldTypeID(u64, u64, u64),
     AssetTypeID(u64, u64),
     AssetFieldTypeID(u64, u64, u64),
+    FunctionTypeID(u64, u64),
 }
 
 fn ffi(key: impl Key) -> u64 {
@@ -141,6 +148,12 @@ impl From<AssetTypeID> for TypeID {
 impl From<AssetFieldTypeID> for TypeID {
     fn from(AssetFieldTypeID(plugin, asset, field): AssetFieldTypeID) -> Self {
         Self::AssetFieldTypeID(ffi(plugin), ffi(asset), ffi(field))
+    }
+}
+
+impl From<FunctionTypeID> for TypeID {
+    fn from(FunctionTypeID(plugin, function): FunctionTypeID) -> Self {
+        Self::FunctionTypeID(ffi(plugin), ffi(function))
     }
 }
 
@@ -187,6 +200,17 @@ impl TryFrom<TypeID> for AssetFieldTypeID {
             TypeID::AssetFieldTypeID(plugin, asset, field) => {
                 Ok(Self(key(plugin), key(asset), key(field)))
             }
+            other => Err(other),
+        }
+    }
+}
+
+impl TryFrom<TypeID> for FunctionTypeID {
+    type Error = TypeID;
+
+    fn try_from(id: TypeID) -> Result<Self, Self::Error> {
+        match id {
+            TypeID::FunctionTypeID(plugin, function) => Ok(Self(key(plugin), key(function))),
             other => Err(other),
         }
     }

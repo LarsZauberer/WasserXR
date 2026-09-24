@@ -22,6 +22,8 @@ pub(crate) struct ComponentFieldManifest {
 }
 
 impl Manifest<ComponentFieldDefinition> for ComponentFieldManifest {
+    type Error = ComponentFieldDefinitionError;
+
     unsafe fn checked_convert(
         value: ComponentFieldDefinition,
     ) -> Result<Self, ComponentFieldDefinitionError> {
@@ -46,6 +48,8 @@ pub(crate) struct AssetFieldManifest {
 }
 
 impl Manifest<AssetFieldDefinition> for AssetFieldManifest {
+    type Error = AssetFieldDefinitionError;
+
     unsafe fn checked_convert(
         value: AssetFieldDefinition,
     ) -> Result<Self, AssetFieldDefinitionError> {

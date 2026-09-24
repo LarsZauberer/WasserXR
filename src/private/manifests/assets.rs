@@ -23,6 +23,8 @@ pub(crate) struct AssetManifest {
 }
 
 impl Manifest<AssetDefinition> for AssetManifest {
+    type Error = AssetDefinitionError;
+
     unsafe fn checked_convert(value: AssetDefinition) -> Result<Self, AssetDefinitionError> {
         unsafe { value.validate()? };
         let name = unsafe { value.name() }.expect("validated definitions have valid names");

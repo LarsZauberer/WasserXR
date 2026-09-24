@@ -25,6 +25,9 @@ pub enum TypeIDRequests {
         asset: *const c_char,
         field: *const c_char,
     },
+    FunctionTypeID {
+        function: *const c_char,
+    },
 }
 
 impl Definition for TypeIDRequests {
@@ -53,6 +56,9 @@ impl Definition for TypeIDRequests {
                 unsafe { validate_string(asset, |_| ()) }.map_err(TypeIDRequestError::Asset)?;
                 unsafe { validate_string(field, |_| ()) }.map_err(TypeIDRequestError::Field)
             }
+            Self::FunctionTypeID { function } => unsafe {
+                validate_string(function, |_| ()).map_err(TypeIDRequestError::Function)
+            },
         }
     }
 }

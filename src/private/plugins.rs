@@ -12,10 +12,13 @@ use uuid::Uuid;
 use crate::{
     definitions::plugins::PluginDefinition,
     errors::PluginError,
-    ids::{AssetFieldTypeSlot, AssetTypeSlot, ComponentTypeSlot, FieldTypeSlot, SystemTypeSlot},
+    ids::{
+        AssetFieldTypeSlot, AssetTypeSlot, ComponentTypeSlot, FieldTypeSlot, FunctionTypeSlot,
+        SystemTypeSlot,
+    },
     private::manifests::{
-        Manifest, assets::AssetManifest, components::ComponentManifest, plugins::PluginManifest,
-        systems::SystemManifest,
+        Manifest, assets::AssetManifest, components::ComponentManifest,
+        functions::FunctionManifest, plugins::PluginManifest, systems::SystemManifest,
     },
 };
 
@@ -156,5 +159,15 @@ impl Plugin {
     /// Returns the name of the system type identified by `id`.
     pub(crate) fn get_system_name(&self, id: SystemTypeSlot) -> Option<&str> {
         self.get_system(id).map(|system| system.name.as_str())
+    }
+
+    /// Resolves a function name to its plugin-local slot.
+    pub(crate) fn resolve_function_type_slot(&self, name: &str) -> Option<FunctionTypeSlot> {
+        self.manifest.functions.resolve_id(name)
+    }
+
+    /// Returns the function manifest identified by `id`.
+    pub(crate) fn get_function(&self, id: FunctionTypeSlot) -> Option<&FunctionManifest> {
+        self.manifest.functions.get(id)
     }
 }

@@ -85,6 +85,8 @@ const PLUGIN: PluginDefinition = PluginDefinition {
     asset_count: 0,
     systems: &SYSTEM,
     system_count: 1,
+    functions: std::ptr::null(),
+    function_count: 0,
 };
 
 fn system_definition(
@@ -117,6 +119,8 @@ fn load_systems(scene: &Scene, systems: &[SystemDefinition]) -> wasserxr::ids::P
         asset_count: 0,
         systems: systems.as_ptr(),
         system_count: systems.len(),
+        functions: std::ptr::null(),
+        function_count: 0,
     };
     unsafe { scene.load_static_plugin(plugin) }.unwrap()
 }

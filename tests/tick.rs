@@ -108,6 +108,8 @@ fn load_systems(scene: &Scene, systems: &[SystemDefinition]) -> PluginID {
         asset_count: 0,
         systems: systems.as_ptr(),
         system_count: systems.len(),
+        functions: std::ptr::null(),
+        function_count: 0,
     };
     unsafe { scene.load_static_plugin(plugin) }.unwrap()
 }

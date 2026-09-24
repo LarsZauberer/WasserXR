@@ -22,6 +22,8 @@ pub(crate) struct ComponentManifest {
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {
+    type Error = ComponentDefinitionError;
+
     unsafe fn checked_convert(
         value: ComponentDefinition,
     ) -> Result<Self, ComponentDefinitionError> {

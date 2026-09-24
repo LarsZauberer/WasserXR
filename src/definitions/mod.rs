@@ -51,5 +51,8 @@ pub mod assets;
 /// Define the raw system information
 pub mod systems;
 
+/// Define plugin-provided global functions.
+pub mod functions;
+
 /// Define requests for resolving type IDs
 pub mod type_id_requests;

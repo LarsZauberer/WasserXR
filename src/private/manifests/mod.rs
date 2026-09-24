@@ -1,10 +1,15 @@
 //! Manifests are the validated, Rust-native interpretation of raw C-compatible
 //! [`crate::definitions`] descriptors.
 
+use std::error::Error;
+
 use crate::definitions::Definition;
 
 /// Converts a raw definition into a validated manifest.
 pub(crate) trait Manifest<D: Definition>: Sized {
+    /// The error returned while validating and converting the definition.
+    type Error: Error;
+
     /// Validates and converts `definition`, consuming the raw descriptor.
     ///
     /// # Safety
@@ -24,12 +29,13 @@ pub(crate) trait Manifest<D: Definition>: Sized {
     /// We don't put the validation logic directly in here, because validating
     /// the definition doesn't depend on the manifests. To keep code where
     /// it's responsibility is and it has closer coupling, we keep it there.
-    unsafe fn checked_convert(definition: D) -> Result<Self, D::Error>;
+    unsafe fn checked_convert(definition: D) -> Result<Self, Self::Error>;
 }
 
 pub(crate) mod assets;
 pub(crate) mod components;
 pub(crate) mod fields;
+pub(crate) mod functions;
 pub(crate) mod plugins;
 pub(crate) mod systems;
 pub(crate) mod type_id_requests;

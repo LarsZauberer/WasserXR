@@ -12,8 +12,8 @@ use crate::{
     field::AccessRequest,
     ids::{
         AssetFieldID, AssetFieldTypeID, AssetID, AssetSlot, AssetTypeID, ComponentID,
-        ComponentTypeID, EntityID, EntitySlot, FieldID, FieldTypeID, PluginID, PluginSlot,
-        SystemID, SystemTypeID, TypeID,
+        ComponentTypeID, EntityID, EntitySlot, FieldID, FieldTypeID, FunctionTypeID, PluginID,
+        PluginSlot, SystemID, SystemTypeID, TypeID,
     },
     logging::{LogEntry, LogHandler, LogLevel, LogManager},
     private::{
@@ -480,6 +480,44 @@ impl Scene {
         unsafe { &*name }
     }
 
+    /// Resolves a global function name within a plugin.
+    pub fn resolve_function_type_id(
+        &self,
+        plugin_id: PluginID,
+        name: &str,
+    ) -> Result<FunctionTypeID, SceneError> {
+        self.plugins
+            .read()
+            .expect("scene plugin lock poisoned")
+            .get(plugin_id.0)
+            .and_then(|plugin| plugin.resolve_function_type_slot(name))
+            .map(|function| FunctionTypeID(plugin_id.0, function))
+            .ok_or(SceneError::FunctionNotFound)
+    }
+
+    /// Calls a global function with ordered opaque arguments.
+    ///
+    /// # Safety
+    /// Each argument must meet the callback's pointer and lifetime
+    /// requirements. The callback must uphold the scene's API safety
+    /// requirements.
+    pub unsafe fn run_function(
+        &self,
+        id: FunctionTypeID,
+        arguments: &[*mut c_void],
+    ) -> Result<(), SceneError> {
+        let function = {
+            let plugins = self.plugins.read().expect("scene plugin lock poisoned");
+            plugins
+                .get(id.0)
+                .and_then(|plugin| plugin.get_function(id.1))
+                .map(|manifest| manifest.function)
+                .ok_or(SceneError::FunctionNotFound)?
+        };
+        unsafe { function(self, arguments.as_ptr(), arguments.len()) };
+        Ok(())
+    }
+
     /// Resolves the type IDs requested by a system manifest.
     pub fn resolve_requested_type_ids(
         &self,
@@ -522,6 +560,9 @@ impl Scene {
                                 })
                         })
                     }
+                    TypeIDRequestManifest::FunctionTypeID { function } => plugin
+                        .resolve_function_type_slot(function)
+                        .map(|function| FunctionTypeID(system_type_id.0, function).into()),
                 };
                 type_id.ok_or(SceneError::RequestedTypeIDNotFound)
             })

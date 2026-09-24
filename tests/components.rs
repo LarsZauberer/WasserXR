@@ -129,6 +129,8 @@ const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {
     asset_count: 0,
     systems: std::ptr::null(),
     system_count: 0,
+    functions: std::ptr::null(),
+    function_count: 0,
 };
 
 fn reset_globals() {

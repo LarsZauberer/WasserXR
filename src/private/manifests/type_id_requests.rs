@@ -14,9 +14,12 @@ pub(crate) enum TypeIDRequestManifest {
     FieldTypeID { component: String, field: String },
     AssetTypeID { asset: String },
     AssetFieldTypeID { asset: String, field: String },
+    FunctionTypeID { function: String },
 }
 
 impl Manifest<TypeIDRequests> for TypeIDRequestManifest {
+    type Error = TypeIDRequestError;
+
     unsafe fn checked_convert(value: TypeIDRequests) -> Result<Self, TypeIDRequestError> {
         unsafe { value.validate()? };
         let string = |pointer| {
@@ -38,6 +41,9 @@ impl Manifest<TypeIDRequests> for TypeIDRequestManifest {
             TypeIDRequests::AssetFieldTypeID { asset, field } => Self::AssetFieldTypeID {
                 asset: string(asset),
                 field: string(field),
+            },
+            TypeIDRequests::FunctionTypeID { function } => Self::FunctionTypeID {
+                function: string(function),
             },
         })
     }

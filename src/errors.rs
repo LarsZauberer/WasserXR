@@ -71,6 +71,7 @@ pub enum SceneError {
     AssetNotFound,
     AssetError(AssetError),
     SystemNotFound,
+    FunctionNotFound,
     RequestedTypeIDNotFound,
     SystemError(SystemError),
 }
@@ -89,6 +90,7 @@ impl Display for SceneError {
             Self::AssetNotFound => f.write_str("asset not found"),
             Self::AssetError(error) => write!(f, "asset error: {error}"),
             Self::SystemNotFound => f.write_str("system not found"),
+            Self::FunctionNotFound => f.write_str("function not found"),
             Self::RequestedTypeIDNotFound => f.write_str("requested type ID not found"),
             Self::SystemError(error) => write!(f, "system error: {error}"),
         }

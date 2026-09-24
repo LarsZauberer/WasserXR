@@ -5,7 +5,7 @@ use std::{collections::HashSet, ffi::c_char};
 use crate::{
     definitions::{
         Definition, assets::AssetDefinition, components::ComponentDefinition,
-        error::PluginDefinitionError, systems::SystemDefinition,
+        error::PluginDefinitionError, functions::FunctionDefinition, systems::SystemDefinition,
     },
     utils::ffi::validate_string,
     utils::version::Version,
@@ -31,8 +31,9 @@ use crate::{
 /// remain valid for the lifetime of the plugin definition.
 /// The asset array follows the same convention.
 /// The system array follows the same convention.
-/// Component, asset, and system names must be unique within the plugin, and
-/// field names must be unique within their component or asset.
+/// The function array follows the same convention.
+/// Component, asset, system, and function names must be unique within the
+/// plugin, and field names must be unique within their component or asset.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {
@@ -47,6 +48,9 @@ pub struct PluginDefinition {
 
     pub systems: *const SystemDefinition,
     pub system_count: usize,
+
+    pub functions: *const FunctionDefinition,
+    pub function_count: usize,
 }
 
 impl Definition for PluginDefinition {
@@ -145,6 +149,26 @@ impl Definition for PluginDefinition {
                 unsafe { system.name() }.expect("validated system definitions have valid names");
             if !system_names.insert(system_name.clone()) {
                 return Err(PluginDefinitionError::DuplicateSystemName(system_name));
+            }
+        }
+
+        let functions = if self.function_count == 0 {
+            &[]
+        } else {
+            if self.functions.is_null() {
+                return Err(PluginDefinitionError::FunctionsIsNull(name.clone()));
+            }
+            unsafe { std::slice::from_raw_parts(self.functions, self.function_count) }
+        };
+        let mut function_names = HashSet::new();
+        for function in functions {
+            if let Err(error) = unsafe { function.validate() } {
+                return Err((name.clone(), error).into());
+            }
+            let function_name = unsafe { function.name() }
+                .expect("validated function definitions have valid names");
+            if !function_names.insert(function_name.clone()) {
+                return Err(PluginDefinitionError::DuplicateFunctionName(function_name));
             }
         }
 
