@@ -51,6 +51,18 @@ pub enum ComponentDefinitionError {
     FieldsIsNull(String),
     DuplicateFieldName(String),
     FieldInvalid(String, ComponentFieldDefinitionError),
+    MethodsIsNull(String),
+    DuplicateMethodName(String),
+    MethodInvalid(String, MethodDefinitionError),
+}
+
+/// Errors found while validating a component method definition.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MethodDefinitionError {
+    NameIsNull,
+    NameIsNotUtf8,
+    NameIsEmpty,
+    MethodIsNull(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -141,6 +153,16 @@ impl From<StringError> for PluginDefinitionError {
 }
 
 impl From<StringError> for ComponentDefinitionError {
+    fn from(error: StringError) -> Self {
+        match error {
+            StringError::Null => Self::NameIsNull,
+            StringError::NotUtf8 => Self::NameIsNotUtf8,
+            StringError::Empty => Self::NameIsEmpty,
+        }
+    }
+}
+
+impl From<StringError> for MethodDefinitionError {
     fn from(error: StringError) -> Self {
         match error {
             StringError::Null => Self::NameIsNull,
@@ -310,6 +332,13 @@ impl Display for ComponentDefinitionError {
             Self::FieldInvalid(name, error) => {
                 write!(f, "component '{name}' has an invalid field: {error}")
             }
+            Self::MethodsIsNull(name) => write!(f, "component '{name}' method list is null"),
+            Self::DuplicateMethodName(name) => {
+                write!(f, "component contains duplicate method name '{name}'")
+            }
+            Self::MethodInvalid(name, error) => {
+                write!(f, "component '{name}' has an invalid method: {error}")
+            }
         }
     }
 }
@@ -318,10 +347,24 @@ impl Error for ComponentDefinitionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FieldInvalid(_, error) => Some(error),
+            Self::MethodInvalid(_, error) => Some(error),
             _ => None,
         }
     }
 }
+
+impl Display for MethodDefinitionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NameIsNull => f.write_str("method name is null"),
+            Self::NameIsNotUtf8 => f.write_str("method name is not valid UTF-8"),
+            Self::NameIsEmpty => f.write_str("method name is empty"),
+            Self::MethodIsNull(name) => write!(f, "method '{name}' callback is null"),
+        }
+    }
+}
+
+impl Error for MethodDefinitionError {}
 
 impl Display for ComponentFieldDefinitionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

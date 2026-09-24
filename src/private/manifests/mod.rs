@@ -34,8 +34,10 @@ pub(crate) trait Manifest<D: Definition>: Sized {
 
 pub(crate) mod assets;
 pub(crate) mod components;
+pub(crate) mod error;
 pub(crate) mod fields;
 pub(crate) mod functions;
+pub(crate) mod methods;
 pub(crate) mod plugins;
 pub(crate) mod systems;
 pub(crate) mod type_id_requests;

@@ -34,6 +34,7 @@ use crate::{
 /// The function array follows the same convention.
 /// Component, asset, system, and function names must be unique within the
 /// plugin, and field names must be unique within their component or asset.
+/// Method names must be unique within their component.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct PluginDefinition {

@@ -47,6 +47,8 @@ const VALID_EMPTY_COMPONENT: ComponentDefinition = ComponentDefinition {
     destroyer: Some(simple_destroyer),
     fields: std::ptr::null(),
     field_count: 0,
+    methods: std::ptr::null(),
+    method_count: 0,
 };
 
 const VALID_EMPTY_COMPONENT_PLUGIN: PluginDefinition = PluginDefinition {
@@ -77,6 +79,8 @@ const VALID_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
     destroyer: Some(simple_destroyer),
     fields: &VALID_COMPONENT_FIELD,
     field_count: 1,
+    methods: std::ptr::null(),
+    method_count: 0,
 };
 
 const VALID_COMPONENT_FIELD_PLUGIN: PluginDefinition = PluginDefinition {

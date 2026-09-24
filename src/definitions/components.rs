@@ -7,6 +7,7 @@ use std::{
 
 use crate::definitions::{
     Definition, error::ComponentDefinitionError, fields::ComponentFieldDefinition,
+    methods::MethodDefinition,
 };
 use crate::utils::ffi::validate_string;
 
@@ -34,11 +35,11 @@ pub type Destroyer = unsafe extern "C" fn(ptr: *mut c_void);
 
 /// This is the definition defining a component in WasserXR. It contains a
 /// pointer to all the functions to create, destroy the actual components and
-/// what kind of fields are included.
+/// what kind of fields and methods are included.
 ///
 /// The field array uses a C-compatible pointer/count pair. The pointer must
 /// remain valid for the duration of validation and while the definition is in
-/// use.
+/// use. The method array follows the same convention.
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct ComponentDefinition {
@@ -48,6 +49,9 @@ pub struct ComponentDefinition {
 
     pub fields: *const ComponentFieldDefinition,
     pub field_count: usize,
+
+    pub methods: *const MethodDefinition,
+    pub method_count: usize,
 }
 
 impl Definition for ComponentDefinition {
@@ -86,6 +90,26 @@ impl Definition for ComponentDefinition {
                 unsafe { field.name() }.expect("validated component fields have valid names");
             if !field_names.insert(field_name.clone()) {
                 return Err(ComponentDefinitionError::DuplicateFieldName(field_name));
+            }
+        }
+
+        let methods = if self.method_count == 0 {
+            &[]
+        } else {
+            if self.methods.is_null() {
+                return Err(ComponentDefinitionError::MethodsIsNull(name.clone()));
+            }
+            unsafe { std::slice::from_raw_parts(self.methods, self.method_count) }
+        };
+
+        let mut method_names = HashSet::new();
+        for method in methods {
+            unsafe { method.validate() }
+                .map_err(|error| ComponentDefinitionError::MethodInvalid(name.clone(), error))?;
+            let method_name =
+                unsafe { method.name() }.expect("validated component methods have valid names");
+            if !method_names.insert(method_name.clone()) {
+                return Err(ComponentDefinitionError::DuplicateMethodName(method_name));
             }
         }
 

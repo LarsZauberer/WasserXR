@@ -107,6 +107,8 @@ const VALID_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
     destroyer: Some(simple_destroyer),
     fields: VALID_COMPONENT_FIELDS.as_ptr(),
     field_count: VALID_COMPONENT_FIELDS.len(),
+    methods: std::ptr::null(),
+    method_count: 0,
 };
 
 const OTHER_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
@@ -115,6 +117,8 @@ const OTHER_COMPONENT_WITH_FIELD: ComponentDefinition = ComponentDefinition {
     destroyer: Some(simple_destroyer),
     fields: VALID_COMPONENT_FIELDS.as_ptr(),
     field_count: VALID_COMPONENT_FIELDS.len(),
+    methods: std::ptr::null(),
+    method_count: 0,
 };
 
 const COMPONENTS: [ComponentDefinition; 2] =

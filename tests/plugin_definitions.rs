@@ -66,6 +66,8 @@ fn rejects_duplicate_plugin_definition_names() {
             destroyer: Some(destroyer),
             fields: std::ptr::null(),
             field_count: 0,
+            methods: std::ptr::null(),
+            method_count: 0,
         },
         ComponentDefinition {
             name: c"Transform".as_ptr(),
@@ -73,6 +75,8 @@ fn rejects_duplicate_plugin_definition_names() {
             destroyer: Some(destroyer),
             fields: std::ptr::null(),
             field_count: 0,
+            methods: std::ptr::null(),
+            method_count: 0,
         },
     ];
     let mut definition = plugin();

@@ -74,6 +74,8 @@ const COMPONENTS: [ComponentDefinition; 1] = [ComponentDefinition {
     destroyer: Some(destroy),
     fields: FIELDS.as_ptr(),
     field_count: FIELDS.len(),
+    methods: std::ptr::null(),
+    method_count: 0,
 }];
 
 const PLUGIN: PluginDefinition = PluginDefinition {

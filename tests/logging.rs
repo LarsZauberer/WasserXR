@@ -127,6 +127,8 @@ const COMPONENT: ComponentDefinition = ComponentDefinition {
     destroyer: Some(destroy_component),
     fields: std::ptr::null(),
     field_count: 0,
+    methods: std::ptr::null(),
+    method_count: 0,
 };
 
 const ASSETS: [AssetDefinition; 2] = [

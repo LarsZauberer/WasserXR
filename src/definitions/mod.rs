@@ -46,6 +46,9 @@ pub mod components;
 /// Define the raw fields in components and assets
 pub mod fields;
 
+/// Define raw component methods.
+pub mod methods;
+
 pub mod assets;
 
 /// Define the raw system information

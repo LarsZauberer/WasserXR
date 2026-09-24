@@ -4,10 +4,13 @@ use crate::{
         components::{ComponentDefinition, Creator, Destroyer},
         error::ComponentDefinitionError,
     },
-    ids::FieldTypeSlot,
+    ids::{FieldTypeSlot, MethodTypeSlot},
     private::{
         id_store::IDStore,
-        manifests::{Manifest, fields::ComponentFieldManifest},
+        manifests::{
+            Manifest, error::MethodManifestError, fields::ComponentFieldManifest,
+            methods::MethodManifest,
+        },
     },
 };
 
@@ -19,6 +22,7 @@ pub(crate) struct ComponentManifest {
     pub destroyer: Destroyer,
 
     pub fields: IDStore<String, FieldTypeSlot, ComponentFieldManifest>,
+    pub methods: IDStore<String, MethodTypeSlot, MethodManifest>,
 }
 
 impl Manifest<ComponentDefinition> for ComponentManifest {
@@ -50,6 +54,26 @@ impl Manifest<ComponentDefinition> for ComponentManifest {
                     fields.insert_named(manifest.name.clone(), manifest);
                 }
                 fields
+            },
+            methods: {
+                let mut methods = IDStore::default();
+                let definitions = if value.method_count == 0 {
+                    &[]
+                } else {
+                    unsafe { std::slice::from_raw_parts(value.methods, value.method_count) }
+                };
+                for method in definitions {
+                    let manifest =
+                        unsafe { MethodManifest::checked_convert(*method) }.map_err(|error| {
+                            match error {
+                                MethodManifestError::InvalidDefinition(error) => {
+                                    ComponentDefinitionError::MethodInvalid(name.clone(), error)
+                                }
+                            }
+                        })?;
+                    methods.insert_named(manifest.name.clone(), manifest);
+                }
+                methods
             },
         })
     }

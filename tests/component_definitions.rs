@@ -28,6 +28,8 @@ fn component() -> ComponentDefinition {
         destroyer: Some(destroyer),
         fields: std::ptr::null(),
         field_count: 0,
+        methods: std::ptr::null(),
+        method_count: 0,
     }
 }
 

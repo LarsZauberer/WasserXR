@@ -19,6 +19,8 @@ new_key_type! {
     pub(crate) struct ComponentTypeSlot;
     /// Storage slot for a field type within a component manifest.
     pub(crate) struct FieldTypeSlot;
+    /// Storage slot for a method within a component manifest.
+    pub(crate) struct MethodTypeSlot;
     /// Storage slot for an asset type within a plugin manifest.
     pub(crate) struct AssetTypeSlot;
     /// Storage slot for a field type within an asset manifest.
