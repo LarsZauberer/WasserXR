@@ -29,11 +29,16 @@ static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(C)]
 struct TestAsset {
     value: usize,
+    other: usize,
 }
 
 unsafe extern "C" fn create_asset() -> *mut c_void {
     CREATE_COUNT.fetch_add(1, Ordering::Relaxed);
-    Box::into_raw(Box::new(TestAsset { value: 42 })).cast()
+    Box::into_raw(Box::new(TestAsset {
+        value: 42,
+        other: 7,
+    }))
+    .cast()
 }
 
 unsafe extern "C" fn fail_to_create_asset() -> *mut c_void {
@@ -56,19 +61,34 @@ unsafe extern "C" fn get_value(data: *const c_void) -> *mut c_void {
     }
 }
 
-const VALUE_FIELD: AssetFieldDefinition = AssetFieldDefinition {
-    name: c"value".as_ptr(),
-    type_hint: TypeHint::Usize as u32,
-    getter: Some(get_value),
-};
+unsafe extern "C" fn get_other(data: *const c_void) -> *mut c_void {
+    unsafe {
+        (&raw const (*(data.cast::<TestAsset>())).other)
+            .cast_mut()
+            .cast()
+    }
+}
+
+const FIELDS: [AssetFieldDefinition; 2] = [
+    AssetFieldDefinition {
+        name: c"value".as_ptr(),
+        type_hint: TypeHint::Usize as u32,
+        getter: Some(get_value),
+    },
+    AssetFieldDefinition {
+        name: c"other".as_ptr(),
+        type_hint: TypeHint::Usize as u32,
+        getter: Some(get_other),
+    },
+];
 
 const ASSETS: [AssetDefinition; 2] = [
     AssetDefinition {
         name: c"TestAsset".as_ptr(),
         creator: Some(create_asset),
         destroyer: Some(destroy_asset),
-        fields: &VALUE_FIELD,
-        field_count: 1,
+        fields: FIELDS.as_ptr(),
+        field_count: FIELDS.len(),
     },
     AssetDefinition {
         name: c"FailingAsset".as_ptr(),
@@ -163,9 +183,9 @@ fn different_data_strings_create_distinct_assets() {
     assert_eq!(CREATE_COUNT.load(Ordering::Relaxed), 2);
 }
 
-/// Whole-asset pointers preserve request order and repeat cached identities.
+/// Field pointers preserve request and field order, including duplicates.
 #[test]
-fn asset_query_returns_complete_assets_in_request_order() {
+fn asset_query_returns_fields_in_request_order() {
     let _guard = TEST_LOCK.lock().unwrap();
     reset_counts();
     let scene = scene();
@@ -173,33 +193,36 @@ fn asset_query_returns_complete_assets_in_request_order() {
     let field_type = scene
         .resolve_asset_field_type_id(asset_type, "value")
         .unwrap();
+    let other_type = scene
+        .resolve_asset_field_type_id(asset_type, "other")
+        .unwrap();
     let first_asset = scene.get_asset_id(asset_type, "first").unwrap();
     scene
         .resolve_asset_field_id(first_asset, field_type)
         .unwrap();
     let requests = [
-        (asset_type, "second"),
-        (asset_type, "first"),
-        (asset_type, "second"),
+        (asset_type, "second", &[other_type, field_type][..]),
+        (asset_type, "first", &[field_type][..]),
+        (asset_type, "second", &[field_type, field_type][..]),
     ];
 
     let mut first_pointer = std::ptr::null();
     scene
-        .with_asset_fields(&[(asset_type, "first")], |pointers| {
+        .with_asset_fields(&[(asset_type, "first", &[field_type])], |pointers| {
             first_pointer = pointers[0];
         })
         .unwrap();
     let mut calls = 0;
     scene
-        .with_asset_fields(&requests, |assets| {
+        .with_asset_fields(&requests, |fields| {
             calls += 1;
-            assert_eq!(assets.len(), 3);
-            assert_eq!(assets[0], assets[2]);
-            assert_eq!(assets[1], first_pointer);
-            assert_ne!(assets[0], assets[1]);
-            for value in assets {
-                assert_eq!(unsafe { (*value.cast::<TestAsset>()).value }, 42);
-            }
+            assert_eq!(fields.len(), 5);
+            assert_eq!(unsafe { *fields[0].cast::<usize>() }, 7);
+            assert_eq!(unsafe { *fields[1].cast::<usize>() }, 42);
+            assert_eq!(fields[1], fields[3]);
+            assert_eq!(fields[3], fields[4]);
+            assert_eq!(fields[2], first_pointer);
+            assert_ne!(fields[1], fields[2]);
         })
         .unwrap();
     assert_eq!(calls, 1);
@@ -223,6 +246,12 @@ fn missing_asset_field_is_rejected() {
         scene.resolve_asset_field_id(asset, missing),
         Err(SceneError::AssetError(AssetError::FieldNotFound))
     ));
+    assert!(matches!(
+        scene.with_asset_fields(&[(asset_type, "field", &[missing])], |_| {
+            panic!("missing field called callback")
+        }),
+        Err(SceneError::AssetError(AssetError::FieldNotFound))
+    ));
 }
 
 /// Empty queries call once; failures skip the callback and release cache locks.
@@ -241,8 +270,16 @@ fn asset_query_empty_and_failure_behavior() {
         })
         .unwrap();
     assert_eq!(calls, 1);
+    scene
+        .with_asset_fields(&[(valid, "fieldless", &[])], |pointers| {
+            calls += 1;
+            assert!(pointers.is_empty());
+        })
+        .unwrap();
+    assert_eq!(calls, 2);
+    assert!(scene.resolve_asset_id(valid, "fieldless").is_ok());
     assert!(matches!(
-        scene.with_asset_fields(&[(valid, "ok"), (failing, "bad")], |_| {
+        scene.with_asset_fields(&[(valid, "ok", &[]), (failing, "bad", &[])], |_| {
             panic!("failed query called callback");
         }),
         Err(SceneError::AssetError(AssetError::CreationFailure))
@@ -253,7 +290,7 @@ fn asset_query_empty_and_failure_behavior() {
     };
     let missing = AssetTypeID::try_from(TypeID::AssetTypeID(plugin, u64::MAX)).unwrap();
     assert!(matches!(
-        scene.with_asset_fields(&[(missing, "missing")], |_| {
+        scene.with_asset_fields(&[(missing, "missing", &[])], |_| {
             panic!("invalid query called callback");
         }),
         Err(SceneError::AssetNotFound)
@@ -269,15 +306,18 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
     reset_counts();
     let scene = Arc::new(scene());
     let asset_type = asset_type(&scene, "TestAsset").unwrap();
+    let field_type = scene
+        .resolve_asset_field_type_id(asset_type, "value")
+        .unwrap();
     let (locked, locked_rx) = mpsc::channel();
     let (release, release_rx) = mpsc::channel();
     let reader_scene = Arc::clone(&scene);
     let reader = thread::spawn(move || {
         reader_scene
-            .with_asset_fields(&[(asset_type, "first")], |pointers| {
+            .with_asset_fields(&[(asset_type, "first", &[field_type])], |pointers| {
                 locked.send(()).unwrap();
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-                assert_eq!(unsafe { (*pointers[0].cast::<TestAsset>()).value }, 42);
+                assert_eq!(unsafe { *pointers[0].cast::<usize>() }, 42);
                 assert_eq!(DESTROY_COUNT.load(Ordering::Relaxed), 0);
             })
             .unwrap();
@@ -301,7 +341,9 @@ fn asset_query_keeps_data_alive_until_callback_finishes() {
 
     let panic = std::panic::catch_unwind(|| {
         scene
-            .with_asset_fields(&[(asset_type, "again")], |_| panic!("callback panic"))
+            .with_asset_fields(&[(asset_type, "again", &[field_type])], |_| {
+                panic!("callback panic")
+            })
             .unwrap();
     });
     assert!(panic.is_err());

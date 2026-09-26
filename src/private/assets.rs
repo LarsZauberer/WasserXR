@@ -63,16 +63,6 @@ impl Asset {
             .ok_or(AssetError::FieldNotFound)
     }
 
-    /// Returns the complete asset's immutable plugin data.
-    ///
-    /// # Design decisions
-    ///
-    /// Asset queries request whole assets, so no field lookup is needed. The
-    /// caller keeps the asset collection locked while exposing this pointer.
-    pub(crate) fn data(&self) -> *const c_void {
-        self.data.cast_const()
-    }
-
     /// Get the field pointer from an asset-local field slot.
     pub(crate) fn get_field(&self, id: AssetFieldSlot) -> Result<*const c_void, AssetError> {
         self.fields

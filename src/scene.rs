@@ -48,8 +48,9 @@ pub(crate) type AssetStorage = IDStore<(AssetTypeID, String), AssetSlot, Asset>;
 /// field types. An empty field slice still requires and locks the component.
 pub type ComponentQuery<'a> = (ComponentTypeID, AccessRequest, &'a [FieldTypeID]);
 
-/// One complete asset requested by plugin, asset type, and cache data string.
-pub type AssetQuery<'a> = (AssetTypeID, &'a str);
+/// One asset requirement: asset type, cache data string, and ordered field
+/// types. An empty field slice still loads the asset.
+pub type AssetQuery<'a> = (AssetTypeID, &'a str, &'a [AssetFieldTypeID]);
 
 /// The scene is the core object in WasserXR. It contains the main public API to
 /// access and maintain all ECS objects.
@@ -925,19 +926,20 @@ impl Scene {
     }
 
     /// Loads or reuses each requested asset, then calls `action` once with
-    /// pointers to complete asset data in request order, including duplicates.
-    /// An empty query calls `action` with an empty slice.
+    /// read-only field pointers in query order, then field order. Duplicate
+    /// requests and fields are retained. Empty queries and field lists
+    /// contribute no pointers; a fieldless request still loads its asset.
     ///
-    /// A load failure skips the callback; assets already loaded remain cached.
-    /// A concurrent reset between loading and locking can return
-    /// [`SceneError::AssetNotFound`]. Once locked, assets remain alive
-    /// throughout the callback. Data strings use the same cache semantics
-    /// as [`Self::get_asset_id`].
+    /// A load or field lookup failure skips the callback; assets already loaded
+    /// remain cached. A concurrent reset between loading and locking can
+    /// return [`SceneError::AssetNotFound`]. Once locked, assets remain
+    /// alive throughout the callback. Data strings use the same cache
+    /// semantics as [`Self::get_asset_id`].
     ///
     /// # Pointer and callback contract
     ///
     /// Pointers may only be read during `action`, using the correct plugin
-    /// asset type. They must never be mutated. Do not call scene methods
+    /// field type. They must never be mutated. Do not call scene methods
     /// from `action` or wait for work needing the asset collection lock.
     /// The lock releases on return or panic.
     ///
@@ -953,12 +955,12 @@ impl Scene {
     ///
     /// ```no_run
     /// # use wasserxr::{scene::Scene, ids::*, errors::SceneError};
-    /// # struct Settings { scale: f32 }
-    /// # fn read(scene: &Scene, settings: AssetTypeID) -> Result<(), SceneError> {
-    /// scene.with_asset_fields(&[(settings, "default")], |assets| {
-    ///     // SAFETY: This plugin's settings asset uses the `Settings` layout.
-    ///     let settings = unsafe { &*assets[0].cast::<Settings>() };
-    ///     println!("{}", settings.scale);
+    /// # fn read(scene: &Scene, settings: AssetTypeID,
+    /// #         scale: AssetFieldTypeID) -> Result<(), SceneError> {
+    /// scene.with_asset_fields(&[(settings, "default", &[scale])], |fields| {
+    ///     // SAFETY: This plugin defines `scale` as an f32 field.
+    ///     let scale = unsafe { &*fields[0].cast::<f32>() };
+    ///     println!("{scale}");
     /// })?;
     /// # Ok(())
     /// # }
@@ -971,18 +973,17 @@ impl Scene {
         let result = (|| {
             let ids = query
                 .iter()
-                .map(|&(asset_type, data)| self.get_asset_id(asset_type, data))
+                .map(|&(asset_type, data, _)| self.get_asset_id(asset_type, data))
                 .collect::<Result<Vec<_>, _>>()?;
             let assets = self.assets.read().expect("scene asset lock poisoned");
-            let pointers = ids
-                .into_iter()
-                .map(|id| {
-                    assets
-                        .get(id.2)
-                        .map(Asset::data)
-                        .ok_or(SceneError::AssetNotFound)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut pointers = Vec::new();
+            for (id, &(_, _, fields)) in ids.into_iter().zip(query) {
+                let asset = assets.get(id.2).ok_or(SceneError::AssetNotFound)?;
+                for &field in fields {
+                    let slot = asset.resolve_field_slot(field)?;
+                    pointers.push(asset.get_field(slot)?);
+                }
+            }
             action(&pointers);
             Ok(())
         })();

@@ -506,7 +506,7 @@ fn instrumented_scene_operations_report_success() {
         .unwrap();
     let asset = scene.get_asset_id(asset_type, "bounded-data").unwrap();
     scene
-        .with_asset_fields(&[(asset_type, "bounded-data")], |_| {})
+        .with_asset_fields(&[(asset_type, "bounded-data", &[])], |_| {})
         .unwrap();
     let system = scene.add_system(system_type).unwrap();
     scene.tick();
@@ -570,7 +570,7 @@ fn instrumented_failures_report_warnings_without_success_entries() {
         .get_asset_id(failing_asset_type, "secret-input")
         .unwrap_err();
     let query_error = scene
-        .with_asset_fields(&[(failing_asset_type, "secret-input")], |_| {})
+        .with_asset_fields(&[(failing_asset_type, "secret-input", &[])], |_| {})
         .unwrap_err();
 
     let TypeID::ComponentTypeID(plugin, component_slot) = TypeID::from(component_type) else {
