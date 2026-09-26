@@ -6,6 +6,7 @@ pub(crate) mod id_store;
 pub(crate) mod macros;
 pub(crate) mod manifests;
 pub(crate) mod plugins;
+pub(crate) mod query_manager;
 pub(crate) mod system;
 pub(crate) mod system_storage;
 pub(crate) mod thread_pool;

@@ -18,10 +18,11 @@ use crate::{
     logging::{LogEntry, LogHandler, LogLevel, LogManager},
     private::{
         assets::Asset,
-        entities::{self, Entity},
+        entities::Entity,
         id_store::IDStore,
         manifests::{Manifest, plugins::PluginManifest, type_id_requests::TypeIDRequestManifest},
         plugins::Plugin,
+        query_manager::{self, QueryKey, QueryManager},
         system::System,
         system_storage::SystemStorage,
         thread_pool::ThreadPool,
@@ -63,6 +64,7 @@ pub struct Scene {
     logging: LogManager,
     systems: RwLock<SystemStorage>,
     entities: RwLock<EntityStorage>,
+    query_manager: RwLock<QueryManager>,
     plugins: RwLock<PluginStorage>,
     assets: RwLock<AssetStorage>,
     thread_pool: ThreadPool,
@@ -126,12 +128,9 @@ impl Scene {
     /// Creates a new entity and returns it's handle. The handle will be unique
     /// to every other entity ever created within this scene.
     pub fn add_entity(&self) -> EntityID {
-        let id = EntityID(
-            self.entities
-                .write()
-                .expect("scene entity lock poisoned")
-                .insert(Entity::new()),
-        );
+        let mut entities = self.entities.write().expect("scene entity lock poisoned");
+        let id = EntityID(entities.insert(Entity::new()));
+        drop(entities);
         self.debug(format!("Added entity {id:?}"));
         id
     }
@@ -142,13 +141,20 @@ impl Scene {
     /// If the entity couldn't be found with the handle, the function will
     /// return a [`SceneError::EntityNotFound`]
     pub fn remove_entity(&self, id: EntityID) -> Result<(), SceneError> {
+        let mut query_manager = self
+            .query_manager
+            .write()
+            .expect("scene query manager lock poisoned");
         let result = self
             .entities
             .write()
             .expect("scene entity lock poisoned")
             .remove(id.0)
             .ok_or(SceneError::EntityNotFound)
-            .map(drop);
+            .map(|entity| {
+                query_manager.entity_removed(id.0);
+                drop(entity);
+            });
         match &result {
             Ok(()) => self.debug(format!("Removed entity {id:?}")),
             Err(error) => self.warning(format!("Could not remove entity {id:?}: {error}")),
@@ -189,11 +195,16 @@ impl Scene {
         }
     }
 
-    /// Removes all entities and their components from the scene.
+    /// Removes all entities, their components, and cached component queries.
     pub fn reset_entities(&self) {
+        let mut query_manager = self
+            .query_manager
+            .write()
+            .expect("scene query manager lock poisoned");
         let mut entities = self.entities.write().expect("scene entity lock poisoned");
         let count = entities.keys().count();
         entities.clear();
+        query_manager.clear();
         drop(entities);
         self.debug(format!("Removed entities: {count}"));
     }
@@ -205,6 +216,18 @@ impl Scene {
         assets.clear();
         drop(assets);
         self.debug(format!("Removed cached assets: {count}"));
+    }
+
+    /// Evicts all cached component queries.
+    ///
+    /// Entries otherwise remain cached until this method, [`Self::reset`], or
+    /// scene destruction. [`Self::reset_entities`] also evicts the entire
+    /// cache because no existing concrete match can survive that reset.
+    pub fn reset_query_cache(&self) {
+        self.query_manager
+            .write()
+            .expect("scene query manager lock poisoned")
+            .clear();
     }
 
     /// This will reset the scene's main objects. Meaning it will remove all the
@@ -584,11 +607,16 @@ impl Scene {
                 .get(component_type_id.0)
                 .and_then(|plugin| plugin.get_component(component_type_id.1))
                 .ok_or(SceneError::NoComponentType)?;
+            let mut query_manager = self
+                .query_manager
+                .write()
+                .expect("scene query manager lock poisoned");
             self.with_entity(entity_id.0, |entity| {
-                entity
+                let component = entity
                     .add_component(component_type_id, manifest)
-                    .map(|component| ComponentID(entity_id.0, component))
-                    .map_err(SceneError::EntityError)
+                    .map_err(SceneError::EntityError)?;
+                query_manager.component_added(entity_id.0, entity, component_type_id);
+                Ok(ComponentID(entity_id.0, component))
             })
         })();
         match &result {
@@ -609,12 +637,22 @@ impl Scene {
         &self,
         component_type_id: ComponentTypeID,
     ) -> Result<EntityID, SceneError> {
+        // TODO: Perhaps rewrite this at some point with the QueryCache API
         let result = (|| {
             let plugins = self.plugins.read().expect("scene plugin lock poisoned");
             let manifest = plugins
                 .get(component_type_id.0)
                 .and_then(|plugin| plugin.get_component(component_type_id.1))
                 .ok_or(SceneError::NoComponentType)?;
+            // Intentionally take both write locks before looking for an
+            // existing singleton. A read-first fast path would have to release
+            // its locks, reacquire them for writing in manager-before-entity
+            // order, and repeat the lookup to prevent concurrent callers from
+            // creating duplicates. The single write-locked pass is simpler.
+            let mut query_manager = self
+                .query_manager
+                .write()
+                .expect("scene query manager lock poisoned");
             let mut entities = self.entities.write().expect("scene entity lock poisoned");
 
             if let Some((id, _)) = entities
@@ -630,6 +668,11 @@ impl Scene {
                 .expect("entity was just inserted")
                 .add_component(component_type_id, manifest)
                 .map_err(SceneError::from)?;
+            query_manager.component_added(
+                entity_slot,
+                entities.get(entity_slot).expect("entity was just inserted"),
+                component_type_id,
+            );
             Ok(EntityID(entity_slot))
         })();
         match &result {
@@ -647,10 +690,16 @@ impl Scene {
     ///
     /// The function may fail, if the [`EntityID`] cannot be found in the scene.
     pub fn remove_component(&self, component: ComponentID) -> Result<(), SceneError> {
+        let mut query_manager = self
+            .query_manager
+            .write()
+            .expect("scene query manager lock poisoned");
         let result = self.with_entity(component.0, |entity| {
             entity
                 .remove_component(component.1)
-                .map_err(SceneError::from)
+                .map_err(SceneError::from)?;
+            query_manager.component_removed(component);
+            Ok(())
         });
         match &result {
             Ok(()) => self.debug(format!("Removed component {component:?}")),
@@ -728,6 +777,7 @@ impl Scene {
         query: ComponentQuery<'_>,
         action: impl FnOnce(&[*mut c_void]),
     ) -> Result<(), SceneError> {
+        // TODO: Loop over this until it will always succeed.
         let result = (|| {
             let (component_type_id, _, fields) = query;
             self.ensure_singleton(component_type_id)?;
@@ -756,6 +806,8 @@ impl Scene {
         }
         result
     }
+
+    // TODO: When the macros are ready, adjust the example
 
     /// Calls `action` once with fields from all entities matching every query
     /// entry. Pointers are flattened in ascending entity ID order, then query
@@ -789,13 +841,12 @@ impl Scene {
     ///
     /// # Design decisions
     ///
-    /// Lock order is scene entities, entity component collections in ascending
-    /// entity ID order, then component data in ascending `(EntityID,
-    /// ComponentID)` order. Sorted maps both enforce this order and merge
-    /// duplicate locks. Output order is tracked separately so sorting never
-    /// rearranges requests. Collection read guards prevent removal while
-    /// pointers are in use. This simple scan also blocks component additions
-    /// and removals on unmatched entities until the callback finishes.
+    /// Lock order is query manager, scene entities, entity component
+    /// collections in ascending entity ID order, then component data in
+    /// ascending `(EntityID, ComponentID)` order. Sorted maps both enforce
+    /// this order and merge duplicate locks. Output order is tracked
+    /// separately so sorting never rearranges requests. Collection read
+    /// guards prevent removal from matched entities while pointers are in use.
     ///
     /// # Example
     ///
@@ -817,15 +868,48 @@ impl Scene {
         query: &[ComponentQuery<'_>],
         action: impl FnOnce(&[*mut c_void]),
     ) -> Result<(), SceneError> {
+        let key = QueryKey::from(query);
         let result = (|| {
-            if query.is_empty() {
-                action(&[]);
-                return Ok(());
+            let query_manager = self
+                .query_manager
+                .read()
+                .expect("scene query manager lock poisoned");
+            if let Some(matches) = query_manager.get(&key) {
+                // Query is already cached. Aquiring all the locks and execute the action with
+                // the locks
+                let entities = self.entities.read().expect("scene entity lock poisoned");
+                let collections = query_manager::lock_collections(&entities, matches);
+                return query_manager::execute(matches, &collections, action)
+                    .map_err(SceneError::from);
             }
+            drop(query_manager);
 
+            // The query is absent, so take exclusive access before building it.
+            let mut query_manager = self
+                .query_manager
+                .write()
+                .expect("scene query manager lock poisoned");
             let entities = self.entities.read().expect("scene entity lock poisoned");
-            entities::with_component_fields(entities.iter(), query, action)
-                .map_err(SceneError::from)
+
+            // Check again after replacing the shared manager lock with an
+            // exclusive one: another thread may have inserted this exact key
+            // during that lock gap. This avoids rebuilding and overwriting its
+            // result. On this miss path we clone the matches once and acquire
+            // their component-collection guards before releasing the manager;
+            // those guards keep every cached slot valid during execution.
+            let matches = if let Some(matches) = query_manager.get(&key) {
+                matches.to_vec()
+            } else {
+                let matches =
+                    query_manager::build_matches(&entities, &key).map_err(SceneError::from)?;
+                query_manager.insert(key.clone(), matches.clone());
+                matches
+            };
+            // Collection guards make the local snapshot safe after releasing
+            // exclusive access to the query manager.
+            let collections = query_manager::lock_collections(&entities, &matches);
+            drop(query_manager);
+            query_manager::execute(&matches, &collections, action).map_err(SceneError::from)
         })();
         match &result {
             Ok(()) => self.debug(format!(

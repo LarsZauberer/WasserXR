@@ -1,78 +1,13 @@
-use std::{collections::BTreeMap, ffi::c_void, sync::RwLock};
+use std::sync::RwLock;
 
 use crate::{
     errors::EntityError,
-    field::AccessRequest,
-    ids::{ComponentID, ComponentSlot, ComponentTypeID, EntitySlot, FieldSlot, FieldTypeID},
-    private::{
-        components::{Component, ComponentGuard},
-        id_store::IDStore,
-        manifests::components::ComponentManifest,
-    },
+    ids::{ComponentSlot, ComponentTypeID, FieldSlot, FieldTypeID},
+    private::{components::Component, id_store::IDStore, manifests::components::ComponentManifest},
 };
 
-type ComponentStorage = IDStore<ComponentTypeID, ComponentSlot, RwLock<Component>>;
-
-/// Calls `action` with fields from every entity matching every query entry.
-pub(crate) fn with_component_fields<'a>(
-    entities: impl Iterator<Item = (EntitySlot, &'a Entity)>,
-    query: &[(ComponentTypeID, AccessRequest, &[FieldTypeID])],
-    action: impl FnOnce(&[*mut c_void]),
-) -> Result<(), EntityError> {
-    // Acquire every collection guard before any component data guard.
-    let ordered_entities: BTreeMap<_, _> = entities.collect();
-    let collections: Vec<_> = ordered_entities
-        .iter()
-        .map(|(&id, entity)| {
-            (
-                id,
-                entity
-                    .components
-                    .read()
-                    .expect("entity component lock poisoned"),
-            )
-        })
-        .collect();
-
-    // Lock each component once in global order while retaining request order.
-    let mut locks = BTreeMap::new();
-    let mut requests = Vec::new();
-    for (entity_id, components) in &collections {
-        let ids: Option<Vec<_>> = query
-            .iter()
-            .map(|(component_type, _, _)| components.resolve_id(component_type))
-            .collect();
-        let Some(ids) = ids else { continue };
-
-        for (slot, &(_, access, fields)) in ids.into_iter().zip(query) {
-            let id = ComponentID(*entity_id, slot);
-            let component = components.get(slot).expect("resolved component exists");
-            let (_, lock_access) = locks.entry(id).or_insert((component, access));
-            if access == AccessRequest::Write {
-                *lock_access = AccessRequest::Write;
-            }
-            requests.push((id, access, fields));
-        }
-    }
-
-    let guards: BTreeMap<_, _> = locks
-        .into_iter()
-        .map(|(key, (component, access))| (key, ComponentGuard::lock(component, access)))
-        .collect();
-    let mut pointers = Vec::new();
-    for (key, access, fields) in requests {
-        for &field in fields {
-            pointers.push(
-                guards[&key]
-                    .component()
-                    .query_field(field, access)
-                    .map_err(EntityError::from)?,
-            );
-        }
-    }
-    action(&pointers);
-    Ok(())
-}
+/// Entity-local components indexed by type and stable generational slots.
+pub(crate) type ComponentStorage = IDStore<ComponentTypeID, ComponentSlot, RwLock<Component>>;
 
 /// The entity struct corresponds to the actual entity data. It stores the
 /// components it is carrying.
@@ -85,6 +20,12 @@ impl Entity {
     /// Create a new entity
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// Borrows the synchronized component store for cache resolution and
+    /// callback-scoped locking.
+    pub(crate) fn components(&self) -> &RwLock<ComponentStorage> {
+        &self.components
     }
 
     /// Runs an action with a component while holding the component collection's
@@ -178,7 +119,8 @@ impl Entity {
         self.with_component(id, |component| Ok(component.get_name().to_owned()))
     }
 
-    /// Get the [`Field`] name of a [`Component`]
+    /// Gets a [`ComponentField`](crate::private::fields::ComponentField) name
+    /// from its owning [`Component`].
     pub(crate) fn get_field_name(
         &self,
         component: ComponentSlot,
